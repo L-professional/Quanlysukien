@@ -6,7 +6,10 @@ import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
-import qrcode
+try:
+    import qrcode
+except ImportError:
+    qrcode = None
 
 logger = logging.getLogger("eventhub.email")
 logger.setLevel(logging.INFO)
@@ -14,6 +17,9 @@ logger.setLevel(logging.INFO)
 
 def generate_qr_base64(data: str) -> str:
     """Generate a PNG QR Code as a base64 encoded string."""
+    if qrcode is None:
+        logger.warning("qrcode package not installed, returning empty string.")
+        return ""
     try:
         qr = qrcode.QRCode(
             version=1,

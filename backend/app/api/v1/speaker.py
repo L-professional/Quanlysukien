@@ -40,16 +40,16 @@ class SlideLinkPayload(BaseModel):
 # ============================================================================
 @router.get("/my-sessions")
 async def get_my_sessions(
-    current_user: User = Depends(require_roles(["SPEAKER", "ADMIN", "EVENT_MANAGER"])),
+    current_user: User = Depends(require_roles(["SPEAKER", "ADMIN", "EVENT_MANAGER", "STAFF"])),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Get all sessions assigned to current speaker.
-    Admins and Event Managers see all sessions.
+    Admins, Event Managers and Staff see all sessions.
     """
     role_name = (await get_user_role_name(current_user, db)).upper()
 
-    if role_name in ["ADMIN", "EVENT_MANAGER"]:
+    if role_name in ["ADMIN", "EVENT_MANAGER", "STAFF"]:
         stmt = select(EventSchedule).order_by(EventSchedule.day_number, EventSchedule.start_time)
         res = await db.execute(stmt)
         schedules = res.scalars().all()
@@ -141,7 +141,7 @@ async def get_my_sessions(
 @router.get("/sessions/{session_id}")
 async def get_speaker_session_detail(
     session_id: int,
-    current_user: User = Depends(require_roles(["SPEAKER", "ADMIN", "EVENT_MANAGER"])),
+    current_user: User = Depends(require_roles(["SPEAKER", "ADMIN", "EVENT_MANAGER", "STAFF"])),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -230,7 +230,7 @@ async def get_speaker_session_qa(
     session_id: int,
     sort_by: str = Query("upvotes", description="Sort by 'upvotes' or 'created_at'"),
     status_filter: Optional[str] = Query(None, description="Filter by status: 'pending', 'answering', 'answered', 'pinned'"),
-    current_user: User = Depends(require_roles(["SPEAKER", "ADMIN", "EVENT_MANAGER"])),
+    current_user: User = Depends(require_roles(["SPEAKER", "ADMIN", "EVENT_MANAGER", "STAFF"])),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -280,7 +280,7 @@ async def get_speaker_session_qa(
 async def update_question_status(
     question_id: int,
     payload: QuestionStatusUpdate,
-    current_user: User = Depends(require_roles(["SPEAKER", "ADMIN", "EVENT_MANAGER"])),
+    current_user: User = Depends(require_roles(["SPEAKER", "ADMIN", "EVENT_MANAGER", "STAFF"])),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -335,7 +335,7 @@ async def upload_session_slide(
     file: Optional[UploadFile] = File(None),
     title: Optional[str] = Form(None),
     file_url: Optional[str] = Form(None),
-    current_user: User = Depends(require_roles(["SPEAKER", "ADMIN", "EVENT_MANAGER"])),
+    current_user: User = Depends(require_roles(["SPEAKER", "ADMIN", "EVENT_MANAGER", "STAFF"])),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -414,7 +414,7 @@ async def upload_session_slide(
 @router.delete("/resources/{resource_id}")
 async def delete_session_resource(
     resource_id: int,
-    current_user: User = Depends(require_roles(["SPEAKER", "ADMIN", "EVENT_MANAGER"])),
+    current_user: User = Depends(require_roles(["SPEAKER", "ADMIN", "EVENT_MANAGER", "STAFF"])),
     db: AsyncSession = Depends(get_db),
 ):
     """

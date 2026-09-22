@@ -49,20 +49,121 @@ import { EventScheduleItem } from '../types';
 import { apiService } from '../services/api';
 import { toast } from 'sonner';
 
-// Session Countdown & Progress Bar Sub-component
+/** Parse specific session's start date and time to timestamp */
+export function parseSessionStartTime(item: EventScheduleItem, activeEventStartDate?: string): number {
+  if (item.start_time) {
+    if (item.start_time.includes('T') || (item.start_time.includes('-') && item.start_time.includes(':'))) {
+      const d = new Date(item.start_time);
+      if (!isNaN(d.getTime())) return d.getTime();
+    }
+    const dmyMatch = item.start_time.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+    if (dmyMatch) {
+      const [, dd, mm, yyyy, hh = '00', min = '00'] = dmyMatch;
+      return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min), 0).getTime();
+    }
+  }
+
+  // Combine start_date + start_time
+  let yyyy = 2026, mm = 10, dd = 15;
+  const dateStr = item.start_date || (activeEventStartDate ? activeEventStartDate.split(' ')[0] : (item.day_number === 2 ? '16/10/2026' : '15/10/2026'));
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split(' ')[0].split('/');
+    if (parts.length === 3) {
+      dd = parseInt(parts[0], 10);
+      mm = parseInt(parts[1], 10);
+      yyyy = parseInt(parts[2], 10);
+    }
+  } else if (dateStr.includes('-')) {
+    const parts = dateStr.split('T')[0].split('-');
+    if (parts.length === 3) {
+      yyyy = parseInt(parts[0], 10);
+      mm = parseInt(parts[1], 10);
+      dd = parseInt(parts[2], 10);
+    }
+  }
+
+  let hh = 8, min = 30;
+  if (item.start_time) {
+    const ampmMatch = item.start_time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+    if (ampmMatch) {
+      let h = parseInt(ampmMatch[1], 10);
+      min = parseInt(ampmMatch[2], 10);
+      const ampm = ampmMatch[3]?.toUpperCase();
+      if (ampm === 'PM' && h < 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      hh = h;
+    }
+  }
+
+  const d = new Date(yyyy, mm - 1, dd, hh, min, 0);
+  return isNaN(d.getTime()) ? Date.now() : d.getTime();
+}
+
+/**
+ * Extract actual date "DD/MM/YYYY" dynamically from a schedule item
+ */
+export function extractItemDate(item: EventScheduleItem, activeEventStartDate?: string): string {
+  if (item.start_date) {
+    if (item.start_date.includes('/')) {
+      const match = item.start_date.match(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/);
+      if (match) return match[0];
+    }
+    if (item.start_date.includes('-')) {
+      const parts = item.start_date.split('T')[0].split('-');
+      if (parts.length === 3) {
+        return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+      }
+    }
+  }
+
+  if (item.date_label) {
+    const match = item.date_label.match(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/);
+    if (match) return match[0];
+  }
+
+  if (item.start_time) {
+    const match = item.start_time.match(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/);
+    if (match) return match[0];
+  }
+
+  if (activeEventStartDate) {
+    const match = activeEventStartDate.match(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/);
+    if (match) {
+      if (item.day_number && item.day_number > 1) {
+        const [d, m, y] = match[0].split('/').map(Number);
+        const nextDate = new Date(y, m - 1, d + (item.day_number - 1));
+        return `${String(nextDate.getDate()).padStart(2, '0')}/${String(nextDate.getMonth() + 1).padStart(2, '0')}/${nextDate.getFullYear()}`;
+      }
+      return match[0];
+    }
+  }
+
+  return item.day_number === 2 ? '16/10/2026' : '15/10/2026';
+}
+
+// Session Countdown & Progress Bar Sub-component with INDEPENDENT countdown
 const SessionCountdownProgress: React.FC<{
   item: EventScheduleItem;
-  now: Date;
-}> = ({ item, now }) => {
+  now?: Date;
+  activeEventStartDate?: string;
+}> = ({ item, now, activeEventStartDate }) => {
   const { t } = useTranslation();
-  const targetDateStr = item.day_number === 2 ? '2026-10-16T09:00:00' : '2026-10-15T09:00:00';
-  const targetTime = new Date(targetDateStr).getTime();
-  const diff = Math.max(0, targetTime - now.getTime());
+  // Independent 1-second interval ticker for this card instance
+  const [currentTimestamp, setCurrentTimestamp] = useState<number>(() => Date.now());
 
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTimestamp(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const targetTime = parseSessionStartTime(item, activeEventStartDate);
+  const currentTime = now ? now.getTime() : currentTimestamp;
+  const distance = targetTime - currentTime;
+
+  const days = Math.floor(Math.max(0, distance) / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((Math.max(0, distance) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((Math.max(0, distance) % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((Math.max(0, distance) % (1000 * 60)) / 1000);
 
   const pad = (num: number) => String(num).padStart(2, '0');
 
@@ -74,37 +175,49 @@ const SessionCountdownProgress: React.FC<{
   return (
     <div className="space-y-3 pt-3 border-t border-slate-200/80">
       <div className="space-y-1.5">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-          <Clock className="w-3.5 h-3.5 text-indigo-600" />
-          <span>{t('events.startsIn')}</span>
-        </div>
+        {distance <= 0 ? (
+          <div className="py-2.5 px-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center gap-2 font-bold text-xs shadow-2xs">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>Sự kiện đang diễn ra</span>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
+              <Clock className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{t('events.startsIn')}</span>
+            </div>
 
-        <div className="grid grid-cols-4 gap-1.5 text-center">
-          <div className="bg-slate-50 border border-slate-100 rounded-xl py-1.5 px-1">
-            <div className="text-xs sm:text-sm font-extrabold text-slate-900 font-mono leading-none">
-              {pad(days)}
+            <div className="grid grid-cols-4 gap-1.5 text-center">
+              <div className="bg-slate-50 border border-slate-100 rounded-xl py-1.5 px-1">
+                <div className="text-xs sm:text-sm font-extrabold text-slate-900 font-mono leading-none">
+                  {pad(days)}
+                </div>
+                <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-1">{t('events.days')}</div>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 rounded-xl py-1.5 px-1">
+                <div className="text-xs sm:text-sm font-extrabold text-slate-900 font-mono leading-none">
+                  {pad(hours)}
+                </div>
+                <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-1">{t('events.hrs')}</div>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 rounded-xl py-1.5 px-1">
+                <div className="text-xs sm:text-sm font-extrabold text-slate-900 font-mono leading-none">
+                  {pad(minutes)}
+                </div>
+                <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-1">{t('events.min')}</div>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 rounded-xl py-1.5 px-1">
+                <div className="text-xs sm:text-sm font-extrabold text-slate-900 font-mono leading-none">
+                  {pad(seconds)}
+                </div>
+                <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-1">{t('events.sec')}</div>
+              </div>
             </div>
-            <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-1">{t('events.days')}</div>
-          </div>
-          <div className="bg-slate-50 border border-slate-100 rounded-xl py-1.5 px-1">
-            <div className="text-xs sm:text-sm font-extrabold text-slate-900 font-mono leading-none">
-              {pad(hours)}
-            </div>
-            <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-1">{t('events.hrs')}</div>
-          </div>
-          <div className="bg-slate-50 border border-slate-100 rounded-xl py-1.5 px-1">
-            <div className="text-xs sm:text-sm font-extrabold text-slate-900 font-mono leading-none">
-              {pad(minutes)}
-            </div>
-            <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-1">{t('events.min')}</div>
-          </div>
-          <div className="bg-slate-50 border border-slate-100 rounded-xl py-1.5 px-1">
-            <div className="text-xs sm:text-sm font-extrabold text-slate-900 font-mono leading-none">
-              {pad(seconds)}
-            </div>
-            <div className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-1">{t('events.sec')}</div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
       <div className="space-y-1">
@@ -130,7 +243,7 @@ const SessionCountdownProgress: React.FC<{
 
 export const EventSchedule: React.FC = () => {
   const { t } = useTranslation();
-  const { events, activeEvent, selectEventById, removeEvent } = useEvent();
+  const { events, activeEvent, selectEventById, removeEvent, refreshEvents } = useEvent();
   const [isWifiModalOpen, setIsWifiModalOpen] = useState<boolean>(false);
   const [eventModalInitialTab, setEventModalInitialTab] = useState<'info' | 'maps'>('info');
   const [eventModalMode, setEventModalMode] = useState<'edit' | 'create'>('edit');
@@ -145,6 +258,7 @@ export const EventSchedule: React.FC = () => {
       await apiService.deleteEvent(activeEvent.id);
       toast.success(`Đã xóa sự kiện "${activeEvent.title}" thành công!`);
       removeEvent(activeEvent.id);
+      await refreshEvents();
       setIsDeleteConfirmModalOpen(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Không thể xóa sự kiện';
@@ -163,7 +277,7 @@ export const EventSchedule: React.FC = () => {
   }, []);
 
   // Filters
-  const [selectedDay, setSelectedDay] = useState<number | 'ALL'>('ALL');
+  const [selectedDate, setSelectedDate] = useState<string | 'ALL'>('ALL');
   const [selectedRoom, setSelectedRoom] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -183,9 +297,11 @@ export const EventSchedule: React.FC = () => {
   const [selectedSessionDetail, setSelectedSessionDetail] = useState<EventScheduleItem | null>(null);
 
   // Auth & RBAC Permissions
-  const { isAuthenticated, user, hasRole } = useAuth();
-  const canManageSchedule = hasRole(['ADMIN', 'EVENT_MANAGER', 'STAFF']);
-  const canManageEvent = hasRole(['ADMIN', 'EVENT_MANAGER']);
+  const { isAuthenticated, user, hasRole, selectedRole } = useAuth();
+  // Dynamic RBAC Permission Guard (Task 63: Staff có đầy đủ quyền bằng Manager)
+  const isAttendeeOnly = selectedRole === 'ATTENDEE';
+  const canManageEvent = (selectedRole ? (selectedRole === 'ORGANIZER' || selectedRole === 'ADMIN' || selectedRole === 'STAFF') : hasRole(['ADMIN', 'EVENT_MANAGER', 'STAFF'])) && !isAttendeeOnly;
+  const canManageSchedule = (selectedRole ? (selectedRole === 'ORGANIZER' || selectedRole === 'ADMIN' || selectedRole === 'STAFF') : hasRole(['ADMIN', 'EVENT_MANAGER', 'STAFF'])) && !isAttendeeOnly;
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [ticketModalData, setTicketModalData] = useState<TicketData | null>(null);
   const [registeringSession, setRegisteringSession] = useState<EventScheduleItem | null>(null);
@@ -233,13 +349,35 @@ export const EventSchedule: React.FC = () => {
   const [isEditingFeedback, setIsEditingFeedback] = useState<boolean>(false);
   const [existingFeedbackId, setExistingFeedbackId] = useState<number | null>(null);
   const [submittedFeedbackIds, setSubmittedFeedbackIds] = useState<number[]>(() => {
+    if (!user) return [];
     try {
-      const saved = localStorage.getItem('eventhub_submitted_feedback_sessions');
+      const saved = localStorage.getItem(`eventhub_submitted_feedback_${user.id}`);
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
   });
+
+  // Synchronize user-specific submitted feedback IDs when user or schedules change
+  useEffect(() => {
+    if (!user) {
+      setSubmittedFeedbackIds([]);
+      return;
+    }
+    const reviewedFromSchedule = schedules
+      .filter((s) => s.has_reviewed)
+      .map((s) => s.id);
+
+    let savedUserFeedback: number[] = [];
+    try {
+      const saved = localStorage.getItem(`eventhub_submitted_feedback_${user.id}`);
+      savedUserFeedback = saved ? JSON.parse(saved) : [];
+    } catch {
+      savedUserFeedback = [];
+    }
+    const merged = Array.from(new Set([...reviewedFromSchedule, ...savedUserFeedback]));
+    setSubmittedFeedbackIds(merged);
+  }, [user?.id, schedules]);
 
   // Card Level Action Menu & Edit/Delete States
   const [openCardMenuId, setOpenCardMenuId] = useState<number | null>(null);
@@ -479,7 +617,7 @@ export const EventSchedule: React.FC = () => {
           title="Xem vé QR Code & thông tin chi tiết"
         >
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" />
-          <span>✅ Đã Đăng Ký / Xem Vé QR</span>
+          <span>✅ {item.is_checked_in ? 'Đã Check-in / Xem Vé QR' : 'Đã Đăng Ký / Xem Vé QR'}</span>
         </button>
       );
     }
@@ -528,11 +666,11 @@ export const EventSchedule: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeEvent.id]);
+  }, [activeEvent.id, user?.id]);
 
   useEffect(() => {
     fetchSchedule(activeEvent.id);
-  }, [activeEvent.id, fetchSchedule]);
+  }, [activeEvent.id, user?.id, fetchSchedule]);
 
   // Task 34: Fetch persisted session reminders from server when logged in
   useEffect(() => {
@@ -983,14 +1121,16 @@ export const EventSchedule: React.FC = () => {
         console.warn('Session feedback submit:', e);
       }
 
-      // 3. Mark as submitted in state & localStorage to prevent duplicates
+      // 3. Mark as submitted in state & user-scoped localStorage
       const sessId = selectedSessionDetail.id;
       setSubmittedFeedbackIds((prev) => {
         const next = prev.includes(sessId) ? prev : [...prev, sessId];
-        try {
-          localStorage.setItem('eventhub_submitted_feedback_sessions', JSON.stringify(next));
-        } catch (e) {
-          console.error(e);
+        if (user?.id) {
+          try {
+            localStorage.setItem(`eventhub_submitted_feedback_${user.id}`, JSON.stringify(next));
+          } catch (e) {
+            console.error(e);
+          }
         }
         return next;
       });
@@ -1067,6 +1207,30 @@ export const EventSchedule: React.FC = () => {
       return;
     }
 
+    if (!newDate) {
+      toast.error('Vui lòng chọn ngày diễn ra phiên!');
+      return;
+    }
+
+    // 1. Chặn Tạo/Sửa Sự Kiện Thời Gian Trong Quá Khứ (Form Validation)
+    const [dY, dM, dD] = newDate.split('-').map(Number);
+    let sH = 8, sM = 0;
+    if (newStartTime) {
+      const ampmMatch = newStartTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+      if (ampmMatch) {
+        sH = parseInt(ampmMatch[1], 10);
+        sM = parseInt(ampmMatch[2], 10);
+        const ampm = ampmMatch[3]?.toUpperCase();
+        if (ampm === 'PM' && sH < 12) sH += 12;
+        if (ampm === 'AM' && sH === 12) sH = 0;
+      }
+    }
+    const sessionStart = new Date(dY, dM - 1, dD, sH, sM, 0);
+    if (isNaN(sessionStart.getTime()) || sessionStart.getTime() < Date.now()) {
+      toast.error('Thời gian bắt đầu sự kiện không được nằm trong quá khứ');
+      return;
+    }
+
     const formattedDate = newDate
       ? `${newDate.split('-')[2]}/${newDate.split('-')[1]}/${newDate.split('-')[0]}`
       : (newDay === 2 ? '16/10/2026' : '15/10/2026');
@@ -1082,7 +1246,7 @@ export const EventSchedule: React.FC = () => {
       end_time: newEndTime,
       room_location: newRoom.trim(),
       day_number: newDay,
-      date_label: newDate ? `Ngày ${newDate}` : `Ngày ${newDay}`,
+      date_label: formattedDate,
       track: newTrack.trim() || 'AI & Tech',
       description: newDesc.trim(),
       start_date: formattedDate,
@@ -1169,7 +1333,7 @@ export const EventSchedule: React.FC = () => {
     if (showMyAgendaOnly && !bookmarkedIds.includes(item.id)) {
       return false;
     }
-    if (selectedDay !== 'ALL' && item.day_number !== selectedDay) {
+    if (selectedDate !== 'ALL' && extractItemDate(item, activeEvent.start_date) !== selectedDate) {
       return false;
     }
     if (selectedRoom !== 'ALL' && item.room_location !== selectedRoom) {
@@ -1446,39 +1610,53 @@ export const EventSchedule: React.FC = () => {
       <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 p-4 bg-white rounded-2xl border border-slate-200/80 shadow-xs">
         {/* Multi-day Filter Tabs & My Agenda Toggle */}
         <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl border border-slate-200/60 overflow-x-auto">
+          {/* Nút "Tất cả các ngày" */}
           <button
+            type="button"
             onClick={() => {
               setShowMyAgendaOnly(false);
-              setSelectedDay('ALL');
+              setSelectedDate('ALL');
             }}
             className={`px-4 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-              !showMyAgendaOnly && selectedDay === 'ALL'
+              !showMyAgendaOnly && selectedDate === 'ALL'
                 ? 'bg-indigo-600 text-white shadow-2xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white'
             }`}
           >
-            {t('events.allDays')} ({schedules.length})
+            Tất cả các ngày ({schedules.length})
           </button>
-          {Array.from(new Set(schedules.map((s) => s.day_number)))
-            .sort((a, b) => a - b)
-            .map((day) => {
-              const count = schedules.filter((s) => s.day_number === day).length;
-              const sample = schedules.find((s) => s.day_number === day);
-              const label = sample?.date_label || `Ngày ${day}`;
+
+          {/* Các tab ngày thực tế được trích xuất động từ danh sách sự kiện hiện có */}
+          {Array.from(
+            new Set(schedules.map((s) => extractItemDate(s, activeEvent.start_date)))
+          )
+            .sort((a, b) => {
+              const parseDmy = (dStr: string) => {
+                const [d, m, y] = dStr.split('/').map(Number);
+                return new Date(y, m - 1, d).getTime();
+              };
+              return parseDmy(a) - parseDmy(b);
+            })
+            .map((dateStr) => {
+              const count = schedules.filter(
+                (s) => extractItemDate(s, activeEvent.start_date) === dateStr
+              ).length;
+              const isSelected = !showMyAgendaOnly && selectedDate === dateStr;
               return (
                 <button
-                  key={day}
+                  key={dateStr}
+                  type="button"
                   onClick={() => {
                     setShowMyAgendaOnly(false);
-                    setSelectedDay(day);
+                    setSelectedDate(dateStr);
                   }}
                   className={`px-4 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                    !showMyAgendaOnly && selectedDay === day
+                    isSelected
                       ? 'bg-indigo-600 text-white shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-white'
                   }`}
                 >
-                  {label} ({count})
+                  {dateStr} ({count})
                 </button>
               );
             })}
@@ -2159,6 +2337,10 @@ export const EventSchedule: React.FC = () => {
                   <label className="block font-medium text-slate-700 mb-1">Ngày Diễn Ra (Date)</label>
                   <input
                     type="date"
+                    min={(() => {
+                      const t = new Date();
+                      return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+                    })()}
                     value={newDate}
                     onChange={(e) => {
                       const val = e.target.value;

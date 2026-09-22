@@ -11,6 +11,7 @@ from app.models.notification import Notification
 from app.models.session_interaction import SessionQuestion, SessionMaterial, SessionFeedback, SessionResource
 from app.models.feedback import Feedback
 from app.models.reminder import UserReminder
+from app.models.user_session import UserSession
 
 __all__ = [
     "TimestampMixin",
@@ -34,5 +35,6 @@ __all__ = [
     "SessionResource",
     "Feedback",
     "UserReminder",
+    "UserSession",
 ]
 

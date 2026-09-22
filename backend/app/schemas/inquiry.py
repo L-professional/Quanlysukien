@@ -44,6 +44,20 @@ class InquiryResponse(BaseModel):
     updated_at: datetime
     replies: List[InquiryReplyResponse] = []
 
+    # Task 43: VIP, Urgency, RAG Telemetry & User QR Attachment
+    is_vip: bool = False
+    priority: str = "NORMAL"  # VIP | URGENT | NORMAL
+    participant_name: Optional[str] = None
+    participant_email: Optional[str] = None
+    participant_phone: Optional[str] = None
+    rag_source: Optional[str] = None
+    rag_similarity: Optional[float] = None
+    rag_doc_title: Optional[str] = None
+    rag_chunk_id: Optional[str] = None
+    rag_distance: Optional[float] = None
+    rag_snippet: Optional[str] = None
+    qr_code_token: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -66,8 +80,11 @@ class InquiryReviewResponse(BaseModel):
 
 class QuickPromptRequest(BaseModel):
     text: str = Field(..., description="Nội dung phản hồi cần xử lý")
-    prompt_type: str = Field(..., description="TRANSLATE | REWRITE_ENGAGING | INSERT_INFO")
+    prompt_type: str = Field(..., description="TRANSLATE | REWRITE_ENGAGING | INSERT_INFO | ATTACH_QR")
     target_language: Optional[str] = Field("en", description="Ngôn ngữ đích nếu là dịch thuật (en hoặc vi)")
+    inquiry_id: Optional[int] = Field(None, description="ID của inquiry để tra cứu thông tin liên quan nếu cần")
+    participant_id: Optional[int] = Field(None, description="ID người tham gia nếu có")
+    event_id: Optional[int] = Field(None, description="ID sự kiện nếu có")
 
 
 class QuickPromptResponse(BaseModel):
@@ -86,4 +103,46 @@ class BatchReviewResponse(BaseModel):
     approved_count: int
     rejected_count: int
     message: str
+
+
+class GenerateConciergeRequest(BaseModel):
+    event_id: int = Field(..., description="ID sự kiện cần tra cứu")
+    question: str = Field(..., min_length=2, description="Câu hỏi của khách tham dự")
+    participant_id: Optional[int] = Field(None, description="ID của khách tham dự nếu đã đăng nhập")
+    bilingual: Optional[bool] = Field(False, description="Bật chế độ phản hồi song ngữ Anh - Việt")
+    target_language: Optional[str] = Field("vi", description="Ngôn ngữ ưu tiên ('vi', 'en', 'bilingual')")
+
+
+class GenerateConciergeResponse(BaseModel):
+    draft_reply: str
+    ai_category: str
+    is_bilingual: bool
+    language: str
+    rag_similarity: float
+    rag_source: Optional[str] = None
+    rag_doc_title: Optional[str] = None
+    rag_chunk_id: Optional[str] = None
+    rag_distance: Optional[float] = None
+    rag_snippet: Optional[str] = None
+    contexts: List[dict] = []
+    is_fallback: bool = False
+
+
+class UserQRResponse(BaseModel):
+    inquiry_id: Optional[int] = None
+    participant_id: int
+    event_id: int
+    full_name: str
+    ticket_type: str
+    qr_code_token: str
+    is_vip: bool
+    formatted_snippet: str
+
+
+class AutoApproveResponse(BaseModel):
+    approved_count: int
+    threshold: float
+    approved_ids: List[int]
+    message: str
+
 

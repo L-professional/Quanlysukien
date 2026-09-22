@@ -65,7 +65,7 @@ export const CheckInScanner: React.FC = () => {
   };
 
   // Play audio tones using Web Audio API synthesizer
-  const playFeedbackSound = (type: 'SUCCESS' | 'ALREADY_USED' | 'INVALID') => {
+  const playFeedbackSound = (type: 'SUCCESS' | 'ALREADY_USED' | 'INVALID' | 'INVALID_EVENT') => {
     if (!soundEnabled) return;
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -191,6 +191,8 @@ export const CheckInScanner: React.FC = () => {
         toast.success(res.message);
       } else if (res.status === 'ALREADY_USED') {
         toast.warning(res.message);
+      } else if (res.status === 'INVALID_EVENT') {
+        toast.error(`⚠️ ${res.message}`);
       } else {
         toast.error(res.message);
       }
@@ -482,6 +484,8 @@ export const CheckInScanner: React.FC = () => {
                   ? 'bg-emerald-950/30 border-emerald-500/40 shadow-lg shadow-emerald-500/10'
                   : result.status === 'ALREADY_USED'
                   ? 'bg-amber-950/30 border-amber-500/40 shadow-lg shadow-amber-500/10'
+                  : result.status === 'INVALID_EVENT'
+                  ? 'bg-purple-950/30 border-purple-500/40 shadow-lg shadow-purple-500/10'
                   : 'bg-rose-950/30 border-rose-500/40 shadow-lg shadow-rose-500/10'
               }`}
             >
@@ -489,6 +493,7 @@ export const CheckInScanner: React.FC = () => {
                 <div className="mt-0.5">
                   {result.status === 'SUCCESS' && <CheckCircle2 className="w-8 h-8 text-emerald-400" />}
                   {result.status === 'ALREADY_USED' && <AlertTriangle className="w-8 h-8 text-amber-400" />}
+                  {result.status === 'INVALID_EVENT' && <AlertTriangle className="w-8 h-8 text-purple-400" />}
                   {result.status === 'INVALID' && <XCircle className="w-8 h-8 text-rose-400" />}
                 </div>
                 <div className="space-y-2 flex-1">
@@ -499,11 +504,14 @@ export const CheckInScanner: React.FC = () => {
                           ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                           : result.status === 'ALREADY_USED'
                           ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : result.status === 'INVALID_EVENT'
+                          ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                           : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                       }`}
                     >
                       {result.status === 'SUCCESS' && 'Xác thực thành công'}
                       {result.status === 'ALREADY_USED' && 'Cảnh báo: Vé đã check-in'}
+                      {result.status === 'INVALID_EVENT' && 'Không đúng sự kiện cổng quét'}
                       {result.status === 'INVALID' && 'Mã vé không hợp lệ'}
                     </span>
                     <h3 className="text-base font-bold text-white mt-1.5">{result.message}</h3>

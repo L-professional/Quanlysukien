@@ -7,6 +7,8 @@ export interface CatalogEvent {
   location: string;
   dateLabel: string;
   targetDate: string; // ISO string e.g. "2026-10-18T08:00:00"
+  start_time?: string;
+  start_date?: string;
   registeredCount: number;
   capacity: number;
   ticketType: string;
@@ -29,13 +31,15 @@ export const EventCatalogCard: React.FC<EventCatalogCardProps> = ({ event, onVie
     return () => clearInterval(timer);
   }, []);
 
-  const targetTime = new Date(event.targetDate).getTime();
-  const diff = Math.max(0, targetTime - now.getTime());
+  // Support event.start_time or targetDate
+  const targetDateStr = event.start_time || event.targetDate;
+  const targetTime = targetDateStr ? new Date(targetDateStr).getTime() : 0;
+  const distance = targetTime - now.getTime();
 
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+  const days = Math.floor(Math.max(0, distance) / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((Math.max(0, distance) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((Math.max(0, distance) % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((Math.max(0, distance) % (1000 * 60)) / 1000);
 
   const pad = (num: number) => String(num).padStart(2, '0');
   const percent = Math.min(100, Math.round((event.registeredCount / event.capacity) * 100));
@@ -66,38 +70,50 @@ export const EventCatalogCard: React.FC<EventCatalogCardProps> = ({ event, onVie
 
       {/* Countdown Timer Section */}
       <div className="space-y-1.5 pt-1">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-          <Clock className="w-3.5 h-3.5 text-indigo-600" />
-          <span>Starts in</span>
-        </div>
+        {distance <= 0 ? (
+          <div className="py-2.5 px-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center gap-2 font-bold text-xs shadow-2xs">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span>Sự kiện đang diễn ra</span>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+              <Clock className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Starts in</span>
+            </div>
 
-        {/* 4 Countdown Boxes matching exact UI screenshot */}
-        <div className="grid grid-cols-4 gap-2 text-center">
-          <div className="bg-slate-50 border border-slate-100 rounded-2xl py-2 px-1">
-            <div className="text-sm sm:text-base font-extrabold text-slate-900 font-mono leading-none">
-              {pad(days)}
+            {/* 4 Countdown Boxes */}
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl py-2 px-1">
+                <div className="text-sm sm:text-base font-extrabold text-slate-900 font-mono leading-none">
+                  {pad(days)}
+                </div>
+                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">NGÀY</div>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl py-2 px-1">
+                <div className="text-sm sm:text-base font-extrabold text-slate-900 font-mono leading-none">
+                  {pad(hours)}
+                </div>
+                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">GIỜ</div>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl py-2 px-1">
+                <div className="text-sm sm:text-base font-extrabold text-slate-900 font-mono leading-none">
+                  {pad(minutes)}
+                </div>
+                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">PHÚT</div>
+              </div>
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl py-2 px-1">
+                <div className="text-sm sm:text-base font-extrabold text-slate-900 font-mono leading-none">
+                  {pad(seconds)}
+                </div>
+                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">GIÂY</div>
+              </div>
             </div>
-            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">DAYS</div>
-          </div>
-          <div className="bg-slate-50 border border-slate-100 rounded-2xl py-2 px-1">
-            <div className="text-sm sm:text-base font-extrabold text-slate-900 font-mono leading-none">
-              {pad(hours)}
-            </div>
-            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">HRS</div>
-          </div>
-          <div className="bg-slate-50 border border-slate-100 rounded-2xl py-2 px-1">
-            <div className="text-sm sm:text-base font-extrabold text-slate-900 font-mono leading-none">
-              {pad(minutes)}
-            </div>
-            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">MIN</div>
-          </div>
-          <div className="bg-slate-50 border border-slate-100 rounded-2xl py-2 px-1">
-            <div className="text-sm sm:text-base font-extrabold text-slate-900 font-mono leading-none">
-              {pad(seconds)}
-            </div>
-            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">SEC</div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
       {/* Registration Capacity Progress Bar */}

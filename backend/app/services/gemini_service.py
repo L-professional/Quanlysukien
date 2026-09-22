@@ -95,11 +95,12 @@ class GeminiService:
         self,
         prompt: str,
         system_instruction: Optional[str] = None,
-        timeout_seconds: float = 15.0,
+        timeout_seconds: float = 20.0,
+        temperature: float = 0.4,
+        max_output_tokens: int = 2048,
     ) -> GeminiGenerationResult:
         """
-        Generate a draft answer using gemini-1.5-flash.
-        Falls back to a generic polite response if API is unavailable.
+        Generate a draft answer using gemini model with automatic fallback.
         """
         start_time = time.perf_counter()
 
@@ -118,23 +119,33 @@ class GeminiService:
 
         try:
             def _call_generate():
-                config = genai_types.GenerateContentConfig(
-                    temperature=0.2,
-                    max_output_tokens=1024,
-                )
+                config_kwargs = {
+                    "temperature": temperature,
+                    "max_output_tokens": max_output_tokens,
+                }
                 if system_instruction:
-                    config = genai_types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        temperature=0.2,
-                        max_output_tokens=1024,
-                    )
+                    config_kwargs["system_instruction"] = system_instruction
+                config = genai_types.GenerateContentConfig(**config_kwargs)
 
-                response = self._client.models.generate_content(  # type: ignore[union-attr]
-                    model=self.model_name,
-                    contents=prompt,
-                    config=config,
-                )
-                return response
+                # Try preferred model first, then fallback models
+                candidate_models = [self.model_name, "gemini-2.5-flash", "gemini-flash-latest"]
+                # Deduplicate while preserving order
+                seen = set()
+                models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]
+
+                last_err = None
+                for m in models_to_try:
+                    try:
+                        response = self._client.models.generate_content(
+                            model=m,
+                            contents=prompt,
+                            config=config,
+                        )
+                        return response
+                    except Exception as err:
+                        last_err = err
+                        logger.warning(f"Gemini model '{m}' call failed: {err}. Trying next fallback...")
+                raise last_err
 
             response = await asyncio.wait_for(
                 asyncio.to_thread(_call_generate),

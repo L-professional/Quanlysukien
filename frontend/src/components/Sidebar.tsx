@@ -13,8 +13,10 @@ import {
   ChevronDown,
   Mic,
   X,
+  Ticket,
+  Settings as SettingsIcon,
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, MockRole } from '../context/AuthContext';
 import { useEvent } from '../context/EventContext';
 import { useTranslation } from 'react-i18next';
 
@@ -78,6 +80,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { userRole } = useAuth();
   const { activeEvent } = useEvent();
 
+  // Current active role view derived from authenticated user role
+  const currentRole: MockRole =
+    userRole === 'ATTENDEE' || userRole === 'PARTICIPANT'
+      ? 'ATTENDEE'
+      : userRole === 'STAFF'
+      ? 'STAFF'
+      : userRole === 'EVENT_MANAGER'
+      ? 'ORGANIZER'
+      : 'ADMIN';
+
   // Real-time VN clock — tick every minute to recompute status
   const [_tick, setTick] = useState<number>(0);
   useEffect(() => {
@@ -85,97 +97,228 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  const eventStatus = computeEventStatus(activeEvent.start_date, activeEvent.end_date);
+  const eventStatus = computeEventStatus(activeEvent?.start_date, activeEvent?.end_date);
 
   const statusConfig = {
-    live:     { dot: 'bg-emerald-400 animate-pulse', text: 'text-emerald-400', label: '🟢 Live' },
-    upcoming: { dot: 'bg-blue-400',                  text: 'text-blue-400',    label: '🔵 Sắp diễn ra' },
-    ended:    { dot: 'bg-slate-500',                  text: 'text-slate-400',   label: '⚫ Đã kết thúc' },
-  } as const;
-  const sc = statusConfig[eventStatus];
+    live:     { dot: 'bg-emerald-400 animate-pulse', text: 'text-emerald-400', label: t('status.live', '🟢 Live') },
+    upcoming: { dot: 'bg-blue-400',                  text: 'text-blue-400',    label: t('status.upcoming', '🔵 Sắp diễn ra') },
+    ended:    { dot: 'bg-slate-500',                  text: 'text-slate-400',   label: t('status.ended', '⚫ Đã kết thúc') },
+  };
+  const sc = statusConfig[eventStatus || 'live'] || statusConfig.live;
 
   // Format start_date for display: "DD/MM/YYYY" only
   const displayDate = (() => {
-    const raw = activeEvent.start_date;
+    const raw = activeEvent?.start_date;
     if (!raw) return '';
     // Already DD/MM/YYYY format
     const match = raw.match(/(\d{2}\/\d{2}\/\d{4})/);
     return match ? match[1] : raw.slice(0, 10);
   })();
 
-  const menuItems: MenuItem[] = [
-    {
-      id: 'dashboard',
-      label: t('nav.dashboard'),
-      icon: LayoutDashboard,
-      roles: ['ADMIN', 'EVENT_MANAGER', 'STAFF'],
-    },
-    {
-      id: 'schedule',
-      label: t('nav.schedule'),
-      icon: Calendar,
-      roles: ['ADMIN', 'EVENT_MANAGER', 'STAFF', 'ATTENDEE', 'PARTICIPANT', 'SPEAKER'],
-    },
-    {
-      id: 'speaker',
-      label: 'Cổng Diễn Giả',
-      icon: Mic,
-      badge: 'Studio',
-      badgeColor: 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30',
-      roles: ['ADMIN', 'SPEAKER'],
-    },
-    {
-      id: 'scanner',
-      label: t('nav.scanner'),
-      icon: QrCode,
-      roles: ['ADMIN', 'STAFF', 'EVENT_MANAGER'],
-    },
-    {
-      id: 'inquiries',
-      label: t('nav.inquiries'),
-      icon: MessageSquare,
-      badge: `${pendingCount > 0 ? pendingCount : 5} ${t('nav.pending')}`,
-      badgeColor: 'bg-amber-400/20 text-amber-300 border border-amber-400/30',
-      roles: ['ADMIN', 'STAFF'],
-    },
-    {
-      id: 'content-studio',
-      label: t('nav.contentStudio'),
-      icon: Sparkles,
-      roles: ['ADMIN', 'EVENT_MANAGER'],
-    },
-    {
-      id: 'knowledge-base',
-      label: t('nav.knowledgeBase'),
-      icon: Database,
-      roles: ['ADMIN', 'EVENT_MANAGER'],
-    },
-    {
-      id: 'feedback',
-      label: t('nav.feedback'),
-      icon: Star,
-      roles: ['ADMIN', 'EVENT_MANAGER', 'STAFF'],
-    },
-    {
-      id: 'users',
-      label: t('nav.users'),
-      icon: Users,
-      roles: ['ADMIN'], // Chỉ ADMIN mới có quyền
-    },
-    {
-      id: 'logs',
-      label: t('nav.logs'),
-      icon: ShieldCheck,
-      roles: ['ADMIN', 'EVENT_MANAGER', 'STAFF'],
-    },
-  ];
+  // Build visible menu items strictly based on Dynamic RBAC (Task 63)
+  const visibleMenuItems: MenuItem[] = React.useMemo(() => {
+    if (currentRole === 'ATTENDEE') {
+      // Role 1 (Người tham dự - Attendee):
+      // Chỉ hiển thị: Vé QR của tôi, Sự kiện đã đăng ký.
+      // ẨN HOÀN TOÀN: AI Concierge (HITL), AI Feedback & Summary, cùng tất cả các chức năng quản trị.
+      return [
+        {
+          id: 'dashboard',
+          label: t('nav.myTickets', 'Vé QR của tôi'),
+          icon: Ticket,
+          badge: t('nav.myTicketBadge', 'Vé của tôi'),
+          badgeColor: 'bg-blue-400/20 text-blue-300 border border-blue-400/30',
+        },
+        {
+          id: 'schedule',
+          label: t('nav.registeredEvents', 'Sự kiện đã đăng ký'),
+          icon: Calendar,
+        },
+        {
+          id: 'settings',
+          label: t('nav.settings', 'Cài Đặt'),
+          icon: SettingsIcon,
+        },
+      ];
+    }
 
-  // Filter menu items by user role
-  const visibleMenuItems = menuItems.filter((item) => {
-    if (!item.roles) return true;
-    const current = userRole === 'PARTICIPANT' ? 'ATTENDEE' : userRole;
-    return item.roles.includes(current) || item.roles.includes(userRole);
-  });
+    if (currentRole === 'STAFF') {
+      // Role 2 (Nhân viên sự kiện - Staff):
+      // Task 64: Ẩn hoàn toàn 2 mục AI PR Studio và Kho Tri Thức RAG khỏi Sidebar dành cho vai trò Staff.
+      // Giữ lại 6 menu khả dụng + Cài Đặt.
+      return [
+        {
+          id: 'dashboard',
+          label: t('nav.dashboard'),
+          icon: LayoutDashboard,
+        },
+        {
+          id: 'schedule',
+          label: t('nav.schedule'),
+          icon: Calendar,
+        },
+        {
+          id: 'speaker',
+          label: t('nav.speaker', 'Cổng Diễn Giả'),
+          icon: Mic,
+          badge: 'Studio',
+          badgeColor: 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30',
+        },
+        {
+          id: 'scanner',
+          label: t('nav.scanner'),
+          icon: QrCode,
+        },
+        {
+          id: 'inquiries',
+          label: t('nav.inquiries', 'AI Concierge (HITL)'),
+          icon: MessageSquare,
+          badge: `${pendingCount > 0 ? pendingCount : 5} HITL`,
+          badgeColor: 'bg-amber-400/20 text-amber-300 border border-amber-400/30',
+        },
+        {
+          id: 'feedback',
+          label: t('nav.feedback', 'AI Feedback & Summary'),
+          icon: Star,
+          badge: 'Analytics',
+          badgeColor: 'bg-blue-400/20 text-blue-300 border border-blue-400/30',
+        },
+        {
+          id: 'settings',
+          label: t('nav.settings', 'Cài Đặt'),
+          icon: SettingsIcon,
+        },
+      ];
+    }
+
+    if (currentRole === 'ORGANIZER') {
+      // Role 3 (Quản lý sự kiện - Event Manager):
+      // Hiển thị đầy đủ 8 module quản trị sự kiện và AI (gồm cả AI PR Studio & Kho Tri Thức RAG) + Cài Đặt.
+      return [
+        {
+          id: 'dashboard',
+          label: t('nav.dashboard'),
+          icon: LayoutDashboard,
+        },
+        {
+          id: 'schedule',
+          label: t('nav.schedule'),
+          icon: Calendar,
+        },
+        {
+          id: 'speaker',
+          label: t('nav.speaker', 'Cổng Diễn Giả'),
+          icon: Mic,
+          badge: 'Studio',
+          badgeColor: 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30',
+        },
+        {
+          id: 'scanner',
+          label: t('nav.scanner'),
+          icon: QrCode,
+        },
+        {
+          id: 'inquiries',
+          label: t('nav.inquiries', 'AI Concierge (HITL)'),
+          icon: MessageSquare,
+          badge: `${pendingCount > 0 ? pendingCount : 5} HITL`,
+          badgeColor: 'bg-amber-400/20 text-amber-300 border border-amber-400/30',
+        },
+        {
+          id: 'content-studio',
+          label: t('nav.contentStudio', 'AI PR Studio'),
+          icon: Sparkles,
+          badge: 'AI Gen',
+          badgeColor: 'bg-purple-400/20 text-purple-300 border border-purple-400/30',
+        },
+        {
+          id: 'knowledge-base',
+          label: t('nav.knowledgeBase'),
+          icon: Database,
+        },
+        {
+          id: 'feedback',
+          label: t('nav.feedback', 'AI Feedback & Summary'),
+          icon: Star,
+          badge: 'Analytics',
+          badgeColor: 'bg-blue-400/20 text-blue-300 border border-blue-400/30',
+        },
+        {
+          id: 'settings',
+          label: t('nav.settings', 'Cài Đặt'),
+          icon: SettingsIcon,
+        },
+      ];
+    }
+
+    // Role 4 (Quản trị viên - Admin):
+    // Hiển thị đầy đủ 100% tất cả các mục menu trong Sidebar + Cài Đặt.
+    return [
+      {
+        id: 'dashboard',
+        label: t('nav.dashboard'),
+        icon: LayoutDashboard,
+      },
+      {
+        id: 'schedule',
+        label: t('nav.schedule'),
+        icon: Calendar,
+      },
+      {
+        id: 'speaker',
+        label: t('nav.speaker', 'Cổng Diễn Giả'),
+        icon: Mic,
+        badge: 'Studio',
+        badgeColor: 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30',
+      },
+      {
+        id: 'scanner',
+        label: t('nav.scanner'),
+        icon: QrCode,
+      },
+      {
+        id: 'inquiries',
+        label: t('nav.inquiries', 'AI Concierge (HITL)'),
+        icon: MessageSquare,
+        badge: `${pendingCount > 0 ? pendingCount : 5} HITL`,
+        badgeColor: 'bg-amber-400/20 text-amber-300 border border-amber-400/30',
+      },
+      {
+        id: 'content-studio',
+        label: t('nav.contentStudio', 'AI PR Studio'),
+        icon: Sparkles,
+        badge: 'AI Gen',
+        badgeColor: 'bg-purple-400/20 text-purple-300 border border-purple-400/30',
+      },
+      {
+        id: 'knowledge-base',
+        label: t('nav.knowledgeBase'),
+        icon: Database,
+      },
+      {
+        id: 'feedback',
+        label: t('nav.feedback', 'AI Feedback & Summary'),
+        icon: Star,
+        badge: 'Analytics',
+        badgeColor: 'bg-blue-400/20 text-blue-300 border border-blue-400/30',
+      },
+      {
+        id: 'users',
+        label: t('nav.users'),
+        icon: Users,
+      },
+      {
+        id: 'logs',
+        label: t('nav.logs'),
+        icon: ShieldCheck,
+      },
+      {
+        id: 'settings',
+        label: t('nav.settings', 'Cài Đặt'),
+        icon: SettingsIcon,
+      },
+    ];
+  }, [currentRole, pendingCount, t]);
 
   return (
     <aside
@@ -188,7 +331,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="space-y-6">
         {/* Header Sidebar: Logo Lightning + Brand Title + Optional Mobile Close (X) */}
         <div className="flex items-center justify-between gap-3 px-2 py-1">
-          <div className="flex items-center gap-3 min-w-0">
+          <div
+            onClick={() => {
+              setActiveTab('dashboard');
+              if (onCloseMobileDrawer) onCloseMobileDrawer();
+            }}
+            className="flex items-center gap-3 min-w-0 cursor-pointer hover:opacity-90 transition-opacity"
+            title="EventHub AI Dashboard"
+          >
             <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-600/30 shrink-0">
               <Zap className="w-5 h-5 fill-current text-white" />
             </div>
@@ -226,8 +376,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Calendar className="w-4 h-4" />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-xs font-bold text-white truncate" title={activeEvent.title}>
-                    {activeEvent.title || 'EventHub AI Summit 2026'}
+                  <div className="text-xs font-bold text-white truncate" title={activeEvent?.title || 'EventHub AI'}>
+                    {activeEvent?.title || 'EventHub AI Summit 2026'}
                   </div>
                   <div className={`text-[10px] font-semibold flex items-center gap-1.5 mt-0.5 ${sc.text}`}>
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${sc.dot}`} />

@@ -61,6 +61,7 @@ class Registration(Base, TimestampMixin):
         index=True
     )
     ticket_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, default="Vé Tham Dự")
+    price: Mapped[int] = mapped_column(Integer, default=500000, nullable=False)
     phone_number: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     organization: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     job_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

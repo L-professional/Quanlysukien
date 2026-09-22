@@ -53,6 +53,7 @@ async def init_db() -> None:
             "ALTER TABLE event_schedules ADD COLUMN IF NOT EXISTS capacity INTEGER NOT NULL DEFAULT 100;",
             "ALTER TABLE event_schedules ADD COLUMN IF NOT EXISTS registered_count INTEGER NOT NULL DEFAULT 0;",
             "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS schedule_id INTEGER REFERENCES event_schedules(id) ON DELETE CASCADE;",
+            "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS price INTEGER NOT NULL DEFAULT 500000;",
             "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS phone_number VARCHAR(50);",
             "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS organization VARCHAR(255);",
             "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS job_title VARCHAR(255);",
@@ -158,6 +159,29 @@ async def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS ix_user_reminders_user_id ON user_reminders(user_id);",
             "CREATE INDEX IF NOT EXISTS ix_user_reminders_session_id ON user_reminders(session_id);",
             "CREATE INDEX IF NOT EXISTS ix_user_reminders_event_id ON user_reminders(event_id);",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS job_title VARCHAR(255);",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_2fa_enabled BOOLEAN NOT NULL DEFAULT FALSE;",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR(255);",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences JSONB DEFAULT '{\"language\": \"vi\", \"theme\": \"dark\"}';",
+            """
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                session_token VARCHAR(255) NOT NULL,
+                device_name VARCHAR(255) NOT NULL,
+                browser VARCHAR(100),
+                os VARCHAR(100),
+                ip_address VARCHAR(50),
+                location VARCHAR(100) DEFAULT 'Hà Nội, Việt Nam',
+                is_current BOOLEAN DEFAULT FALSE,
+                last_active_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            """,
+            "ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;",
+            "CREATE INDEX IF NOT EXISTS ix_user_sessions_user_id ON user_sessions(user_id);",
         ]
         for migration in migrations:
             await conn.execute(text(migration))
+

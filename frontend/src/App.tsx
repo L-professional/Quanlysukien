@@ -2,7 +2,7 @@ import React from 'react';
 import { Toaster } from 'sonner';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { useAuth, AuthProvider } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 import { EventProvider } from './context/EventContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { MainLayout } from './components/layout/MainLayout';
@@ -18,39 +18,29 @@ import { FeedbackSummary } from './pages/FeedbackSummary';
 import { SystemLogs } from './pages/SystemLogs';
 import { SpeakerDashboard } from './pages/SpeakerDashboard';
 import { SpeakerControlCenter } from './pages/SpeakerControlCenter';
-
-const RootRedirect: React.FC = () => {
-  const { userRole, isAuthenticated } = useAuth();
-  if (!isAuthenticated || userRole === 'ATTENDEE' || userRole === 'PARTICIPANT') {
-    return <Navigate to="/events" replace />;
-  }
-  if (userRole === 'SPEAKER') {
-    return <Navigate to="/speaker/dashboard" replace />;
-  }
-  return <Navigate to="/dashboard" replace />;
-};
+import { LandingPage } from './pages/LandingPage';
+import { Settings } from './pages/Settings';
 
 const AppRoutes: React.FC = () => {
   const navigate = useNavigate();
 
   return (
     <Routes>
+      {/* Standalone Public Portal Landing Page at root "/" */}
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/landing" element={<LandingPage />} />
+
+      {/* Auth Screen */}
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Navigate to="/login?mode=register" replace />} />
 
       {/* Main Single Persistent Layout Shell — Accessible to public & authenticated users */}
       <Route element={<MainLayout />}>
-        <Route index element={<RootRedirect />} />
-
-        {/* Dashboard — Admin, Staff, Event Manager */}
+        {/* 4 Role-Based Dashboards (Attendee, Staff, Organizer, Admin) */}
         <Route
           path="dashboard"
           element={
-            <ProtectedRoute
-              allowedRoles={['ADMIN', 'STAFF', 'EVENT_MANAGER']}
-              onRedirect={() => navigate('/events')}
-            >
-              <Dashboard onNavigateTab={(tab) => navigate(`/${tab === 'schedule' ? 'events' : tab}`)} />
-            </ProtectedRoute>
+            <Dashboard onNavigateTab={(tab) => navigate(`/${tab === 'schedule' ? 'events' : tab}`)} />
           }
         />
 
@@ -121,6 +111,18 @@ const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="feedback-summary"
+          element={
+            <ProtectedRoute
+              allowedRoles={['ADMIN', 'STAFF', 'EVENT_MANAGER']}
+              onRedirect={() => navigate('/events')}
+            >
+              <FeedbackSummary />
+            </ProtectedRoute>
+          }
+        />
+
 
         {/* User Management — Admin only */}
         <Route
@@ -185,12 +187,22 @@ const AppRoutes: React.FC = () => {
           }
         />
 
+        {/* Settings — All authenticated roles (Task 65) */}
+        <Route
+          path="settings"
+          element={
+            <ProtectedRoute onRedirect={() => navigate('/login')}>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Catch-all inner route */}
-        <Route path="*" element={<RootRedirect />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
 
       {/* Fallback */}
-      <Route path="*" element={<RootRedirect />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };

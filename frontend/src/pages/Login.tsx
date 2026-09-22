@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
   Mail,
@@ -61,9 +61,9 @@ const QUICK_DEMO_ACCOUNTS: {
   {
     role: 'EVENT_MANAGER',
     title: 'Quản Lý Sự Kiện',
-    badge: '🎯 Manager',
+    badge: '🏢 Manager',
     email: 'manager@eventhub.ai',
-    desc: 'Tạo sự kiện, AI PR Studio, Dashboard báo cáo',
+    desc: 'Khởi tạo sự kiện, sinh bài PR bằng AI & xem Dashboard',
     icon: Briefcase,
     color: 'from-purple-500/20 to-indigo-500/10 text-purple-300',
     border: 'border-purple-500/40 hover:border-purple-400',
@@ -71,19 +71,19 @@ const QUICK_DEMO_ACCOUNTS: {
   {
     role: 'STAFF',
     title: 'Nhân Viên Điều Phối',
-    badge: '🎫 Staff',
+    badge: '🛡️ Staff',
     email: 'staff@eventhub.ai',
-    desc: 'Soát vé QR Code, duyệt AI Concierge (HITL)',
+    desc: 'Soát vé QR, duyệt & tinh chỉnh phản hồi AI Concierge',
     icon: ShieldCheck,
-    color: 'from-indigo-500/20 to-blue-500/10 text-indigo-300',
-    border: 'border-indigo-500/40 hover:border-indigo-400',
+    color: 'from-blue-500/20 to-cyan-500/10 text-blue-300',
+    border: 'border-blue-500/40 hover:border-blue-400',
   },
   {
     role: 'ATTENDEE',
     title: 'Khách Tham Dự',
-    badge: '👤 Attendee',
+    badge: '🎟️ Attendee',
     email: 'attendee@eventhub.ai',
-    desc: 'Xem sự kiện, nhận vé QR, hỏi đáp AI Concierge',
+    desc: 'Xem lịch trình, đăng ký vé QR cá nhân & hỏi đáp RAG',
     icon: Ticket,
     color: 'from-emerald-500/20 to-teal-500/10 text-emerald-300',
     border: 'border-emerald-500/40 hover:border-emerald-400',
@@ -93,9 +93,13 @@ const QUICK_DEMO_ACCOUNTS: {
 export const Login: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, userRole, isAuthenticated, login, register, logout, isLoading } = useAuth();
 
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const redirectParam = searchParams.get('redirect');
+  const modeParam = searchParams.get('mode');
+
+  const [mode, setMode] = useState<'login' | 'register'>(modeParam === 'register' ? 'register' : 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -104,15 +108,25 @@ export const Login: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [showGoogleModal, setShowGoogleModal] = useState(false);
 
+  useEffect(() => {
+    if (modeParam === 'register') {
+      setMode('register');
+    }
+  }, [modeParam]);
+
   const isDemoLoginEnabled = import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
 
-  const handleRedirectAfterAuth = (role: UserRole) => {
-    if (role === 'SPEAKER') {
-      navigate('/speaker/dashboard', { replace: true });
+  const handleRedirectAfterAuth = (_role?: UserRole) => {
+    if (
+      redirectParam &&
+      redirectParam.startsWith('/') &&
+      redirectParam !== '/' &&
+      redirectParam !== '/landing'
+    ) {
+      navigate(redirectParam, { replace: true });
       return;
     }
-    const isAttendee = role === 'ATTENDEE' || role === 'PARTICIPANT';
-    navigate(isAttendee ? '/events' : '/dashboard', { replace: true });
+    navigate('/dashboard', { replace: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

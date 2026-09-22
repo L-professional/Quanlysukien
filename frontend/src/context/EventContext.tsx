@@ -52,7 +52,7 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsLoadingEvents(true);
     try {
       const fetched = await apiService.getEvents();
-      if (fetched && fetched.length > 0) {
+      if (fetched && Array.isArray(fetched)) {
         setEvents(fetched);
 
         // Check if there is a saved selected event ID in localStorage
@@ -68,6 +68,8 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const currentExists = fetched.find((e) => e.id === prev.id);
             return currentExists || fetched[0];
           });
+        } else {
+          setActiveEventState(DEFAULT_EVENT);
         }
         return fetched;
       }

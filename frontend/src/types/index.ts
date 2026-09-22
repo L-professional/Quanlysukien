@@ -8,8 +8,27 @@ export interface User {
   phone_number?: string;
   role_name?: string;
   is_active?: boolean;
+  avatar_url?: string;
+  job_title?: string;
+  is_2fa_enabled?: boolean;
+  preferences?: {
+    language?: 'vi' | 'en';
+    theme?: 'dark' | 'light';
+    [key: string]: unknown;
+  };
   last_active_at?: string;
   created_at?: string;
+}
+
+export interface ActiveSession {
+  id: number;
+  device_name: string;
+  browser?: string;
+  os?: string;
+  ip_address?: string;
+  location?: string;
+  is_current: boolean;
+  last_active_at?: string;
 }
 
 export interface AuthResponse {
@@ -71,6 +90,9 @@ export interface Event {
   status: 'DRAFT' | 'PUBLISHED' | 'ONGOING' | 'COMPLETED' | 'CANCELLED';
   wifiName?: string;
   wifiPassword?: string;
+  is_registered?: boolean;
+  is_checked_in?: boolean;
+  has_reviewed?: boolean;
 }
 
 export interface EventScheduleItem {
@@ -92,6 +114,8 @@ export interface EventScheduleItem {
   capacity?: number;
   registered_count?: number;
   is_registered?: boolean;
+  is_checked_in?: boolean;
+  has_reviewed?: boolean;
   registration_id?: number;
   qr_code_token?: string;
   qr_code_image?: string;
@@ -149,7 +173,7 @@ export interface Registration {
 }
 
 export interface CheckInResult {
-  status: 'SUCCESS' | 'ALREADY_USED' | 'INVALID';
+  status: 'SUCCESS' | 'ALREADY_USED' | 'INVALID' | 'INVALID_EVENT';
   message: string;
   participantName?: string;
   ticketType?: string;
@@ -262,5 +286,113 @@ export interface SessionAttendeesResponse {
   not_checked_in_count: number;
   data: SessionAttendee[];
 }
+
+export interface BottleneckItem {
+  id: string;
+  category: 'CHECK_IN_CONGESTION' | 'LOW_ATTENDANCE' | 'LOGISTICS_TECH' | string;
+  aspect?: string;
+  title: string;
+  severity: 'CRITICAL' | 'MODERATE' | 'MINOR' | 'HIGH' | 'MEDIUM' | 'LOW';
+  metric: string;
+  impacted_area: string;
+  description: string;
+  urgency?: string;
+}
+
+export interface ActionPlanItem {
+  id: string;
+  title: string;
+  description: string;
+  priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  department: string;
+  estimated_impact: string;
+  timeframe: string;
+  status: 'proposed' | 'applied';
+}
+
+export interface RepresentativeQuote {
+  id: string;
+  quote: string;
+  rating: number;
+  aspect: string;
+  severity: 'CRITICAL' | 'MODERATE' | 'MINOR' | string;
+  author: string;
+  user_email?: string;
+  feedback_id?: number;
+}
+
+export interface AspectBreakdownItem {
+  name: string;
+  score: number;
+  negative_count: number;
+  severity: 'CRITICAL' | 'MODERATE' | 'MINOR' | string;
+  status: string;
+  key_issues: string[];
+}
+
+export interface AspectBreakdownData {
+  infrastructure: AspectBreakdownItem;
+  content: AspectBreakdownItem;
+  logistics: AspectBreakdownItem;
+}
+
+export interface QualitativeInsightsData {
+  summary_text: string;
+  root_causes: string[];
+  representative_quotes: RepresentativeQuote[];
+}
+
+export interface HistoricalBenchmarkItem {
+  event_id?: number;
+  title: string;
+  satisfaction_score: number;
+  checkin_rate: number;
+  comparison_note: string;
+}
+
+export interface BenchmarkComparisonData {
+  historical_avg_satisfaction: number;
+  current_vs_historical_diff: number;
+  status: string;
+  retrieval_method: string;
+  historical_events: HistoricalBenchmarkItem[];
+}
+
+export interface ApologyEmailDraft {
+  subject: string;
+  recipient_name: string;
+  recipient_email: string;
+  aspect: string;
+  discount_code: string;
+  compensation_offer: string;
+  email_body_text: string;
+  email_body_html: string;
+  generated_at: string;
+}
+
+export interface AIFeedbackAnalysisData {
+  satisfaction_score: number;
+  average_rating: number;
+  sentiment_breakdown: {
+    positive_percent: number;
+    neutral_percent: number;
+    negative_percent: number;
+    total_analyzed: number;
+  };
+  executive_summary: string;
+  top_bottlenecks: BottleneckItem[];
+  action_plan: ActionPlanItem[];
+  aspect_breakdown?: AspectBreakdownData;
+  qualitative_insights?: QualitativeInsightsData;
+  benchmark_comparison?: BenchmarkComparisonData;
+}
+
+export interface AIFeedbackAnalysisResponse {
+  success: boolean;
+  analyzed_at: string;
+  data: AIFeedbackAnalysisData;
+}
+
+
 
 

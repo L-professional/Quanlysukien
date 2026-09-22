@@ -1,18 +1,28 @@
-from datetime import datetime
-from typing import List, Optional
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional, Any, Union
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import require_roles, get_current_user_optional
+from app.core.security import require_roles, get_current_user_optional, get_user_role_name
 from app.models.event import Event, EventSchedule
 from app.models.knowledge import KnowledgeBase
 from app.models.user import User
 from app.models.registration import Registration
+from app.models.feedback import Feedback
+from app.models.reminder import UserReminder
+from app.models.inquiry import EventInquiry, InquiryReply
+from app.models.session_interaction import (
+    SessionQuestion,
+    SessionResource,
+    SessionMaterial,
+    SessionFeedback,
+)
 from app.services.email_service import generate_qr_base64
 from pydantic import BaseModel
 from app.services.gemini_service import gemini_service
+from app.services.rag_engine import rag_engine
 from app.schemas.event import (
     EventResponse,
     EventCreate,
@@ -107,82 +117,266 @@ INITIAL_SEED_SCHEDULE = [
 
 
 @router.get("", response_model=List[EventResponse])
-async def list_events(db: AsyncSession = Depends(get_db)):
+async def list_events(
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
     """
     List all events with dates, address, and Google Maps embed links.
+    Returns user-specific flags: is_registered, is_checked_in, has_reviewed.
     """
     stmt = select(Event).order_by(Event.id.asc())
     res = await db.execute(stmt)
     events = res.scalars().all()
 
     if not events:
-        # Seed default event
-        now = datetime.now()
-        default_event = Event(
-            id=1,
-            title="EventHub AI Summit 2026",
-            description="Hội thảo quốc tế hàng đầu về Generative AI, RAG Vector Search và Tự Động Hóa Quản Trị Sự Kiện.",
-            category_id=1,
-            location="GEM Center, TP. Hồ Chí Minh",
-            location_address=DEFAULT_LOCATION_ADDRESS,
-            google_maps_url=DEFAULT_MAPS_URL,
-            start_time=now,
-            end_time=now,
-            start_date="15/10/2026 08:30",
-            end_date="16/10/2026 17:30",
-            status="PUBLISHED",
-        )
-        db.add(default_event)
-        try:
-            await db.commit()
-            await db.refresh(default_event)
-            return [default_event]
-        except Exception:
-            await db.rollback()
-            return [
-                EventResponse(
-                    id=1,
-                    title="EventHub AI Summit 2026",
-                    description="Hội thảo quốc tế hàng đầu về Generative AI, RAG Vector Search và Tự Động Hóa Quản Trị Sự Kiện.",
-                    category_id=1,
-                    location="GEM Center, TP. Hồ Chí Minh",
-                    location_address=DEFAULT_LOCATION_ADDRESS,
-                    google_maps_url=DEFAULT_MAPS_URL,
-                    start_date="15/10/2026 08:30",
-                    end_date="16/10/2026 17:30",
-                    status="PUBLISHED",
-                )
-            ]
+        return []
 
-    return events
+    user_reg_events = set()
+    user_checked_in_events = set()
+    user_reviewed_events = set()
+
+    if current_user:
+        # Check user registrations
+        reg_stmt = select(Registration).where(Registration.participant_id == current_user.id)
+        reg_res = await db.execute(reg_stmt)
+        for r in reg_res.scalars().all():
+            user_reg_events.add(r.event_id)
+            if r.is_checked_in:
+                user_checked_in_events.add(r.event_id)
+
+        # Check user feedbacks
+        fb_stmt = select(Feedback).where(Feedback.user_id == current_user.id)
+        fb_res = await db.execute(fb_stmt)
+        for f in fb_res.scalars().all():
+            user_reviewed_events.add(f.event_id)
+
+    response_items = []
+    for e in events:
+        response_items.append(
+            EventResponse(
+                id=e.id,
+                title=e.title,
+                description=e.description,
+                category_id=e.category_id,
+                location=e.location,
+                location_address=e.location_address,
+                google_maps_url=e.google_maps_url,
+                start_time=e.start_time,
+                end_time=e.end_time,
+                start_date=e.start_date,
+                end_date=e.end_date,
+                status=e.status,
+                created_at=e.created_at,
+                updated_at=e.updated_at,
+                is_registered=e.id in user_reg_events,
+                is_checked_in=e.id in user_checked_in_events,
+                has_reviewed=e.id in user_reviewed_events,
+            )
+        )
+
+    return response_items
 
 
 @router.get("/{id}", response_model=EventResponse)
-async def get_event(id: int, db: AsyncSession = Depends(get_db)):
+async def get_event(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
     """
-    Get a single event with date and Google Maps details.
+    Get a single event with date, Google Maps details, and user-specific status flags.
     """
     stmt = select(Event).where(Event.id == id)
     res = await db.execute(stmt)
     event = res.scalar_one_or_none()
 
     if not event:
-        if id == 1:
-            return EventResponse(
-                id=1,
-                title="EventHub AI Summit 2026",
-                description="Hội thảo quốc tế hàng đầu về Generative AI, RAG Vector Search và Tự Động Hóa Quản Trị Sự Kiện.",
-                category_id=1,
-                location="GEM Center, TP. Hồ Chí Minh",
-                location_address=DEFAULT_LOCATION_ADDRESS,
-                google_maps_url=DEFAULT_MAPS_URL,
-                start_date="15/10/2026 08:30",
-                end_date="16/10/2026 17:30",
-                status="PUBLISHED",
-            )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
-    return event
+    is_registered = False
+    is_checked_in = False
+    has_reviewed = False
+
+    if current_user:
+        reg_stmt = select(Registration).where(
+            Registration.event_id == id,
+            Registration.participant_id == current_user.id
+        )
+        reg_res = await db.execute(reg_stmt)
+        regs = reg_res.scalars().all()
+        if regs:
+            is_registered = True
+            is_checked_in = any(r.is_checked_in for r in regs)
+
+        fb_stmt = select(Feedback).where(
+            Feedback.event_id == id,
+            Feedback.user_id == current_user.id
+        )
+        fb_res = await db.execute(fb_stmt)
+        if fb_res.scalar_one_or_none():
+            has_reviewed = True
+
+    return EventResponse(
+        id=event.id,
+        title=event.title,
+        description=event.description,
+        category_id=event.category_id,
+        location=event.location,
+        location_address=event.location_address,
+        google_maps_url=event.google_maps_url,
+        start_time=event.start_time,
+        end_time=event.end_time,
+        start_date=event.start_date,
+        end_date=event.end_date,
+        status=event.status,
+        created_at=event.created_at,
+        updated_at=event.updated_at,
+        is_registered=is_registered,
+        is_checked_in=is_checked_in,
+        has_reviewed=has_reviewed,
+    )
+
+
+def parse_event_datetime(val: Any) -> Optional[datetime]:
+    if not val:
+        return None
+    if isinstance(val, datetime):
+        return val
+    if isinstance(val, str):
+        val_str = val.strip()
+        if not val_str:
+            return None
+        try:
+            return datetime.fromisoformat(val_str.replace("Z", "+00:00"))
+        except Exception:
+            pass
+        formats = [
+            "%d/%m/%Y %H:%M",
+            "%d/%m/%Y %H:%M:%S",
+            "%d/%m/%Y",
+            "%Y-%m-%d %H:%M",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d",
+            "%Y-%m-%dT%H:%M",
+            "%Y-%m-%dT%H:%M:%S",
+        ]
+        for fmt in formats:
+            try:
+                return datetime.strptime(val_str, fmt)
+            except Exception:
+                pass
+    return None
+
+
+def to_comparable_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
+        return None
+    if isinstance(dt, str):
+        dt = parse_event_datetime(dt)
+        if dt is None:
+            return None
+    if dt.tzinfo is None:
+        return dt.astimezone().astimezone(timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+async def check_event_time_location_overlap(
+    db: AsyncSession,
+    location: str,
+    start_time: datetime,
+    end_time: datetime,
+    exclude_event_id: Optional[int] = None,
+):
+    """
+    Check if an event already exists with the same location and overlapping time interval.
+    Overlap condition:
+    (event.location == payload.location) AND
+    (payload.start_time < existing_event.end_time) AND
+    (payload.end_time > existing_event.start_time)
+    """
+    clean_location = (location or "").strip()
+    if not clean_location:
+        return
+
+    stmt = select(Event).where(Event.status != "CANCELLED")
+    if exclude_event_id is not None:
+        stmt = stmt.where(Event.id != exclude_event_id)
+
+    res = await db.execute(stmt)
+    existing_events = res.scalars().all()
+
+    target_start = to_comparable_utc(start_time)
+    target_end = to_comparable_utc(end_time)
+
+    if not target_start or not target_end:
+        return
+
+    if target_end <= target_start:
+        target_end = target_start + timedelta(hours=2)
+
+    for ev in existing_events:
+        ev_loc = (ev.location or "").strip()
+        if ev_loc.lower() != clean_location.lower():
+            continue
+
+        ev_start = to_comparable_utc(ev.start_time) or to_comparable_utc(parse_event_datetime(ev.start_date))
+        ev_end = to_comparable_utc(ev.end_time) or to_comparable_utc(parse_event_datetime(ev.end_date))
+
+        if not ev_start or not ev_end:
+            continue
+
+        if ev_end <= ev_start:
+            ev_end = ev_start + timedelta(hours=2)
+
+        # Time Overlap Check:
+        # (payload.start_time < existing_event.end_time) AND (payload.end_time > existing_event.start_time)
+        if target_start < ev_end and target_end > ev_start:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Địa điểm '{clean_location}' đã có sự kiện '{ev.title}' đăng ký trong khoảng thời gian này. Vui lòng chọn địa điểm hoặc thời gian khác.",
+            )
+
+
+def check_session_within_event_bounds(
+    event: Event,
+    session_date: Optional[str],
+    session_start_time: str,
+    session_end_time: str,
+):
+    """
+    Task 59 Requirement 3: Ensure session start and end times fall strictly within
+    the parent event's start_time and end_time.
+    """
+    ev_start = to_comparable_utc(event.start_time) or to_comparable_utc(parse_event_datetime(event.start_date))
+    ev_end = to_comparable_utc(event.end_time) or to_comparable_utc(parse_event_datetime(event.end_date))
+
+    if not ev_start or not ev_end:
+        return
+
+    # Clean up session date string
+    s_date_clean = (session_date or "").strip()
+    if not s_date_clean:
+        s_date_clean = ev_start.strftime("%d/%m/%Y")
+    elif " " in s_date_clean:
+        s_date_clean = s_date_clean.split(" ")[0]
+
+    sess_start_dt = parse_event_datetime(f"{s_date_clean} {session_start_time}")
+    sess_end_dt = parse_event_datetime(f"{s_date_clean} {session_end_time}")
+
+    if sess_start_dt and sess_end_dt:
+        sess_start_utc = to_comparable_utc(sess_start_dt)
+        sess_end_utc = to_comparable_utc(sess_end_dt)
+
+        # Allow 30-minute buffer for hall check-in and stage handoff
+        buffer = timedelta(minutes=30)
+        if (sess_start_utc + buffer) < ev_start or (sess_end_utc - buffer) > ev_end:
+            ev_start_str = ev_start.strftime("%H:%M %d/%m/%Y")
+            ev_end_str = ev_end.strftime("%H:%M %d/%m/%Y")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Lịch trình phiên của diễn giả ({session_start_time} - {session_end_time} ngày {s_date_clean}) phải nằm trong khoảng thời gian diễn ra sự kiện (từ {ev_start_str} đến {ev_end_str}).",
+            )
 
 
 @router.post("", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
@@ -194,27 +388,75 @@ async def create_event(
     """
     Create a new event in the database.
     """
-    if current_user and current_user.role and current_user.role.name not in ["ADMIN", "EVENT_MANAGER"]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền tạo sự kiện")
+    if current_user:
+        role_name = await get_user_role_name(current_user, db)
+        if role_name not in ["ADMIN", "EVENT_MANAGER"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền tạo sự kiện")
 
     now = datetime.now()
+    raw_start = parse_event_datetime(payload.start_time) or parse_event_datetime(payload.start_date) or now
+    raw_end = parse_event_datetime(payload.end_time) or parse_event_datetime(payload.end_date) or (raw_start + timedelta(hours=3))
+    start_dt = to_comparable_utc(raw_start)
+    end_dt = to_comparable_utc(raw_end)
+
+    # Overlap validation check
+    await check_event_time_location_overlap(
+        db=db,
+        location=payload.location,
+        start_time=start_dt,
+        end_time=end_dt,
+    )
+
+    from app.models.category import EventCategory
+    cat_id = payload.category_id
+    cat_obj = await db.get(EventCategory, cat_id) if cat_id else None
+    if not cat_obj:
+        first_cat = (await db.execute(select(EventCategory.id).order_by(EventCategory.id.asc()).limit(1))).scalar_one_or_none()
+        cat_id = first_cat or 1
+
     new_event = Event(
         title=payload.title,
         description=payload.description or "",
-        category_id=payload.category_id or 1,
+        category_id=cat_id,
         location=payload.location,
         location_address=payload.location_address or DEFAULT_LOCATION_ADDRESS,
         google_maps_url=payload.google_maps_url or DEFAULT_MAPS_URL,
-        start_time=payload.start_time or now,
-        end_time=payload.end_time or now,
-        start_date=payload.start_date,
-        end_date=payload.end_date,
+        start_time=start_dt,
+        end_time=end_dt,
+        start_date=payload.start_date or start_dt.strftime("%d/%m/%Y %H:%M"),
+        end_date=payload.end_date or end_dt.strftime("%d/%m/%Y %H:%M"),
         status=payload.status or "PUBLISHED",
     )
     db.add(new_event)
     await db.commit()
     await db.refresh(new_event)
-    return new_event
+
+    # Task 59 Requirement 1: Real-time RAG Knowledge Indexing into pgvector
+    try:
+        await rag_engine.sync_event_knowledge(db, new_event, action="UPSERT")
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to auto-index new event into pgvector: {e}")
+
+    return EventResponse(
+        id=new_event.id,
+        title=new_event.title,
+        description=new_event.description,
+        category_id=new_event.category_id,
+        location=new_event.location,
+        location_address=new_event.location_address,
+        google_maps_url=new_event.google_maps_url,
+        start_time=new_event.start_time,
+        end_time=new_event.end_time,
+        start_date=new_event.start_date,
+        end_date=new_event.end_date,
+        status=new_event.status,
+        created_at=new_event.created_at,
+        updated_at=new_event.updated_at,
+        is_registered=False,
+        is_checked_in=False,
+        has_reviewed=False,
+    )
 
 
 @router.put("/{id}", response_model=EventResponse)
@@ -227,8 +469,10 @@ async def update_event(
     """
     Update event dates, location address, and Google Maps embed URL.
     """
-    if current_user and current_user.role and current_user.role.name not in ["ADMIN", "EVENT_MANAGER"]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền cập nhật sự kiện")
+    if current_user:
+        role_name = await get_user_role_name(current_user, db)
+        if role_name not in ["ADMIN", "EVENT_MANAGER"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền cập nhật sự kiện")
 
     stmt = select(Event).where(Event.id == id)
     res = await db.execute(stmt)
@@ -236,6 +480,22 @@ async def update_event(
 
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    target_location = payload.location if payload.location is not None else event.location
+    raw_start = parse_event_datetime(payload.start_time) or parse_event_datetime(payload.start_date) or event.start_time
+    raw_end = parse_event_datetime(payload.end_time) or parse_event_datetime(payload.end_date) or event.end_time
+    target_start = to_comparable_utc(raw_start)
+    target_end = to_comparable_utc(raw_end)
+
+    # Overlap validation check (excluding current event id)
+    if target_location and target_start and target_end:
+        await check_event_time_location_overlap(
+            db=db,
+            location=target_location,
+            start_time=target_start,
+            end_time=target_end,
+            exclude_event_id=id,
+        )
 
     if payload.title is not None:
         event.title = payload.title
@@ -251,12 +511,42 @@ async def update_event(
         event.start_date = payload.start_date
     if payload.end_date is not None:
         event.end_date = payload.end_date
+    if payload.start_time is not None:
+        event.start_time = to_comparable_utc(parse_event_datetime(payload.start_time)) or event.start_time
+    if payload.end_time is not None:
+        event.end_time = to_comparable_utc(parse_event_datetime(payload.end_time)) or event.end_time
     if payload.status is not None:
         event.status = payload.status
 
     await db.commit()
     await db.refresh(event)
-    return event
+
+    # Task 59 Requirement 1: Real-time RAG Knowledge Re-indexing into pgvector
+    try:
+        await rag_engine.sync_event_knowledge(db, event, action="UPSERT")
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to auto-update event in pgvector: {e}")
+
+    return EventResponse(
+        id=event.id,
+        title=event.title,
+        description=event.description,
+        category_id=event.category_id,
+        location=event.location,
+        location_address=event.location_address,
+        google_maps_url=event.google_maps_url,
+        start_time=event.start_time,
+        end_time=event.end_time,
+        start_date=event.start_date,
+        end_date=event.end_date,
+        status=event.status,
+        created_at=event.created_at,
+        updated_at=event.updated_at,
+        is_registered=False,
+        is_checked_in=False,
+        has_reviewed=False,
+    )
 
 
 @router.delete("/{id}")
@@ -266,10 +556,13 @@ async def delete_event(
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
-    Delete an event by ID (also deletes all its associated session schedules).
+    Delete an event by ID with full cascade of all associated records:
+    schedules, session interactions, registrations, feedbacks, inquiries, and reminders.
     """
-    if current_user and current_user.role and current_user.role.name not in ["ADMIN", "EVENT_MANAGER"]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền xóa sự kiện")
+    if current_user:
+        role_name = await get_user_role_name(current_user, db)
+        if role_name not in ["ADMIN", "EVENT_MANAGER"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền xóa sự kiện")
 
     stmt = select(Event).where(Event.id == id)
     res = await db.execute(stmt)
@@ -278,16 +571,50 @@ async def delete_event(
     if not event:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
 
-    # Cascade delete all associated schedules for this event
+    # 1. Schedules associated with this event
+    sched_res = await db.execute(select(EventSchedule.id).where(EventSchedule.event_id == id))
+    schedule_ids = sched_res.scalars().all()
+
+    if schedule_ids:
+        # Cascade delete session interaction entities
+        await db.execute(delete(SessionQuestion).where(SessionQuestion.session_id.in_(schedule_ids)))
+        await db.execute(delete(SessionResource).where(SessionResource.session_id.in_(schedule_ids)))
+        await db.execute(delete(SessionMaterial).where(SessionMaterial.session_id.in_(schedule_ids)))
+        await db.execute(delete(SessionFeedback).where(SessionFeedback.session_id.in_(schedule_ids)))
+        await db.execute(delete(Registration).where((Registration.schedule_id.in_(schedule_ids)) | (Registration.session_id.in_(schedule_ids))))
+        await db.execute(delete(Feedback).where(Feedback.session_id.in_(schedule_ids)))
+        await db.execute(delete(UserReminder).where(UserReminder.session_id.in_(schedule_ids)))
+
+    # 2. Cascade delete event-level relations
+    await db.execute(delete(Registration).where(Registration.event_id == id))
+    await db.execute(delete(Feedback).where(Feedback.event_id == id))
+    await db.execute(delete(UserReminder).where(UserReminder.event_id == id))
+    await db.execute(delete(KnowledgeBase).where(KnowledgeBase.event_id == id))
+
+    # Inquiries & replies
+    inq_res = await db.execute(select(EventInquiry.id).where(EventInquiry.event_id == id))
+    inq_ids = inq_res.scalars().all()
+    if inq_ids:
+        await db.execute(delete(InquiryReply).where(InquiryReply.inquiry_id.in_(inq_ids)))
+        await db.execute(delete(EventInquiry).where(EventInquiry.id.in_(inq_ids)))
+
+    # 3. Cascade delete schedules
     await db.execute(delete(EventSchedule).where(EventSchedule.event_id == id))
 
-    # Delete event
+    # Sync pgvector deletion
+    try:
+        await rag_engine.sync_event_knowledge(db, event, action="DELETE")
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Failed to remove event knowledge in pgvector: {e}")
+
+    # 4. Delete event itself
     await db.delete(event)
     await db.commit()
 
     return {
         "status": "success",
-        "message": f"Sự kiện #{id} ('{event.title}') đã được xóa thành công!",
+        "message": f"Sự kiện #{id} ('{event.title}') đã được xóa thành công khỏi hệ thống!",
         "event_id": id,
     }
 
@@ -300,42 +627,15 @@ async def get_event_schedule(
 ):
     """
     Retrieve event schedule items for a given event ID.
-    Populates user registration status and QR ticket info if authenticated.
-    If no schedule items exist in DB, seeds initial demo schedules.
+    Populates user registration status, check-in status, and feedback status if authenticated.
     """
     stmt = select(EventSchedule).where(EventSchedule.event_id == id).order_by(EventSchedule.day_number.asc(), EventSchedule.id.asc())
     res = await db.execute(stmt)
     schedules = res.scalars().all()
 
-    if not schedules:
-        # Seed initial schedule if empty
-        new_items = []
-        for item in INITIAL_SEED_SCHEDULE:
-            schedule_item = EventSchedule(
-                event_id=id,
-                **item
-            )
-            db.add(schedule_item)
-            new_items.append(schedule_item)
-        try:
-            await db.commit()
-            for item in new_items:
-                await db.refresh(item)
-            schedules = new_items
-        except Exception:
-            await db.rollback()
-            # Return initial seed list mapped into dummy format
-            return [
-                EventScheduleResponse(
-                    id=idx + 1,
-                    event_id=id,
-                    **item
-                )
-                for idx, item in enumerate(INITIAL_SEED_SCHEDULE)
-            ]
-
-    # Look up user's registrations for this event/session
+    # Look up user's registrations and feedbacks for this event/session
     user_reg_map = {}
+    user_reviewed_schedules = set()
     if current_user:
         reg_stmt = select(Registration).where(
             Registration.event_id == id,
@@ -343,13 +643,34 @@ async def get_event_schedule(
         )
         reg_res = await db.execute(reg_stmt)
         for r in reg_res.scalars().all():
-            if r.schedule_id is not None:
-                user_reg_map[r.schedule_id] = r
+            target_sid = r.schedule_id if r.schedule_id is not None else r.session_id
+            if target_sid is not None:
+                user_reg_map[target_sid] = r
+
+        # Check global Feedback table
+        fb_stmt = select(Feedback).where(
+            Feedback.event_id == id,
+            Feedback.user_id == current_user.id
+        )
+        fb_res = await db.execute(fb_stmt)
+        for f in fb_res.scalars().all():
+            if f.session_id is not None:
+                user_reviewed_schedules.add(f.session_id)
+
+        # Check SessionFeedback table
+        sfb_stmt = select(SessionFeedback).where(
+            SessionFeedback.user_id == current_user.id
+        )
+        sfb_res = await db.execute(sfb_stmt)
+        for sf in sfb_res.scalars().all():
+            user_reviewed_schedules.add(sf.session_id)
 
     response_items = []
     for s in schedules:
         user_reg = user_reg_map.get(s.id)
         is_registered = user_reg is not None
+        is_checked_in = bool(user_reg and user_reg.is_checked_in)
+        has_reviewed = s.id in user_reviewed_schedules
         reg_id = user_reg.id if user_reg else None
         qr_token = user_reg.qr_code_token if user_reg else None
         qr_image = generate_qr_base64(user_reg.qr_code_token) if user_reg else None
@@ -373,6 +694,8 @@ async def get_event_schedule(
             capacity=s.capacity if s.capacity is not None else 100,
             registered_count=s.registered_count if s.registered_count is not None else 0,
             is_registered=is_registered,
+            is_checked_in=is_checked_in,
+            has_reviewed=has_reviewed,
             registration_id=reg_id,
             qr_code_token=qr_token,
             qr_code_image=qr_image,
@@ -392,6 +715,18 @@ async def create_event_schedule(
     """
     Add a new schedule session / speaker slot to an event.
     """
+    event_res = await db.execute(select(Event).where(Event.id == id))
+    parent_event = event_res.scalar_one_or_none()
+    if not parent_event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy sự kiện cha!")
+
+    check_session_within_event_bounds(
+        event=parent_event,
+        session_date=payload.start_date or payload.date_label,
+        session_start_time=payload.start_time,
+        session_end_time=payload.end_time,
+    )
+
     schedule_item = EventSchedule(
         event_id=id,
         title=payload.title,
@@ -442,8 +777,10 @@ async def update_event_schedule(
     """
     Update a session / schedule item by its ID.
     """
-    if current_user and current_user.role and current_user.role.name not in ["ADMIN", "EVENT_MANAGER", "STAFF"]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền chỉnh sửa phiên này")
+    if current_user:
+        role_name = await get_user_role_name(current_user, db)
+        if role_name not in ["ADMIN", "EVENT_MANAGER", "STAFF"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền chỉnh sửa phiên này")
 
     stmt = select(EventSchedule).where(EventSchedule.id == schedule_id)
     res = await db.execute(stmt)
@@ -451,6 +788,18 @@ async def update_event_schedule(
 
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiên diễn thuyết")
+
+    target_event_id = event_id or item.event_id
+    if target_event_id:
+        ev_stmt = select(Event).where(Event.id == target_event_id)
+        parent_event = (await db.execute(ev_stmt)).scalar_one_or_none()
+        if parent_event:
+            check_session_within_event_bounds(
+                event=parent_event,
+                session_date=payload.start_date or item.start_date or payload.date_label or item.date_label,
+                session_start_time=payload.start_time if payload.start_time is not None else item.start_time,
+                session_end_time=payload.end_time if payload.end_time is not None else item.end_time,
+            )
 
     # Backup old title in case it changes
     old_title = item.title
@@ -524,8 +873,10 @@ async def delete_event_schedule(
     """
     Delete a session / schedule item by its ID.
     """
-    if current_user and current_user.role and current_user.role.name not in ["ADMIN", "EVENT_MANAGER", "STAFF"]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền xóa phiên này")
+    if current_user:
+        role_name = await get_user_role_name(current_user, db)
+        if role_name not in ["ADMIN", "EVENT_MANAGER", "STAFF"]:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền xóa phiên này")
 
     stmt = select(EventSchedule).where(EventSchedule.id == schedule_id)
     res = await db.execute(stmt)
@@ -533,6 +884,15 @@ async def delete_event_schedule(
 
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phiên diễn thuyết")
+
+    # Cascade delete schedule interactions, registrations, feedbacks, and reminders
+    await db.execute(delete(SessionQuestion).where(SessionQuestion.session_id == schedule_id))
+    await db.execute(delete(SessionResource).where(SessionResource.session_id == schedule_id))
+    await db.execute(delete(SessionMaterial).where(SessionMaterial.session_id == schedule_id))
+    await db.execute(delete(SessionFeedback).where(SessionFeedback.session_id == schedule_id))
+    await db.execute(delete(Registration).where((Registration.schedule_id == schedule_id) | (Registration.session_id == schedule_id)))
+    await db.execute(delete(Feedback).where(Feedback.session_id == schedule_id))
+    await db.execute(delete(UserReminder).where(UserReminder.session_id == schedule_id))
 
     await db.delete(item)
     await db.commit()

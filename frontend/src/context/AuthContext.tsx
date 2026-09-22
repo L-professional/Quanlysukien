@@ -83,10 +83,16 @@ export const DEMO_PRESETS: Record<UserRole, User> = {
   },
 };
 
+export type MockRole = 'ATTENDEE' | 'STAFF' | 'ORGANIZER' | 'ADMIN';
+
 interface AuthContextType {
   user: User | null;
   token: string | null;
   userRole: UserRole;
+  selectedRole: MockRole;
+  setSelectedRole: (role: MockRole) => void;
+  activeRoleView: MockRole;
+  setActiveRoleView: (role: MockRole) => void;
   isAuthenticated: boolean;
   isLoading: boolean;
   hasRole: (roles: UserRole[]) => boolean;
@@ -95,6 +101,7 @@ interface AuthContextType {
   googleLogin: (payload: { credential?: string; email?: string; full_name?: string; avatar_url?: string }) => Promise<boolean>;
   logout: () => void;
   switchDemoAccount: (role: UserRole) => void;
+  updateUser: (updatedData: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -130,6 +137,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (user?.role_id === 3) return 'STAFF';
     return 'ATTENDEE';
   }, [user, token]);
+
+  // Dynamic RBAC Selected Role (Mockup preview & dynamic filtering)
+  const [selectedRole, setSelectedRoleState] = useState<MockRole>(() => {
+    const saved = localStorage.getItem('eventhub_active_role_view');
+    if (saved === 'ATTENDEE' || saved === 'STAFF' || saved === 'ORGANIZER' || saved === 'ADMIN') {
+      return saved;
+    }
+    return 'ADMIN';
+  });
+
+  const setSelectedRole = React.useCallback((role: MockRole) => {
+    setSelectedRoleState(role);
+    localStorage.setItem('eventhub_active_role_view', role);
+  }, []);
+
+  // Synchronize selectedRole when userRole changes
+  useEffect(() => {
+    if (userRole === 'ATTENDEE' || userRole === 'PARTICIPANT') {
+      setSelectedRole('ATTENDEE');
+    } else if (userRole === 'STAFF') {
+      setSelectedRole('STAFF');
+    } else if (userRole === 'EVENT_MANAGER') {
+      setSelectedRole('ORGANIZER');
+    } else if (userRole === 'ADMIN') {
+      setSelectedRole('ADMIN');
+    }
+  }, [userRole, setSelectedRole]);
 
   /** Check if current user has one of the allowed roles */
   const hasRole = (roles: UserRole[]): boolean => {
@@ -288,11 +322,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('eventhub_token');
     localStorage.removeItem('eventhub_user');
     localStorage.removeItem('eventhub_user_role');
+    localStorage.removeItem('eventhub_submitted_feedback_sessions');
+    localStorage.removeItem('eventhub_my_agenda');
     document.cookie = 'eventhub_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
     toast.info('Đã đăng xuất khỏi hệ thống EventHub AI');
-    if (window.location.pathname !== '/login') {
-      window.location.href = '/login';
+    if (window.location.pathname !== '/') {
+      window.location.href = '/';
     }
+  };
+
+  const updateUser = (updatedData: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const nextUser = { ...prev, ...updatedData };
+      localStorage.setItem('eventhub_user', JSON.stringify(nextUser));
+      return nextUser;
+    });
   };
 
   return (
@@ -301,6 +346,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         user,
         token,
         userRole,
+        selectedRole,
+        setSelectedRole,
+        activeRoleView: selectedRole,
+        setActiveRoleView: setSelectedRole,
         isAuthenticated: !!user && !!token,
         isLoading,
         hasRole,
@@ -309,6 +358,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         googleLogin,
         logout,
         switchDemoAccount,
+        updateUser,
       }}
     >
       {children}

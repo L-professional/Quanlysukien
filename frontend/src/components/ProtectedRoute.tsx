@@ -7,8 +7,8 @@ import { UserRole } from '../types';
 interface ProtectedRouteProps {
   /** The content to render if the user passes the role check */
   children: React.ReactNode;
-  /** List of roles allowed to access this route */
-  allowedRoles: UserRole[];
+  /** List of roles allowed to access this route. If omitted, any authenticated user can access */
+  allowedRoles?: UserRole[];
   /** Called when user clicks "Go Back" / "Trang Chủ" */
   onRedirect?: () => void;
 }
@@ -29,7 +29,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" replace />;
   }
 
-  const hasAccess = hasRole(allowedRoles);
+  const hasAccess = allowedRoles && allowedRoles.length > 0 ? hasRole(allowedRoles) : true;
 
   if (!hasAccess) {
     return (
@@ -75,15 +75,17 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
               </span>{' '}
               không có quyền truy cập vào trang này.
             </p>
-            <p className="text-slate-400 text-xs">
-              Trang này yêu cầu một trong các quyền:{' '}
-              {allowedRoles.map((r, i) => (
-                <span key={r}>
-                  <span className="font-bold text-brand-300">{r}</span>
-                  {i < allowedRoles.length - 1 && <span className="text-slate-500">, </span>}
-                </span>
-              ))}
-            </p>
+            {allowedRoles && allowedRoles.length > 0 && (
+              <p className="text-slate-400 text-xs">
+                Trang này yêu cầu một trong các quyền:{' '}
+                {allowedRoles.map((r, i) => (
+                  <span key={r}>
+                    <span className="font-bold text-brand-300">{r}</span>
+                    {i < allowedRoles.length - 1 && <span className="text-slate-500">, </span>}
+                  </span>
+                ))}
+              </p>
+            )}
           </div>
 
           {/* Action Buttons */}

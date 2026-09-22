@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Union
 from pydantic import BaseModel
 
 
@@ -16,8 +16,8 @@ class EventBase(BaseModel):
 
 
 class EventCreate(EventBase):
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: Optional[Union[datetime, str]] = None
+    end_time: Optional[Union[datetime, str]] = None
 
 
 class EventUpdate(BaseModel):
@@ -29,8 +29,8 @@ class EventUpdate(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     status: Optional[str] = None
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: Optional[Union[datetime, str]] = None
+    end_time: Optional[Union[datetime, str]] = None
     wifi_name: Optional[str] = None
     wifi_password: Optional[str] = None
 
@@ -41,6 +41,9 @@ class EventResponse(EventBase):
     end_time: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    is_registered: bool = False
+    is_checked_in: bool = False
+    has_reviewed: bool = False
 
     class Config:
         from_attributes = True
@@ -99,6 +102,8 @@ class EventScheduleResponse(BaseModel):
     capacity: int = 100
     registered_count: int = 0
     is_registered: bool = False
+    is_checked_in: bool = False
+    has_reviewed: bool = False
     registration_id: Optional[int] = None
     qr_code_token: Optional[str] = None
     qr_code_image: Optional[str] = None

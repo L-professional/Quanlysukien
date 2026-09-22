@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Plus,
   Mic,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -144,6 +145,7 @@ export const Header: React.FC<HeaderProps> = ({
         '/feedback': 'feedback',
         '/users': 'users',
         '/logs': 'logs',
+        '/settings': 'settings',
       };
       const targetTab = linkToTab[item.link] || 'dashboard';
       setActiveTab?.(targetTab);
@@ -211,15 +213,17 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const searchItems = [
-    { id: 'dashboard', label: 'Dashboard Báo Cáo', category: 'Quản Trị' },
+    { id: 'landing', label: 'Trang Chủ Portal', category: 'Cổng Công Khai' },
+    { id: 'dashboard', label: 'Dashboard Báo Cáo (4 Vai Trò)', category: 'Quản Trị' },
     { id: 'schedule', label: 'Danh Mục Sự Kiện (Events)', category: 'Sự Kiện' },
     { id: 'scanner', label: 'Soát Vé QR Check-in', category: 'Vận Hành' },
     { id: 'inquiries', label: 'AI Concierge (HITL Inquiries)', category: 'AI & Khách Hàng' },
     { id: 'content-studio', label: 'AI PR Studio', category: 'Nội Dung' },
     { id: 'knowledge-base', label: 'Kho Tri Thức RAG', category: 'Kho Dữ Liệu' },
-    { id: 'feedback', label: 'Tổng Hợp Feedback & AI Summary', category: 'Đánh Giá' },
+    { id: 'feedback', label: 'AI Feedback & Summary', category: 'Đánh Giá' },
     { id: 'users', label: 'Quản Lý Người Dùng', category: 'Hệ Thống' },
     { id: 'logs', label: 'Security & AI Audit Logs', category: 'Bảo Mật' },
+    { id: 'settings', label: 'Cài Đặt Hệ Thống (Hồ Sơ & Bảo Mật)', category: 'Cá Nhân' },
   ];
 
   const roleMeta: Record<
@@ -512,7 +516,18 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
 
                   {/* Auth Actions */}
-                  <div className="pt-2 mt-2 border-t border-slate-100">
+                  <div className="pt-2 mt-2 border-t border-slate-100 space-y-1">
+                    <button
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        if (setActiveTab) setActiveTab('settings');
+                        else window.location.href = '/settings';
+                      }}
+                      className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/70 rounded-xl flex items-center gap-2 transition-colors text-left cursor-pointer"
+                    >
+                      <SettingsIcon className="w-4 h-4 text-slate-500" />
+                      {t('header.settings', 'Cài Đặt Tài Khoản')}
+                    </button>
                     <button
                       onClick={() => {
                         setShowUserDropdown(false);

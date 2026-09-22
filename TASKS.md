@@ -496,3 +496,484 @@
     - Gán phím tắt `Ctrl + Enter` để trigger action Duyệt & Gửi Phản Hồi nhanh.
   - **4. Chọn Kênh Gửi (Dispatch Channel Selector):**
     - Cho phép chọn kênh gửi (Email / In-App Notify / SMS) trước khi bấm `[Duyệt & Gửi Phản Hồi]`.
+
+## HOÀN THIỆN MODULE AI PR & TRUYỀN THÔNG STUDIO (Task 38)
+
+- [x] **Task 38: Hoàn Thiện Module AI PR & Truyền Thông Studio (Gemini SDK & Form State Binding)**
+  - **1. Backend System Prompt & Endpoint Linh Hoạt (Unrestricted AI Prompt):**
+    - Tạo endpoint `POST /api/v1/ai/generate-pr` (kèm alias `POST /api/v1/pr-studio/generate`) tích hợp Gemini SDK với model `gemini-2.5-flash`.
+    - Cấu hình System Prompt đa nhiệm linh hoạt: vừa tự nhiên giải đáp, chào hỏi, tư vấn cởi mở về sự kiện, vừa xử lý sinh bài PR chuẩn xác bám sát payload (`event_name`, `event_category`, `event_time`, `event_location`, `target_audience`, `main_topic`, `tone_of_voice`, `keywords`).
+    - Hỗ trợ trích xuất cấu trúc đa kênh cho 3 ấn phẩm: Email (Subject, Body, CTA), Social (Hook, Body, Hashtags), Reminder (SMS/Push Notification).
+  - **2. Binding Form Data & Bộ Chọn Tông Giọng (Interactive Tone Selector):**
+    - Binding 100% hai chiều state tại route `/content-studio` cho tất cả các trường: Tên sự kiện, Danh mục sự kiện (kèm gợi ý chip nhanh), Thời gian, Người dùng / Khán giả mục tiêu, Hội trường / Địa điểm, Chủ đề chính, Từ khóa.
+    - Bộ chọn Tông giọng dạng nút bấm tương tác linh hoạt: *Chuyên nghiệp (Professional)*, *Thu hút / Hào hứng (Engaging)*, *Thân mật / Gần gũi (Casual)* tự động lưu và highlight trực quan.
+  - **3. Render Đa Tab & Hiệu Ứng Chờ (Multi-Tab Output & Skeleton Loading):**
+    - Xử lý gửi request khi bấm nút `[✨ Tạo Nội Dung Bằng AI]`.
+    - Hiệu ứng Skeleton Loading hiện đại ở khung kết quả bên phải trong suốt thời gian chờ Gemini phản hồi.
+    - Hiển thị kết quả linh hoạt theo 3 tab chuyên biệt:
+      - *Bản tin Email*: Có Tiêu đề (Subject) kèm nút sao chép nhanh, Thân bài và Lời kêu gọi hành động (CTA).
+      - *Bài đăng Mạng xã hội*: Có Hook mở đầu bắt trend, Thân bài và Bộ Hashtags tag cloud tương tác.
+      - *Tin nhắc sự kiện*: Khung mô phỏng Push Notification / SMS trên smartphone kèm mốc giờ, địa điểm và nhắc nhở QR code.
+  - **4. Thanh Công Cụ Thao Tác Nhanh (Quick Content Actions):**
+    - `[📋 Sao Chép Nội Dung]`: Sao chép nhanh nội dung ấn phẩm của tab hiện tại kèm Sonner toast.
+    - `[🔄 Tạo Lại Bản Khác]`: Kích hoạt tạo phiên bản mới với cùng thông số form đầu vào.
+    - `[📤 Xuất Khung Văn Bản]`: Xuất và tải ngay file văn bản Markdown (`.md`) chứa trọn bộ ấn phẩm truyền thông và siêu dữ liệu sự kiện về máy.
+
+## HOÀN THIỆN MODULE PHÂN TÍCH, ĐÁNH GIÁ & ĐỀ XUẤT GIẢI PHÁP BẰNG AI (AI FEEDBACK & ANALYTICS ENGINE) (Task 39)
+
+- [x] **Task 39: Hoàn thiện Module Phân Tích, Đánh Giá & Đề Xuất Giải Pháp Bằng AI (AI Feedback & Analytics Engine) trên giao diện /feedback-summary và /dashboard**
+  - **1. Backend AI Analytics Engine & API Endpoints (FastAPI & Gemini RAG):**
+    - Tạo API endpoint `POST /api/v1/ai/analyze-feedback`:
+      - Truy vấn và tổng hợp phản hồi thực tế từ bảng `feedbacks` trong PostgreSQL.
+      - Phân tích cảm xúc đa chiều (*Positive / Neutral / Negative*) và tính toán chỉ số hài lòng *Satisfaction Score* (thang điểm 100 & điểm trung bình 5.0 ⭐).
+      - Tự động phát hiện điểm nghẽn vận hành (Operational Bottlenecks): dồn ứ tại cổng check-in giờ cao điểm (Check-in Congestion), tỷ lệ tham dự thấp tại các phiên chuyên đề (Low Attendance Rate), và phản ánh kỹ thuật/hậu cần.
+      - Tích hợp Gemini RAG/Prompting để sinh Kế Hoạch Khắc Phục (*Action Plan*) tức thì phân bổ rõ ràng theo từng phòng ban, mức độ ưu tiên (*CRITICAL, HIGH, MEDIUM, LOW*), thời gian thực thi và dự báo tác động định lượng.
+    - Tạo API endpoint `POST /api/v1/ai/apply-action-plan`: Tiếp nhận danh sách giải pháp được duyệt và ghi nhận vào hệ thống nhật ký kiểm toán (*AILog*).
+  - **2. Binding Dữ Liệu Lên Giao Diện React Tại `/feedback-summary`:**
+    - Cập nhật định tuyến route alias `/feedback-summary` và `/feedback`.
+    - Hiển thị 4 thẻ thông số điều hành: *Satisfaction Score*, *Phân Bổ Cảm Xúc*, *Điểm Nghẽn Phát Hiện*, *Tiến Độ Kế Hoạch Khắc Phục*.
+    - Khung *AI Executive Summary* giao diện tối màu sang trọng kèm Live RAG status và nút sao chép nhanh.
+    - Khung *Top Điểm Nghẽn Vận Hành*: Cảnh báo dồn ứ cửa soát vé giờ cao điểm, tỷ lệ tham dự phòng workshop và vấn đề âm thanh/tea-break.
+    - Khung *Kế Hoạch Khắc Phục Tự Động Thời Gian Thực (AI Action Plan)*: Danh sách thẻ giải pháp có gắn nhãn ưu tiên, phòng ban phụ trách, dự báo tác động và nút chuyển đổi trạng thái *Đã Áp Dụng*.
+  - **3. Binding Dữ Liệu Lên Giao Diện React Tại `/dashboard`:**
+    - Bổ sung khối module *AI Feedback & Analytics Engine* ngay trên trang tổng quan.
+    - Hiển thị thẻ *Sentiment Score*, *Satisfaction Score*, danh sách điểm nghẽn và khung đề xuất giải pháp trực tiếp trên màn hình quản trị.
+    - Điều hướng mượt mà tới `/feedback-summary` chỉ với 1 click.
+  - **4. Thanh Công Cụ Thao Tác Nhanh (Quick Action Toolbar):**
+    - `[📥 Xuất Báo Cáo Executive Summary (PDF/Word)]`: Cho phép tải báo cáo quản trị đầy đủ định dạng Word (`.doc`) hoặc in/lưu PDF chuyên nghiệp.
+    - `[⚡ Phân Tích Real-Time]`: Kích hoạt gọi AI Engine tái phân tích toàn bộ dữ liệu phản hồi và vận hành theo thời gian thực.
+    - `[✅ Áp Dụng Kế Hoạch Khắc Phục]`: Chuyển đổi trạng thái và áp dụng toàn bộ giải pháp do AI đề xuất vào hệ thống điều phối.
+
+## HOTFIX AI FEEDBACK & ANALYTICS ENGINE (Task 40)
+
+- [x] **Task 40: Hotfix - Khắc Phục Lỗi Kích Hoạt AI Feedback & Analytics Engine (/feedback & /dashboard)**
+  - **1. Backend Graceful Fallback & Exception Handling (FastAPI):**
+    - Đảm bảo route `POST /api/v1/ai/analyze-feedback` tại [`backend/app/api/v1/ai_analytics.py`](file:///d:/TL_2026-2027/eventhub-ai/backend/app/api/v1/ai_analytics.py) được bao bọc hoàn toàn trong khối `try-except`.
+    - Giới hạn timeout gọi Gemini API tối đa 3.0 giây để tránh nghẽn tiến trình mạng.
+    - Trong mọi trường hợp mất kết nối, thiếu `GEMINI_API_KEY`, DNS lookup thất bại hoặc API quá tải, tự động trả về cấu trúc dữ liệu phân tích mẫu đầy đủ (*satisfaction_score*, *sentiment_breakdown*, *top_bottlenecks*, *action_plan*, *executive_summary*) với HTTP Status 200 OK thay vì lỗi 500.
+  - **2. Frontend State Recovery & Fallback (React):**
+    - Tại [`frontend/src/services/api.ts`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/services/api.ts) và [`frontend/src/pages/FeedbackSummary.tsx`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/pages/FeedbackSummary.tsx), bổ sung try-catch bọc quanh lệnh gọi API.
+    - Tự động nạp bộ dữ liệu Fallback nội bộ nếu fetch bị hủy hoặc lỗi mạng.
+    - Luôn đảm bảo `setLoading(false)` và `setAiLoading(false)` để giao diện lập tức hiển thị báo cáo hoàn chỉnh, không bao giờ rơi vào trạng thái treo hoặc báo Toast lỗi.
+    - Cập nhật tương tự cho hàm phân tích real-time tại [`frontend/src/pages/Dashboard.tsx`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/pages/Dashboard.tsx).
+  - **3. Đăng Ký Router & CORS Checking:**
+    - Xác nhận endpoint `/api/v1/ai/analyze-feedback` và `/api/v1/ai/apply-action-plan` đã được `include_router` chính xác vào main FastAPI app qua `api_v1_router`.
+    - CORS middleware đã được cấu hình mở (`allow_origins=["*"]`, `allow_methods=["*"]`, `allow_headers=["*"]`) không gây cản trở các request từ frontend.
+
+## HOTFIX ĐỘC LẬP TRẠNG THÁI NÚT BẤM & FIX LỖI XÓA SỰ KIỆN (Task 41)
+
+- [x] **Task 41: Hotfix - Độc Lập Trạng Thái Nút Bấm Theo Tài Khoản & Fix Lỗi Xóa Sự Kiện Không Lưu DB**
+  - **1. Phân Lập Trạng Thái Button Theo `user_id` (User-Specific Button State):**
+    - **Backend:** Cập nhật các API truy vấn danh sách sự kiện (`GET /api/v1/events/`) để trả về các cờ trạng thái (`is_registered`, `is_checked_in`, `has_reviewed`) được tính toán ĐỘC LẬP dựa theo `current_user.id` từ JWT token.
+    - **Frontend:** Tại trang Danh mục sự kiện (`/events`), kiểm tra tất cả các nút hành động (*Đăng ký, Check-in, Đánh giá/Feedback*). Đảm bảo giao diện chỉ hiển thị trạng thái "Đã đánh giá" hoặc "Đã đăng ký" NẾU chính tài khoản đang đăng nhập đã thực hiện hành động đó.
+  - **2. Khắc Phục Triệt Để Lỗi Xóa Sự Kiện (Persistent Event Deletion):**
+    - **Backend:** Kiểm tra endpoint `DELETE /api/v1/events/{event_id}` trong FastAPI. Đảm bảo có xử lý xóa/cascade các bản ghi liên quan trong PostgreSQL và gọi `db.commit()`.
+    - **Frontend:** Cập nhật hàm xử lý nút **Xóa sự kiện**: Bắt buộc dùng `await` gọi API `DELETE /api/v1/events/{id}` thành công, sau đó mới cập nhật lại React state hoặc re-fetch danh sách sự kiện từ server.
+  - [x] **Task 42: Nâng Cấp Engine AI Feedback & Summary - Phân Tích Phản Hồi Tiêu Cực & Đề Xuất Chuyên Sâu**
+  - **1. Backend Aspect-Based Sentiment Analysis & Severity Matrix (FastAPI + Gemini):**
+    - Cập nhật API `POST /api/v1/ai/analyze-feedback` hỗ trợ phân loại phản hồi tiêu cực theo 3 nhóm khía cạnh: *Hạ tầng/Kỹ thuật, Nội dung/Diễn giả, Hậu cần/Trải nghiệm*.
+    - Gán mức độ nghiêm trọng (Critical / Moderate / Minor) cho các điểm nghẽn để thiết lập thứ tự ưu tiên xử lý.
+  - **2. AI Qualitative Insights & Trích Xuất Dẫn Chứng:**
+    - Lập trình AI tự động tổng hợp đoạn văn nhận định định tính (Qualitative Text), bóc tách nguyên nhân cốt lõi kèm trích dẫn nguyên văn phản hồi tiêu cực tiêu biểu từ người tham dự.
+  - **3. Động Cơ Sinh Email Xin Lỗi & Đền Bù Tự Động (Auto Recovery Draft):**
+    - Xây dựng API `POST /api/v1/ai/generate-apology` tự động sinh bản thảo Email xin lỗi cá nhân hóa kèm voucher/ưu đãi dành cho người tham dự đánh giá 1-2 sao.
+  - **4. Giao Diện Báo Cáo Chuyên Sâu & RAG Benchmarking (React `/feedback-summary`):**
+    - Render khối **"Nhận Định Chi Tiết Từ AI"** hiển thị nguyên nhân & trích dẫn người dùng.
+    - Render widget **"Email Xin Lỗi Tự Động"** cho phép Admin xem trước và gửi nhanh.
+    - Tích hợp đối chiếu chỉ số phản hồi so với các sự kiện trước đó qua CSDL Vector (`pgvector`).
+- [x] **Task 43: Nâng Cấp Toàn Diện AI Concierge Queue (HITL) - Tiếng Việt, Prompt Assistant & AI Advanced Automation**
+  - **1. Ưu Tiên Tiếng Việt & Phản Hồi Song Ngữ (Bilingual Auto-Response):**
+    - Cập nhật backend `POST /api/v1/ai/generate-concierge-response`: Ép AI sinh câu trả lời mặc định bằng **Tiếng Việt** chuẩn xác.
+    - Hỗ trợ chế độ sinh phản hồi song ngữ Anh - Việt cho khách quốc tế.
+  - **2. Bộ Công Cụ Trợ Lý AI (Prompt Assistant Actions):**
+    - `[🌐 Dịch Ngôn Ngữ]`: Chuyển đổi linh hoạt nội dung gợi ý sang Tiếng Việt/Anh.
+    - `[✨ Viết Lại Trực Quan]`: Định dạng lại text ngắn gọn, bổ sung icon và bullet point.
+    - `[📍 Chèn WiFi & Bản Đồ]`: Tự động đính kèm thông tin WiFi và sơ đồ hội trường.
+  - **3. Xem Trích Dẫn RAG & Đính Kèm Thông Tin Tự Động (Smart Attachment & RAG Popover):**
+    - Hiển thị Popover/Modal chi tiết chunk văn bản từ PostgreSQL (pgvector) khi bấm `[Xem trích dẫn đầy đủ]`.
+    - Bổ sung nút `[📎 Chèn QR Check-in]`: Tự động tra cứu mã QR/Thẻ tham dự của user trong CSDL và chèn vào phản hồi.
+  - **4. Phân Luồng VIP & Chế Độ Tự Động Duyệt (VIP Escalation & Auto-Pilot):**
+    - Tự động đẩy các câu hỏi từ khách có badge `VIP` hoặc chứa từ khóa khẩn cấp lên đầu hàng đợi.
+    - Thêm công tắc `[⚡ Auto-Approve RAG > 95%]`: Tự động duyệt và gửi câu trả lời nếu độ chính xác RAG đạt trên 95%.
+- [x] **Task 44: Thiết Kế Giao Diện UI/UX Toàn Diện Chuẩn Template & Tích Hợp Phân Hệ AI**
+
+  - **1. Landing Page Công Khai (Public Portal `/`):**
+    - **Hero Section:** Banner xanh ngọc/xanh đậm hiện đại, tiêu đề "Nền tảng quản lý sự kiện thông minh với AI", thẻ floating "AI Assistant" và "Sự kiện chuyên nghiệp".
+    - **Stats Counter Bar:** 4 thẻ chỉ số: *1,000+ Sự kiện*, *500+ Doanh nghiệp*, *50,000+ Người tham dự*, *99.9% Độ ổn định*.
+    - **Feature Showcase:** Grid hiển thị giải pháp toàn diện (Quản lý sự kiện, Soát vé QR, AI PR Studio, Feedback Engine, RAG Concierge) kèm mockup thiết bị.
+    - **Sự Kiện Nổi Bật:** Grid danh sách sự kiện kèm bộ lọc danh mục, ngày tổ chức và nút `[Đăng ký ngay]`.
+    - **Testimonials & Footer:** Thẻ đánh giá khách hàng (5 sao) và Footer đa cột chuẩn SEO.
+
+  - **2. Phân Quyền 4 Giao Diện Dashboard (Role-Based Dashboards):**
+    - **Role 1: Giao Diện Người Tham Dự (Attendee):**
+      - Widget chào hỏi cá nhân hóa, khung "Trợ lý AI Chat ngay".
+      - Danh sách "Sự kiện sắp diễn ra" và "Sự kiện đã đăng ký" kèm thẻ vé QR cá nhân.
+    - **Role 2: Giao Diện Nhân Viên Sự Kiện (Staff / Check-in):**
+      - Thẻ tổng quan soát vé (*Tổng vé, Đã check-in, Còn lại, Tỷ lệ %*).
+      - Bảng log "Danh sách check-in gần đây" real-time + Thanh tác vụ nhanh (*Quét mã QR, Tìm khách, Soát vé thủ công*).
+    - **Role 3: Giao Diện Quản Lý Sự Kiện (Organizer):**
+      - Thẻ tổng quan hệ thống, biểu đồ đường (Registrations over time), biểu đồ tròn phân bổ doanh thu/vé.
+      - Bảng điều khiển tích hợp lối vào nhanh cho **AI PR Studio** và **AI Feedback & Summary**.
+    - **Role 4: Giao Diện Quản Trị Viên (Admin):**
+      - Metrics tổng quan hệ thống (Users, Events, Revenue, Server Uptime 99.9%).
+      - Biểu đồ phân bổ vai trò người dùng + Cài đặt hệ thống & Nhật ký bảo mật.
+
+  - **3. Tích Hợp Các Module AI Nâng Cao Vào Menu Sidebar:**
+    - **AI Concierge Queue (`/inquiries`):** Tích hợp giao diện kiểm duyệt HITL, bộ công cụ Prompt Assistant (Dịch, Viết lại, Chèn WiFi/Bản đồ, QR Check-in), Popover RAG Snippet và phân luồng ưu tiên khách VIP.
+    - **AI PR Studio (`/content-studio`):** Tích hợp form binding parameters, bộ chọn Tông giọng linh hoạt, hiệu ứng Skeleton Loading và xem trước đa tab (Email, Social, SMS).
+    - **AI Feedback & Summary (`/feedback-summary`):** Tích hợp Sentiment Score, phân tích khía cạnh (Hạ tầng, Nội dung, Hậu cần), AI Qualitative Insights và đống cơ sinh Email xin lỗi tự động.
+
+  - **4. Quy Chuẩn UI/UX & Styling:**
+    - Sử dụng Tailwind CSS với tông màu chủ đạo: Deep Blue (`#0F172A`), Primary Accent Blue (`#2563EB`), Glassmorphism nhẹ và Lucide Icons.
+    - Đảm bảo Responsive 100% trên Desktop, Tablet và Mobile.
+- [x] **Task 45: Refactor UI/UX Khớp Visual Mockup (Landing Page & 4 Role Dashboards)**
+
+  - **1. Quy Chuẩn Bảng Màu & Theme (Tailwind CSS):**
+    - Màu nền Hero/Sidebar: Dark Navy (`#0B132B` / `bg-slate-900`).
+    - Màu nhấn Brand: Primary Blue (`#2563EB` / `bg-blue-600`), hiệu ứng Gradient (`bg-gradient-to-r from-blue-600 to-indigo-600`).
+    - Nền trang Dashboard: Light Gray (`bg-slate-50`), Card container: White (`bg-white`) bo góc `rounded-xl`, shadow nhẹ `shadow-sm border border-slate-100`.
+
+  - **2. Tái Cấu Trúc Landing Page Công Khai (`/`):**
+    - **Header:** Sticky Navbar với Logo "EventAI", menu điều hướng, nút [Đăng nhập] và [Đăng ký] xanh gradient.
+    - **Hero Section:** Tiêu đề lớn "Tạo nên những sự kiện đáng nhớ với EventAI", bên phải là hình ảnh/mockup sân khấu sự kiện hoành tráng kèm các thẻ floating badge ("AI hỗ trợ tổ chức", "Sự kiện chuyên nghiệp").
+    - **Stats Bar:** 4 thẻ chỉ số vuông vắn căn giữa (*500+ Sự kiện*, *50,000+ Người tham dự*, *200+ Doanh nghiệp*, *99.9% Độ ổn định*).
+    - **Feature Grid:** Khối 2 cột "Vì sao chọn EventAI?" kèm hình ảnh Laptop/Tablet hiển thị màn hình ứng dụng.
+    - **Event Cards:** Grid 4 cột hiển thị danh sách sự kiện nổi bật có thumbnail, ngày tháng, địa điểm và nút `[Đăng ký ngay]` xanh lam.
+    - **CTA Banner & Testimonials:** Sân khấu hoành tráng, 3 thẻ đánh giá khách hàng (5 sao) và Footer đa cột chuẩn SEO.
+
+  - **3. Chuẩn Hóa 4 Bố Cục Dashboard Theo Vai Trò (Role Dashboards):**
+    - **Giao diện Người tham dự:** Header chào "Xin chào, [Tên]", Widget Trợ lý AI bên phải, Grid "Sự kiện sắp diễn ra" và danh sách "Sự kiện đã đăng ký" kèm modal vé QR.
+    - **Giao diện Nhân viên (Staff):** Top bar chứa 4 thẻ chỉ số check-in, bảng "Danh sách check-in gần đây" góc trái + Cột "Thao tác nhanh" (*Quét QR, Tìm khách, Tạo sự kiện mới, Gửi thông báo*) viền xanh bên phải.
+    - **Giao diện Quản lý sự kiện (Organizer):** 4 Stat Cards top head + Biểu đồ đường (Line chart) xu hướng đăng ký + Biểu đồ tròn (Donut chart) phân bổ doanh thu 856M và Sự kiện sắp tới.
+    - **Giao diện Quản trị viên (Admin):** Màn hình Quản lý hệ thống với 4 thẻ tổng quan (1,268 người dùng, 48 sự kiện, 856,230,000đ, 99.9%), Biểu đồ tròn phân bổ vai trò người dùng và danh sách Hoạt động hệ thống real-time.
+- [x] **Task 46: Cấu Hình Trang Chủ Công Khai (Public Landing Page `/`) & Tích Hợp Nút Thao Tác Sự Kiện**
+
+  - **1. Route Mặc Định & Navigation Bar Công Khai:**
+    - Cấu hình route `/` thành Public Landing Page độc lập (không bắt buộc đăng nhập để xem).
+    - **Header Sticky:** Logo **EventAI**, các menu (*Trang chủ, Sự kiện, Tính năng, Giải pháp, Bảng giá, Tin tức, Liên hệ*), thanh tìm kiếm nhanh tương tác thời gian thực, cùng 2 nút hành động `[Đăng nhập]` và `[Đăng ký]` kèm hỗ trợ tham số query `redirect`.
+
+  - **2. Hero Section & Khối Chỉ Số (Stats Counter Bar):**
+    - **Hero Banner:** Tiêu đề lớn *"Tạo nên những sự kiện đáng nhớ với EventAI"*, đoạn mô tả ngắn, kèm 2 nút CTA `[Khám phá sự kiện ->]` (scroll tự động xuống danh sách sự kiện) và `[Tìm hiểu thêm]` (scroll xuống phần tính năng).
+    - **Thẻ Floating Badges:** Hiển thị thẻ *"AI hỗ trợ tổ chức"* và *"Sự kiện chuyên nghiệp"* phía trên banner bên phải.
+    - **Stats Bar:** 4 thẻ chỉ số nổi bật: *500+ Sự kiện đã tổ chức*, *50.000+ Người tham dự*, *200+ Doanh nghiệp tin tưởng*, *99.9% Độ ổn định*.
+
+  - **3. Khối Giới Thiệu & Mô Phỏng Giao Diện (Device Mockups):**
+    - **Section "Vì sao chọn EventAI?":** Danh sách ưu điểm bên trái + Mockup thiết bị (Laptop & Smartphone hiển thị ứng dụng) bên phải kèm các thẻ tính năng floating (*Tối ưu trải nghiệm, Báo cáo real-time*).
+
+  - **4. Grid Sự Kiện Nổi Bật & Xử Lý Nút Đăng Ký (Featured Events):**
+    - **Section "Sự kiện nổi bật":** Render Grid 4 cột các thẻ sự kiện thực tế lấy từ Database (hoặc Mock Data chuẩn mẫu) gồm: Ảnh thumbnail, Ngày tháng, Tiêu đề, Mô tả ngắn, Địa điểm.
+    - **Nút `[Đăng ký ngay ->]` trên từng thẻ:** 
+      - Nếu người dùng đã đăng nhập: Mở Modal xác nhận đăng ký sự kiện ngay lập tức, chọn vé Tiêu chuẩn/VIP, hiển thị mã vé và QR Code tham dự.
+      - Nếu chưa đăng nhập: Tự động điều hướng sang trang Đăng nhập / Đăng ký kèm tham số `redirect`.
+
+  - **5. Khối Kêu Gọi Hành Động, Đánh Giá & Footer:**
+    - **Banner "Tổ chức sự kiện chuyên nghiệp":** Nút `[Đăng ký ngay]` và `[Liên hệ tư vấn]` (Modal gửi thông tin tư vấn nhanh).
+    - **Khách hàng nói về chúng tôi:** 3 card đánh giá (5 sao) cá nhân hóa.
+    - **Footer:** Đầy đủ thông tin liên hệ, hotline 1900 1234, email, liên kết nhanh và bản quyền hệ thống.
+- [x] **Task 47: Bỏ Bắt Buộc Đăng Nhập Mặc Định - Hiển Thị Public Landing Page Tại Route Root (`/`)**
+
+  - **1. Cấu Hình Lại React Router (`App.jsx` / `routes.jsx`):**
+    - Gỡ bỏ `AuthGuard` / `ProtectedRoute` đang bao bọc đường dẫn root `/`.
+    - Gán component **Public Landing Page** làm element mặc định cho path `/`.
+    - Chuyển màn hình Đăng nhập về đúng path độc lập `/login`.
+
+  - **2. Xử Lý Tự Động Điều Hướng (Navigation & Auth Flow):**
+    - Kiểm tra và hủy bỏ tất cả logic `navigate('/login')` tự động kích hoạt khi mở trang chính.
+    - Nếu người dùng chưa đăng nhập: Mở `localhost:3000` sẽ thấy ngay Landing Page sự kiện. Khi bấm `[Đăng nhập]` trên Header mới chuyển hướng đến `/login`.
+    - Nếu người dùng đã đăng nhập: Mở `localhost:3000` vẫn thấy Landing Page, trên Header hiển thị nút `[Vào Dashboard ->]`.
+
+  - **3. Kiểm Thử Tab Ẩn Danh (Incognito Check):**
+    - Mở tab ẩn danh truy cập `localhost:3000` để đảm bảo hệ thống không bắt đăng nhập và tải thẳng giao diện Trang chủ công khai.
+- [x] **Task 48: Xóa "Trang Chủ Portal" Khỏi Sidebar & Thiết Lập Public Landing Page Làm Route Root (`/`)**
+
+  - **1. Xóa Nút "Trang Chủ Portal" Trong Sidebar:**
+    - Mở component Sidebar (`frontend/src/components/Sidebar.tsx`).
+    - Đã xóa hoàn toàn phần tử "Trang Chủ Portal" và icon `Globe` khỏi mảng menu.
+    - Giữ lại đầy đủ các mục: Dashboard Báo Cáo, Danh Mục Sự Kiện, Cổng Diễn Giả, Soát Vé QR, AI Concierge, AI PR Studio, Kho Tri Thức RAG, AI Feedback & Summary, Quản Trị Tài Khoản, Nhật Ký Bảo Mật.
+
+  - **2. Đưa Public Landing Page Thành Trang Mặc Định (`/`):**
+    - File cấu hình đường dẫn `App.tsx`: Route `/` và `/landing` render trực tiếp component Public Landing Page độc lập cấp cao nhất.
+    - Tuyệt đối không dùng `AuthGuard` / `ProtectedRoute` trên root `/`. Không tự động chuyển hướng khi mở `localhost:3000`.
+
+  - **3. Tách Độc Lập Route Auth & Dashboard:**
+    - Giao diện Đăng nhập / Đăng ký đặt tại route riêng `/login`.
+    - Giao diện Báo cáo / Quản trị đặt tại route `/dashboard`.
+    - Trên Header của Public Landing Page, khi bấm nút `[Đăng nhập]` mới điều hướng sang `/login`. Khi đã đăng nhập, hiển thị nút `[Vào Dashboard ->]`.
+- [x] **Task 52: Hiển Thị Landing Page Công Khai Làm Trang Mặc Định Ngay Khi Mở Website & Chuẩn Hóa Routing/Sidebar**
+
+  - **1. Hiển Thị Trang Chủ Công Khai Ngay Khi Truy Cập Link (`/`):**
+    - Đặt component **Public Landing Page** làm route mặc định tại `/`. Ngay khi người dùng mở URL website (`localhost:3000`), màn hình **Trang Chủ Công Khai** được tải và hiển thị ĐẦU TIÊN.
+    - Hủy bỏ hoàn toàn các logic `AuthGuard`, `ProtectedRoute` hoặc tự động `navigate('/login')` / `navigate('/dashboard')` ép người dùng phải đăng nhập khi vừa truy cập trang web.
+
+  - **2. Thiết Kế Giao Diện Trang Chủ Chuẩn 100% Theo Visual Mockup:**
+    - **Header Sticky:** Logo **EventAI**, menu điều hướng (*Trang chủ, Sự kiện, Tính năng, Giải pháp, Bảng giá, Tin tức, Liên hệ*), thanh tìm kiếm và 2 nút `[Đăng nhập]`, `[Đăng ký]`.
+    - **Hero Section:** Tiêu đề *"Tạo nên những sự kiện đáng nhớ với EventAI"*, mô tả ngắn, nút `[Khám phá sự kiện ->]`, `[Tìm hiểu thêm]` và các thẻ floating badge ("AI hỗ trợ tổ chức", "Sự kiện chuyên nghiệp").
+    - **Thẻ Chỉ Số (Stats Counter Bar):** 4 thẻ nổi bật: *500+ Sự kiện*, *50,000+ Người tham dự*, *200+ Doanh nghiệp*, *99.9% Độ ổn định*.
+    - **Section "Vì sao chọn EventAI?":** Danh sách ưu điểm + Mockup thiết bị (Laptop & Smartphone) hiển thị ứng dụng.
+    - **Grid "Sự kiện nổi bật":** Render 4 cột thẻ sự kiện với ảnh thumbnail, thông tin chi tiết và nút `[Đăng ký ngay ->]`.
+    - **Footer & Đánh Giá:** Khách hàng đánh giá 5 sao + Footer thông tin đầy đủ.
+
+  - **3. Loại Bỏ "Trang Chủ Portal" Khỏi Sidebar Bên Trong:**
+    - Đã xóa hoàn toàn mục menu **"Trang Chủ Portal"** khỏi Sidebar.
+    - Giữ nguyên các mục: Dashboard Báo Cáo, Danh Mục Sự Kiện, Cổng Diễn Giả, Soát Vé QR, AI Concierge, AI PR Studio, Kho Tri Thức RAG, AI Feedback & Summary, Quản Trị Tài Khoản, Nhật Ký Bảo Mật.
+
+  - **4. Điều Hướng & Phân Quyền (Auth & Dashboard Flow):**
+    - Màn hình Đăng nhập nằm ở route độc lập `/login`, chỉ xuất hiện khi click nút `[Đăng nhập]` trên Header.
+    - Màn hình Dashboard Báo Cáo nằm ở route độc lập `/dashboard`. Khi người dùng đã đăng nhập, trên Header trang chủ hiển thị nút `[Vào Dashboard ->]`.
+
+  - **5. Hotfix Trạng Thái Nút Bấm & Xóa Sự Kiện Persistence:**
+    - Trạng thái các nút (Đánh giá, Đăng ký, Check-in) trong danh mục sự kiện được tính toán độc lập theo `user_id` của tài khoản hiện tại thông qua API `/events` và `/events/{id}/schedule`.
+    - Nút Xóa sự kiện gọi API `DELETE /api/v1/events/{id}` và thực thi `db.commit()` để xóa vĩnh viễn dữ liệu trong PostgreSQL.
+- [x] **Task 54: Chuẩn Hóa Điều Hướng Sau Đăng Nhập Về Màn Hình Dashboard Quản Trị (`/dashboard`)**
+
+  - **1. Luồng Chuyển Trang Chi Tiết:**
+    - **Chưa đăng nhập (Khách vãng lai):** Mở `localhost:3000` -> Hiển thị **Trang Chủ Công Khai (Landing Page)** làm mặc định.
+    - **Click [Đăng nhập]:** Điều hướng sang trang `/login`.
+    - **Sau khi Đăng nhập thành công:** Tự động chuyển hướng ngay sang giao diện **Dashboard Quản Trị (`/dashboard`)** (màn hình hiển thị Quản lý hệ thống, các Stat Cards, Biểu đồ người dùng theo vai trò và Hoạt động hệ thống).
+
+  - **2. Đảm Bảo Cấu Trúc Sidebar Trong Dashboard:**
+    - Trong giao diện `/dashboard`, giữ nguyên Sidebar tối màu gồm các mục: Dashboard Báo Cáo, Danh Mục Sự Kiện, Cổng Diễn Giả, Soát Vé QR, AI Concierge, AI PR Studio, Kho Tri Thức RAG, AI Feedback & Summary, Quản Trị Tài Khoản, Nhật Ký Bảo Mật.
+    - Tuyệt đối **không hiển thị** mục menu "Trang Chủ Portal" trong Sidebar này.
+
+  - **3. Cập Nhật State/Context (Auth Context):**
+    - Đảm bảo hàm `handleRedirectAfterAuth` / `handleLoginSuccess` gọi `navigate('/dashboard')` để đưa người dùng tới thẳng trang Dashboard báo cáo ngay sau khi xác thực thành công.
+- [x] **Task 55: Complete Interactive Navbar & Dynamic Auth Header Component**
+
+  - **1. Điều Hướng & Cuộn Trang Mượt (Anchor Links & Smooth Scrolling):**
+    - **Logo EventAI**: Click vào logo tự động cuộn mượt lên đầu trang (`#hero` / `top: 0`).
+    - **Menu điều hướng (`Trang chủ`, `Sự kiện`, `Tính năng`, `Giải pháp`, `Bảng giá`, `Tin tức`, `Liên hệ`)**: Gắn ID chuẩn xác cho các khối (`#hero`, `#events`, `#features`, `#solutions`, `#pricing`, `#news`, `#footer`). Khi click menu item, tự động kích hoạt `scrollToSection(id)` với `element.scrollIntoView({ behavior: 'smooth' })`.
+    - Tích hợp scroll listener tự động theo dõi vị trí màn hình và highlight gạch chân/màu xanh cho menu item tương ứng.
+
+  - **2. Ô Tìm Kiếm Sự Kiện Real-time (`🔍 Tìm sự kiện, địa điểm...`):**
+    - Kết nối input tìm kiếm với `searchQuery` state.
+    - Khi người dùng gõ từ khóa, tự động lọc danh sách sự kiện trong khối "Sự kiện nổi bật" bên dưới theo tiêu đề, địa điểm, mô tả, danh mục.
+    - Hiển thị số lượng sự kiện tìm thấy, nút xóa từ khóa `(X)`, và phím `Enter` tự động cuộn xuống khối sự kiện.
+
+  - **3. Cấu Hình Trạng Thái User Đã Đăng Nhập (Dynamic Auth State):**
+    - Kiểm tra `user` từ AuthContext / LocalStorage.
+    - **Khi ĐÃ đăng nhập**: Hiển thị lời chào `Hi, [Tên_User]` (ví dụ: `Hi, Nguyễn Văn Quản Trị`) kèm nút bấm xanh `[Vào Dashboard ->]` (điều hướng sang `/dashboard`).
+    - **Khi CHƯA đăng nhập**: Hiển thị 2 nút `[Đăng nhập]` (chuyển sang `/login`) và `[Đăng ký]` (chuyển sang `/login?mode=register` hoặc `/register`).
+
+  - **4. Hiệu Ứng Sticky Header:**
+    - Cấu hình Navbar luôn ghim ở mép trên màn hình khi cuộn trang (`sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-xs transition-all duration-200`).
+    - Tích hợp Mobile Drawer Menu đầy đủ tính năng cho màn hình di động/tablet.
+- [x] **Task 56: Fix Logic Countdown Độc Lập, Chặn Tạo Sự Kiện Quá Khứ & Chuẩn Hóa Bộ Lọc Ngày**
+
+  - **1. Chặn Tạo/Sửa Sự Kiện Thời Gian Trong Quá Khứ (Form Validation):**
+    - Trong Form/Modal Tạo và Chỉnh sửa sự kiện (`CreateEventModal`, `EventForm`, `EventSchedule`):
+    - Thêm validation thời gian: Kiểm tra `start_time` và `start_date`. Nếu thời gian bắt đầu nhỏ hơn `Date.now()`, chặn gửi form và hiển thị thông báo lỗi: *"Thời gian bắt đầu sự kiện không được nằm trong quá khứ"*.
+    - Đặt thuộc tính `min` cho input date/datetime bằng ngày hiện tại (`todayStr`) để ngăn người dùng chọn ngày đã qua.
+
+  - **2. Đếm Ngược Thời Gian Độc Lập Cho Từng Sự Kiện (Dynamic Countdown):**
+    - Đã cập nhật component `SessionCountdownProgress`, `EventCatalogCard`, đồng thời tạo `CountdownTimer` và `EventCard` độc lập.
+    - Loại bỏ hoàn toàn target date dùng chung (`item.day_number === 2 ? ... : ...`).
+    - Tính toán đếm ngược độc lập cho từng thẻ dựa theo `start_time` và `start_date` của từng sự kiện/phiên:
+      + `distance = new Date(event.start_time).getTime() - new Date().getTime()`.
+      + Nếu `distance > 0`: Tính toán và hiển thị chính xác **[NGÀY] [GIỜ] [PHÚT] [GIÂY]** thời gian thực còn lại đến khi sự kiện diễn ra.
+      + Nếu `distance <= 0`: Thay cụm đếm ngược bằng nhãn badge *"Sự kiện đang diễn ra"* với hiệu ứng pulse.
+
+  - **3. Chuẩn Hóa Thanh Bộ Lọc Ngày (Date Filter UI):**
+    - Trong giao diện Danh Mục Sự Kiện: Xóa bỏ các tab cứng dạng "Ngày 1 - ...", "Ngày 2 - ...".
+    - Thay bằng bộ lọc ngày thông minh:
+      + Nút **"Tất cả các ngày"**: Hiển thị toàn bộ sự kiện (`Tất cả các ngày (schedules.length)`).
+      + Các tab ngày thực tế được trích xuất động từ danh sách sự kiện hiện có (ví dụ: `15/10/2026`, `16/10/2026`, `24/10/2026`...).
+      + Khi click vào ngày nào, hệ thống lọc và chỉ hiển thị đúng các sự kiện diễn ra trong ngày đó.
+- [x] **Task 57: Tích Hợp Dropdown Chọn Sự Kiện Đã Tạo & Auto-fill Dữ Liệu Vào AI PR Studio**
+
+  - **1. Gọi API Lấy Danh Sách Sự Kiện Đã Tạo:**
+    - Trong `AIPRStudio.tsx`: Gọi `apiService.getEvents()` kết hợp fallback `EventContext` để lấy toàn bộ danh sách sự kiện hiện có từ Backend database.
+
+  - **2. Bổ Sung Bộ Chọn Sự Kiện (Event Selector UI):**
+    - Thêm ô Dropdown / Select hiện đại phía trên cùng của Form nhập liệu (trước ô "TÊN SỰ KIỆN").
+    - Tùy chọn 1 (Mặc định): *"✍️ Nhập thủ công (Tạo quảng bá sự kiện mới)"*.
+    - Các tùy chọn tiếp theo: Danh sách các sự kiện đã tạo trong database hiển thị dạng `📅 [Tên sự kiện] - [Ngày tổ chức]`.
+
+  - **3. Lập Trình Logic Auto-Fill Dữ Liệu:**
+    - Khi chọn một sự kiện cụ thể từ Dropdown:
+      + **Tên sự kiện** -> Điền vào `eventName`.
+      + **Danh mục sự kiện** -> Trích xuất và điền vào `eventCategory`.
+      + **Thời gian tổ chức** -> Định dạng thông minh và điền vào `eventTime` (ví dụ: `15/10 - 16/10/2026 • 08:30 - 17:30`).
+      + **Hội trường / Địa điểm** -> Điền địa chỉ chi tiết vào `eventLocation`.
+      + **Chủ đề / Thông điệp chính** -> Tự động trích xuất từ `description` sự kiện vào `mainTopic`.
+      + **Từ khóa chính (Keywords)** -> Tự động trích xuất các tag công nghệ và danh mục vào `keywords`.
+    - Khi chuyển lại chọn *"✍️ Nhập thủ công"*: Tự động xóa trống toàn bộ các ô input để người dùng nhập mới từ đầu.
+
+  - **4. Linh Hoạt Chỉnh Sửa & Sinh Nội Dung AI:**
+    - Toàn bộ dữ liệu sau khi auto-fill vẫn hoàn toàn tương tác và cho phép chỉnh sửa tự do trước khi bấm nút sinh bài viết bằng AI Gemini.
+- [x] **Task 58: Làm Sạch Tên Hiển Thị Sự Kiện & Chặn Trùng Lịch / Địa Điểm Sự Kiện**
+
+  - **1. Làm Sạch Tên Hiển Thị Trong Dropdown Auto-fill (AI PR Studio):**
+    - Đã cập nhật `frontend/src/pages/AIPRStudio.tsx` với hàm `cleanEventTitle` loại bỏ hoàn toàn các chuỗi mã hash/UUID ngẫu nhiên (ví dụ `db3f53`, `a4a703`, `9a5d2a`, v.v.).
+    - Chuẩn hóa định dạng hiển thị cho mỗi option trong Dropdown: `${event.title} - ${formattedDate}` (Ví dụ: *"AI Summit Vietnam 2026 - 16/09/2026"*).
+    - Tự động điền tên sạch vào trường Tên Sự Kiện và Chủ Đề khi người dùng chọn sự kiện từ dropdown.
+
+  - **2. Logic Chặn Trùng Lịch & Địa Điểm Khi Tạo/Sửa Sự Kiện (Backend Validation):**
+    - Mở API tạo/cập nhật sự kiện trong `backend/app/api/v1/events.py` và schemas `backend/app/schemas/event.py`.
+    - Thêm hàm `to_comparable_utc` và `check_event_time_location_overlap` chuẩn hóa múi giờ và kiểm tra giao thoa thời gian trước khi commit sự kiện mới hoặc sửa sự kiện:
+      + Điều kiện trùng: `(event.location == payload.location)` VÀ `(payload.start_time < existing_event.end_time)` VÀ `(payload.end_time > existing_event.start_time)` (đối với cập nhật, loại trừ chính sự kiện đang sửa).
+      + Trả về HTTP Status `400 Bad Request` kèm thông báo chi tiết: *"Địa điểm '[Tên địa điểm]' đã có sự kiện '[Tên sự kiện trùng]' đăng ký trong khoảng thời gian này. Vui lòng chọn địa điểm hoặc thời gian khác."*
+
+  - **3. Cập Nhật Thông Báo Lỗi Trên Form (Frontend Validation):**
+    - Trong `frontend/src/services/api.ts`: Cập nhật `createEvent` và `updateEvent` không nuốt lỗi 400/422 mà ném lỗi trả về từ Backend API kèm nội dung `detail`.
+    - Trong `frontend/src/components/CreateEventModal.tsx`: Thêm trạng thái `formError` và hiển thị Banner Alert cảnh báo lỗi nổi bật màu đỏ (`⚠️ Không thể lưu sự kiện (Trùng lịch / Lỗi dữ liệu)`) cùng Toast thông báo chi tiết khi bị từ chối tạo hoặc sửa sự kiện.
+    - Đã kiểm thử tự động toàn diện với bộ test suite `backend/tests/test_task58_overlap.py` đạt 100% Passed.
+
+- [x] **Task 59: Rà Soát & Chuẩn Hóa Logic Toàn Hệ Thống (Single Source of Truth & Data Integrity Audit)**
+
+  - **1. Đồng Bộ Dữ Liệu AI Concierge & Kho Tri Thức RAG (pgvector):**
+    - Chuẩn hóa hàm `sync_event_knowledge(db, event, action="UPSERT"|"DELETE")` trong `backend/app/services/rag_engine.py`.
+    - Tự động kích hoạt Vector Embedding qua Gemini API và cập nhật dữ liệu vào bảng `knowledge_base` (pgvector) mỗi khi có thao tác tạo mới (`POST`), cập nhật (`PUT`) hoặc xóa (`DELETE /api/v1/events/{id}`).
+    - Đảm bảo AI Concierge khi truy vấn thông tin trả lời khách hàng luôn lấy dữ liệu sự kiện theo thời gian thực (Real-time DB context), không sử dụng cache cũ hay thông tin đã bị chỉnh sửa.
+
+  - **2. Thắt Chặt Logic Soát Vé QR Code & Check-in Tại Cổng:**
+    - Cấu trúc dữ liệu mã QR thành đối tượng JSON chuẩn hóa: `{"ticket_id": "...", "event_id": "...", "user_id": "..."}`.
+    - Tại màn hình Quét vé QR (`QRScanner.tsx` & `CheckInScanner.tsx`), bổ sung bộ chọn sự kiện cổng quét và truyền `event_id` xuống Backend API.
+    - Backend API `POST /api/v1/registrations/check-in` đối soát chéo `event_id`. Nếu vé không thuộc sự kiện cổng quét hiện tại, từ chối với trạng thái `INVALID_EVENT` cùng thông báo: `"Vé không hợp lệ cho sự kiện này"`.
+    - Nếu vé hợp lệ nhưng đã quét trước đó, trả về trạng thái `ALREADY_USED` kèm mốc thời gian chính xác: `"Vé đã được quét vào lúc [HH:mm:ss DD/MM/YYYY]"`.
+    - Khi check-in thành công, tự động ghi nhận vào `AILog` phục vụ audit log và đối soát.
+
+  - **3. Ràng Buộc Khung Giờ Speaker Studio & Timeline Sự Kiện:**
+    - Trong `backend/app/api/v1/events.py`, bổ sung hàm kiểm tra `check_session_within_event_bounds(event, date_label, start_time, end_time)`.
+    - Khi tạo mới hoặc chỉnh sửa phiên diễn giả (`POST`, `PUT /api/v1/events/{id}/schedule`), hệ thống kiểm tra và từ chối (HTTP 400) nếu khung giờ của phiên diễn giả nằm ngoài thời gian bắt đầu và kết thúc của sự kiện chính.
+    - Đồng bộ thời gian và thông tin phiên ngay lập tức lên thẻ sự kiện mà không cần tải lại trang.
+
+  - **4. Động Hóa Toàn Diện Dữ Liệu Dashboard (Loại Bỏ Mock Data):**
+    - Tạo mới Endpoint `GET /api/v1/ai/dashboard-stats` tổng hợp trực tiếp từ PostgreSQL: tổng số tài khoản (`COUNT(users)`), sự kiện đang diễn ra (`COUNT(events)`), khách check-in thực tế (`COUNT(registrations)`), doanh thu thực tế (`SUM(price)`), cơ cấu vai trò người dùng và nhật ký hoạt động gần đây.
+    - Cập nhật `frontend/src/pages/Dashboard.tsx` kết nối trực tiếp với API, loại bỏ toàn bộ các số liệu fix cứng (`1,268`, `48`, `856,230,000đ`, v.v.).
+
+  - **5. Bổ Sung Ngữ Cảnh Vòng Đời Sự Kiện Vào AI PR Studio (Lifecycle Context):**
+    - Trong `backend/app/api/v1/pr_studio.py` và `frontend/src/pages/AIPRStudio.tsx`, bổ sung trường `lifecycle` (`UPCOMING` vs `CONCLUDED`).
+    - Khi người dùng chọn sự kiện từ dropdown:
+      + Nếu `start_time > now` (hoặc `status != COMPLETED`): Tự động kích hoạt chế độ *"🚀 Mời đăng ký / Quảng bá truyền thông"* (Email thư mời, Social hook lan tỏa, SMS nhắc lịch & vé QR).
+      + Nếu `end_time < now` (hoặc `status == COMPLETED`): Tự động kích hoạt chế độ *"🏁 Tổng kết / Cảm ơn khách tham dự & Tri ân Diễn giả"* (Email tri ân & mời tải slide/khảo sát ý kiến, Social bài recap thành công, SMS tri ân).
+    - Cung cấp badge hiển thị trực quan và bộ nút chuyển đổi linh hoạt chế độ vòng đời ngay dưới bộ chọn sự kiện.
+
+  - **6. Rà Soát Ràng Buộc Khóa Ngoại & Xóa Phân Cấp (Cascade Delete Audit):**
+    - Bổ sung quy trình xóa phân cấp triệt để trong `DELETE /api/v1/events/{id}`: Tự động dọn dẹp toàn bộ dữ liệu phụ thuộc gồm các phiên trình bày (`event_schedules`), câu hỏi & tài liệu phiên (`session_questions`, `session_resources`, `session_materials`, `session_feedbacks`), vé & đăng ký (`registrations`), đánh giá (`feedbacks`), nhắc nhở (`user_reminders`), hỏi đáp (`event_inquiries`, `inquiry_replies`), và tri thức vector trong PostgreSQL `knowledge_base` qua `sync_event_knowledge(action="DELETE")`.
+    - Đảm bảo an toàn cơ sở dữ liệu, loại bỏ hoàn toàn các bản ghi mồ côi (Orphaned records).
+    - Bộ test kiểm thử tự động toàn diện `backend/tests/test_task59_audit.py` đạt 100% Passed.
+
+- [x] **Task 60: Hotfix Lỗi Màn Hình Đen `/dashboard` (React Crash & Safe Data Guard)**
+
+  - **1. Xử Lý Triệt Để Nguyên Nhân Gốc Gây Crash (Root Cause Fix):**
+    - Phát hiện nguyên nhân chính gây lỗi `TypeError: .map is not a function`: Trong `backend/app/api/v1/ai_analytics.py`, trường `user_roles` được trả về dưới dạng Dictionary (`{'ADMIN': 1, ...}`) thay vì Array.
+    - Cập nhật Backend API `GET /api/v1/ai/dashboard-stats` trả về `user_roles` chuẩn hóa dạng danh sách các đối tượng vai trò (`[{name, pct, color, count}]`) kèm tỷ lệ phần trăm chính xác theo cơ sở người dùng thực tế. Bổ sung `user_roles_map` để lưu giữ cấu trúc map tra cứu khi cần.
+
+  - **2. Bổ Sung Null-Check & Array Guard Toàn Diện (Frontend):**
+    - Trong `frontend/src/pages/Dashboard.tsx`: Khởi tạo các mảng bảo vệ an toàn `userRolesList`, `recentActivitiesList`, `revenueByTierList` với logic kiểm tra `Array.isArray()`, xử lý linh hoạt cả trường hợp đối tượng (Object.entries) và cung cấp fallback data mặc định.
+    - Trong `frontend/src/components/Sidebar.tsx`: Thêm Optional Chaining (`?.`) và giá trị mặc định cho toàn bộ các thuộc tính của `activeEvent` (`activeEvent?.start_date`, `activeEvent?.end_date`, `activeEvent?.title`).
+
+  - **3. Tích Hợp React Error Boundary & Trạng Thái Tải Dữ Liệu (Loading State):**
+    - Xây dựng component `DashboardErrorBoundary` bọc toàn bộ trang `Dashboard`: Nếu có bất kỳ lỗi dựng giao diện nào xảy ra ở các component con, hệ thống hiển thị màn hình thông báo thân thiện kèm nút *"🔄 Tải lại trang"* và *"Thử lại"* thay vì bị văng màn hình đen.
+    - Bổ sung thanh loading skeleton mượt mà ở đầu trang Dashboard trong lúc chờ API phản hồi.
+
+- [x] **Task 61: Lập Trình Phân Quyền Động (Dynamic RBAC) Theo 4 Role Mockup Trên Dashboard**
+
+  - **1. Cấu Hình Bộ Lọc Sidebar Động (Dynamic Sidebar Filtering):**
+    - Kết nối State toàn cục `selectedRole` từ `AuthContext.tsx` với menu Sidebar:
+      + **Role 1 (Người tham dự - Attendee):**
+        * Chỉ hiển thị: Vé QR của tôi (`dashboard`), Sự kiện đã đăng ký (`schedule`), AI Concierge (HITL) (`inquiries`), AI Feedback & Summary (`feedback`).
+        * Ẩn hoàn toàn: Dashboard Báo Cáo hệ thống, Cổng Diễn Giả, AI PR Studio, Kho Tri Thức RAG, Quản Trị Tài Khoản, Nhật Ký Bảo Mật.
+      + **Role 2 (Nhân viên sự kiện - Staff):**
+        * Chỉ hiển thị: Soát Vé QR Code (`scanner`), Danh Sách Check-in (`dashboard`), AI Concierge (`inquiries`).
+        * Ẩn các tính năng tạo/xóa sự kiện, báo cáo doanh thu và quản trị hệ thống.
+      + **Role 3 (Quản lý sự kiện - Event Manager):**
+        * Hiển thị: Dashboard Báo Cáo Sự Kiện, Danh Mục Sự Kiện (Toàn quyền Thêm/Sửa), Cổng Diễn Giả, Soát Vé QR, AI PR Studio, Kho Tri Thức RAG, AI Feedback.
+        * Ẩn các menu cấp hệ thống: Quản Trị Tài Khoản, Nhật Ký Bảo Mật.
+      + **Role 4 (Quản trị viên - Admin):**
+        * Hiển thị đầy đủ 100% tất cả 10 mục menu trong Sidebar.
+
+  - **2. Tùy Biến Giao Diện Nội Dung Dashboard Theo Vai Trò (Dynamic Dashboard Content):**
+    - Khi chuyển đổi qua lại giữa 4 nút Role Mockup:
+      + **Người tham dự:** Hiển thị 3 thẻ chỉ số cá nhân (Số vé đã mua: 3 vé điện tử, Sự kiện sắp tham gia: 2 sự kiện, Lịch trình hôm nay: 1 phiên họp lúc 09:00), danh sách sự kiện sắp diễn ra & đã đăng ký và Popup xem mã QR vé điện tử. Ẩn toàn bộ báo cáo doanh thu/người dùng toàn hệ thống.
+      + **Nhân viên sự kiện:** Màn hình tập trung vào tiến độ Check-in thời gian thực (Số người đã check-in: 1,892 / 2,458 khách kèm thanh tiến độ 77%, Tốc độ soát vé trung bình 0.28s / vé, 3/3 Cổng Scanner trực tuyến, Hàng đợi AI Concierge). Loại bỏ nút tạo sự kiện trong Thao tác nhanh.
+      + **Quản lý sự kiện:** Báo cáo hiệu suất sự kiện (Tổng sự kiện, Tổng khách, Doanh thu, Tỷ lệ hài lòng), Biểu đồ so sánh đăng ký vs thực tế, Sự kiện sắp tới + Công cụ AI PR Studio & AI Feedback.
+      + **Quản trị viên:** Giữ nguyên toàn bộ Biểu đồ tổng quan hệ thống (Tổng người dùng, Doanh thu, Tỷ lệ hoạt động 99.9%, Nhật ký hệ thống, Cài đặt bảo mật RBAC).
+
+  - **3. Chặn Thao Tác Nút Bấm Từng Component (Permission Guard):**
+    - Kiểm tra điều kiện `selectedRole` trên các nút bấm thao tác:
+      + Nút `[Tạo sự kiện]`, `[Chỉnh sửa]`, `[Xóa sự kiện]`: Đã cấu hình Permission Guard tại `EventSchedule.tsx` và `Dashboard.tsx` chỉ cho phép hiển thị và thao tác khi Role là **Quản lý sự kiện** (`ORGANIZER`) hoặc **Quản trị viên** (`ADMIN`). Ẩn hoàn toàn đối với **Người tham dự** và **Nhân viên sự kiện**.
+      + Nút `[Duyệt bài AI]`, `[Đồng bộ RAG]`: Tại `AIPRStudio.tsx`, nút `[✓ Duyệt Bài AI & Phát Hành]` ẩn đối với Người tham dự và Nhân viên sự kiện. Tại `KnowledgeBase.tsx`, nút `[⚡ Đồng bộ RAG (pgvector)]`, nút `[+ Tải tài liệu]` và các thao tác Re-index/Xóa được ẩn hoàn toàn đối với Người tham dự và Nhân viên sự kiện.
+
+  - **4. Kiểm Thử & Xác Nhận:**
+    - Lệnh biên dịch Frontend `npm run build` (`tsc && vite build`) hoàn thành thành công 100% với 0 lỗi.
+
+- [x] **Task 62: Remove "Role Mockup Switcher" Banner from Dashboard UI**
+
+  - **1. Xóa Bỏ Thanh Chế Độ Xem Trong JSX:**
+    - Mở file `Dashboard.tsx` (`frontend/src/pages/Dashboard.tsx`).
+    - Tìm và xóa bỏ hoàn toàn khối JSX thanh switcher *"Chế độ xem Dashboard (4 Role Mockup)"* cùng 4 nút bấm chọn vai trò (`1. Người tham dự`, `2. Nhân viên sự kiện`, `3. Quản lý sự kiện`, `4. Quản trị viên (Admin)`).
+    - Xóa bỏ import biểu tượng `Eye` không còn sử dụng.
+
+  - **2. Dọn Dẹp Code & State Dư Thừa:**
+    - Loại bỏ state/mockup switcher khỏi component `Dashboard.tsx`, chuyển sang tự động xác định vai trò (`activeRoleView`) thông qua `userRole` của tài khoản đăng nhập thực tế.
+    - Cập nhật `Sidebar.tsx` để hiển thị menu phân quyền dựa trên `userRole` trực tiếp, gỡ bỏ tag mockup badge ở footer Sidebar.
+    - Bố cục Dashboard tự động căn chỉnh lại khoảng cách padding/margin gọn gàng, hiển thị trực tiếp giao diện báo cáo "Quản lý hệ thống" chính cho Quản trị viên (hoặc các màn hình báo cáo tương ứng theo vai trò thực).
+
+
+- [x] **Task 63 (Đã sửa đổi): Điều Chỉnh Phân Quyền Staff/Attendee & Chuẩn Hóa Đa Ngôn Ngữ (EN/VI)**
+
+  - **1. Điều Chỉnh Chính Xác Phân Quyền RBAC:**
+    - **Staff (Nhân viên sự kiện):** Cấu hình quyền và hiển thị menu Sidebar **BẰNG HOÀN TOÀN** với quyền của Manager (Quản lý sự kiện). Staff có đầy đủ 8 module: Dashboard Báo Cáo, Danh Mục Sự Kiện (Thêm/Sửa/Xóa), Cổng Diễn Giả, Soát Vé QR Code, AI PR Studio (Duyệt bài AI), Kho Tri Thức RAG (Đồng bộ pgvector), AI Concierge (HITL), AI Feedback. Backend API (`speaker.py`, `events.py`, `registrations.py`, `knowledge.py`, `checkin.py`) đã mở quyền hoàn toàn cho `STAFF`.
+    - **Người tham dự (Attendee):** **ẨN HOÀN TOÀN** 2 mục `AI Concierge (HITL)` và `AI Feedback & Summary` khỏi Sidebar. Sidebar chỉ hiển thị duy nhất 2 mục: `Vé QR của tôi` và `Sự kiện đã đăng ký`.
+    - **Manager (Quản lý sự kiện):** Giữ nguyên toàn quyền điều hành sự kiện và toàn bộ mô-đun AI.
+    - **Admin (Quản trị viên):** Giữ nguyên toàn quyền 100% hệ thống (gồm cả Quản Trị Tài Khoản & Nhật Ký Bảo Mật).
+
+  - **2. Đồng Bộ Chức Năng Đa Ngôn Ngữ (i18n Translation EN/VI):**
+    - Kết nối nút toggle ngôn ngữ `[VN | EN]` trên Header, Login và Landing Page Navbar với thư viện `react-i18next`.
+    - Bổ sung bộ từ điển dịch thuật song ngữ hoàn chỉnh trong `frontend/src/locales/vi.json` và `frontend/src/locales/en.json` cho toàn bộ các module: Navigation, Dashboard, Events, Statuses, User Management, v.v.
+    - **100% Văn bản giao diện (Static UI):** Menu Sidebar, Navbar, Tiêu đề trang, Nút bấm, Thẻ báo cáo Dashboard, Form Modal lập tức chuyển đổi mượt mà khi bấm chuyển `VI` / `EN`.
+    - **Trạng thái & Nhãn dữ liệu (Dynamic Labels):** Trạng thái hoạt động (*Live / Trực tiếp*, *Upcoming / Sắp diễn ra*, *Ended / Đã kết thúc*, *Approved / Đã duyệt*, *Valid / Hợp lệ*, *Used / Đã sử dụng*...) hiển thị chuẩn xác theo ngôn ngữ đang chọn.
+
+  - **3. Kiểm Thử & Xác Nhận:**
+    - Biên dịch Frontend: `npm run build` (`tsc && vite build`) hoàn thành thành công 100% với 0 lỗi cú pháp hoặc TypeScript.
+    - Kiểm thử Backend: `pytest` vượt qua 100% các bài kiểm thử xác thực và kiểm soát dữ liệu.
+
+- [x] **Task 64: Ẩn Chức Năng AI PR Studio & Kho Tri Thức RAG Khỏi Sidebar Dành Cho Vai Trò Staff**
+
+  - **1. Cập Nhật Điều Kiện Hiển Thị Sidebar (`Sidebar.tsx`):**
+    - Cập nhật nhánh role `STAFF` trong `visibleMenuItems` của `Sidebar.tsx`:
+      + **Ẩn hoàn toàn 2 mục:** `AI PR Studio` và `Kho Tri Thức RAG` khỏi thanh điều hướng Sidebar khi tài khoản đăng nhập là `STAFF`.
+      + **Giữ nguyên 6 menu khả dụng cho Staff:** *Dashboard Báo Cáo*, *Danh Mục Sự Kiện*, *Cổng Diễn Giả*, *Soát Vé QR Code*, *AI Concierge (HITL)*, *AI Feedback & Summary*.
+
+  - **2. Đồng Bộ Phân Quyền & Chống Lỗi 403:**
+    - `EVENT_MANAGER` (Quản lý sự kiện) và `ADMIN` (Quản trị viên): Tiếp tục hiển thị đầy đủ và có toàn quyền thao tác trên `AI PR Studio` và `Kho Tri Thức RAG`.
+    - `AIPRStudio.tsx` và `KnowledgeBase.tsx`: Điều chỉnh Permission Guard `canApproveAIPost` và `canSyncRAG` chỉ cấp quyền cho `ORGANIZER` và `ADMIN`.
+    - Đảm bảo Staff chỉ truy cập những tính năng được ủy quyền, triệt tiêu hoàn toàn trường hợp bị báo lỗi 403 Access Denied.
+
+  - **3. Kiểm Thử & Xác Nhận:**
+    - Chạy kiểm tra biên dịch `npm run build` (`tsc && vite build`) hoàn thành thành công 100% với 0 lỗi cú pháp hay TypeScript.
+
+- [x] **Task 65: Khởi Tạo Trang Cài Đặt - Nhóm 1: Hồ Sơ Cá Nhân & Bảo Mật (Account & Security)**
+
+  - **1. Thiết Lập Route & Giao Diện Khung Trang Cài Đặt (Settings UI Framework):**
+    - Tạo trang/component mới `Settings.tsx` tại đường dẫn `/settings` với bố cục phân vùng 3 Tabs: *Hồ Sơ Cá Nhân (Profile Info)* (mặc định), *Tùy Chọn & Giao Diện (Preferences)*, *Bảo Mật & Phiên Đăng Nhập (Security & Sessions)*.
+    - Bổ sung mục "Cài Đặt" (Settings) vào danh sách Sidebar (`Sidebar.tsx`) cho tất cả 4 vai trò đăng nhập (`ATTENDEE`, `STAFF`, `ORGANIZER`, `ADMIN`).
+    - Bổ sung nút "Cài Đặt Tài Khoản" vào Menu Avatar ở Header (`Header.tsx`) và danh sách tìm kiếm nhanh Command-K.
+    - Cập nhật ánh xạ route và tab trong `MainLayout.tsx` và `App.tsx` với bộ bảo vệ `ProtectedRoute`.
+
+  - **2. Chức Năng Cập Nhật Thông Tin Cá Nhân (Profile Info):**
+    - Form nhập liệu tự động load thông tin tài khoản từ `AuthContext` và API `GET /api/v1/users/me`.
+    - Các trường nhập liệu: Tên hiển thị (Display Name), Bộ chọn ảnh & xem trước Avatar (Upload file base64 / chọn ảnh mẫu có sẵn / xóa ảnh), Chức danh (Job Title), Số điện thoại (Phone Number có regex kiểm tra định dạng Việt Nam / Quốc tế), Email liên hệ (Badge đã xác thực).
+    - Nút **[Lưu thay đổi]**: Gọi API `PUT /api/v1/users/me`, cập nhật state `user` toàn hệ thống và lưu `localStorage`, hiển thị Toast thông báo thành công.
+
+  - **3. Cài Đặt Tùy Chỉnh Ngôn Ngữ & Giao Diện (Preferences):**
+    - **Ngôn ngữ ưu tiên:** Lựa chọn `Tiếng Việt (VI)` hoặc `English (EN)` -> tự động đồng bộ ngay với hệ thống dịch thuật `react-i18next`.
+    - **Chế độ giao diện:** Lựa chọn `Dark Mode` hoặc `Light Mode` -> tự động thêm/bỏ class `dark` trên `documentElement`.
+    - Nút **[Lưu tùy chọn]**: Lưu lựa chọn vào `localStorage` và cập nhật trường `preferences` JSON trong DB người dùng.
+
+  - **4. Bảo Mật Tài Khoản (Security, 2FA & Active Sessions):**
+    - **Đổi mật khẩu (Change Password):** Form gồm Mật khẩu hiện tại, Mật khẩu mới, Xác nhận mật khẩu mới. Tích hợp thanh đo độ mạnh mật khẩu trực quan (Yếu / Trung bình / Mạnh), kiểm tra trùng khớp phía client và gửi request tới `POST /api/v1/auth/change-password`.
+    - **Xác thực 2 yếu tố (2FA - Two-Factor Authentication):**
+      + Switch Bật/Tắt 2FA. Khi bấm Bật, mở Modal hiển thị mã QR (tạo từ thư viện `qrcode` + `pyotp`), khóa bí mật thủ công và ô nhập mã 6 số xác nhận -> gọi `POST /api/v1/auth/2fa/verify`. Khi bấm Tắt, hiển thị xác nhận và gọi `POST /api/v1/auth/2fa/disable`.
+    - **Quản lý thiết bị đăng nhập (Active Sessions):**
+      + Hiển thị danh sách thiết bị/trình duyệt đang đăng nhập (Tên thiết bị, Địa chỉ IP, Vị trí, Thời gian hoạt động gần nhất, Cờ đánh dấu *"Thiết bị hiện tại"*).
+      + Bổ sung nút **[Đăng xuất khỏi các thiết bị khác]** gọi API `POST /api/v1/auth/sessions/revoke-others` để hủy token session từ xa.
+
+  - **5. Backend API & Schema Support:**
+    - Bổ sung các cột `job_title`, `is_2fa_enabled`, `two_factor_secret`, `preferences` vào model `User` và tạo bảng `user_sessions` với tự động migration trong `init_db()`.
+    - Tạo router mới `app/api/v1/users.py` (`GET /me`, `PUT /me`) và tích hợp vào `router.py`.
+    - Thêm các endpoint bảo mật trong `app/api/v1/auth.py`: `/change-password`, `/2fa/generate`, `/2fa/verify`, `/2fa/disable`, `/sessions`, `/sessions/revoke-others`.
+    - Thêm bài test toàn diện `tests/test_settings_and_security.py`, chạy `pytest` vượt qua 100% (15/15 tests pass).
+    - Biên dịch `npm run build` thành công 100% không có lỗi TypeScript hay cú pháp.
+

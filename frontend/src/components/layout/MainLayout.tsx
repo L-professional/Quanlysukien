@@ -11,6 +11,8 @@ interface MainLayoutProps {
 }
 
 const pathToTab: Record<string, string> = {
+  '/': 'landing',
+  '/landing': 'landing',
   '/dashboard': 'dashboard',
   '/events': 'schedule',
   '/check-in': 'scanner',
@@ -18,12 +20,15 @@ const pathToTab: Record<string, string> = {
   '/content-studio': 'content-studio',
   '/knowledge-base': 'knowledge-base',
   '/feedback': 'feedback',
+  '/feedback-summary': 'feedback',
   '/users': 'users',
   '/logs': 'logs',
   '/speaker/dashboard': 'speaker',
+  '/settings': 'settings',
 };
 
 const tabToPath: Record<string, string> = {
+  landing: '/',
   dashboard: '/dashboard',
   schedule: '/events',
   scanner: '/check-in',
@@ -34,6 +39,7 @@ const tabToPath: Record<string, string> = {
   users: '/users',
   logs: '/logs',
   speaker: '/speaker/dashboard',
+  settings: '/settings',
 };
 
 export const MainLayout: React.FC<MainLayoutProps> = ({
@@ -50,6 +56,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
   const currentTab = propActiveTab || (location.pathname.startsWith('/speaker') ? 'speaker' : pathToTab[location.pathname]) || 'dashboard';
 
+  const isLanding = currentTab === 'landing' || location.pathname === '/' || location.pathname === '/landing';
+
   const handleTabChange = (tab: string) => {
     if (propSetActiveTab) {
       propSetActiveTab(tab);
@@ -59,8 +67,30 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
     }
   };
 
+  if (isLanding) {
+    return (
+      <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-blue-600 selection:text-white relative">
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          defaultMode="login"
+        />
+        <main className="min-h-screen">
+          <Outlet />
+        </main>
+        <FloatingChatbot />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex bg-[#F8FAFC] text-slate-900 font-sans selection:bg-indigo-500 selection:text-white relative">
+    <div
+      className={`min-h-screen flex ${
+        currentTab === 'settings'
+          ? 'bg-[#0B0F19] text-slate-100'
+          : 'bg-[#F8FAFC] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100'
+      } font-sans selection:bg-indigo-500 selection:text-white relative`}
+    >
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
@@ -124,10 +154,22 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         />
 
         {/* Page Content Viewport */}
-        <main className="flex-1 overflow-y-auto bg-[#F8FAFC] p-3 sm:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
+        <main
+          className={`flex-1 overflow-y-auto ${
+            currentTab === 'landing'
+              ? 'p-0 bg-white'
+              : currentTab === 'settings'
+              ? 'bg-[#0B0F19] text-slate-100 p-3 sm:p-6 lg:p-8'
+              : 'bg-[#F8FAFC] dark:bg-[#0B0F19] p-3 sm:p-6 lg:p-8'
+          }`}
+        >
+          {currentTab === 'landing' ? (
             <Outlet />
-          </div>
+          ) : (
+            <div className="max-w-7xl mx-auto">
+              <Outlet />
+            </div>
+          )}
         </main>
       </div>
 

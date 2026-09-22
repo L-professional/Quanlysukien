@@ -48,7 +48,7 @@ class Settings(BaseSettings):
 
     # AI Configuration (Gemini API)
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     GEMINI_EMBEDDING_MODEL: str = "text-embedding-004"
 
     # JWT Authentication

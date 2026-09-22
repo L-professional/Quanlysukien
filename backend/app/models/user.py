@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, List, Optional
 from datetime import datetime
-# pyrefly: ignore [missing-import]
-from sqlalchemy import Integer, String, Boolean, DateTime, ForeignKey
+from sqlalchemy import Integer, String, Boolean, DateTime, ForeignKey, JSON
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -39,6 +38,10 @@ class User(Base, TimestampMixin):
     last_active_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     avatar_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     provider: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, default="local", server_default="local")
+    job_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    is_2fa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    two_factor_secret: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    preferences: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, default=lambda: {"language": "vi", "theme": "dark"})
 
     # Relationships
     role: Mapped["Role"] = relationship("Role", back_populates="users")

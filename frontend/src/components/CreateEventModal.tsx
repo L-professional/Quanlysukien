@@ -12,6 +12,7 @@ import {
   Compass,
   Edit3,
   Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { useEvent } from '../context/EventContext';
 import { useTranslation } from 'react-i18next';
@@ -66,6 +67,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
   const [isPreviewMap, setIsPreviewMap] = useState<boolean>(true);
   const [aiStyle, setAiStyle] = useState<'auto' | 'professional' | 'literary' | 'inspirational' | 'academic'>('auto');
   const [isAiGeneratingDesc, setIsAiGeneratingDesc] = useState<boolean>(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleAiGenerateDescription = async () => {
     if (!title.trim()) {
@@ -92,6 +94,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      setFormError(null);
       if (mode === 'create') {
         setTitle('');
         setLocation('');
@@ -160,11 +163,49 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
     window.open(directUrl, '_blank', 'noopener,noreferrer');
   };
 
+  // Local current date string YYYY-MM-DD for min attribute
+  const todayDate = new Date();
+  const todayStr = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null);
     if (!title.trim() || !location.trim()) {
-      toast.error('Vui lòng điền đầy đủ tên sự kiện và địa điểm!');
+      const msg = 'Vui lòng điền đầy đủ tên sự kiện và địa điểm!';
+      setFormError(msg);
+      toast.error(msg);
       return;
+    }
+
+    // 1. Chặn Tạo/Sửa Sự Kiện Thời Gian Trong Quá Khứ (Form Validation)
+    if (!startDate) {
+      const msg = 'Vui lòng chọn ngày bắt đầu sự kiện!';
+      setFormError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const [startH = '00', startM = '00'] = (startTime || '00:00').split(':');
+    const [sY, sM, sD] = startDate.split('-').map(Number);
+    const startDateTime = new Date(sY, sM - 1, sD, Number(startH), Number(startM), 0);
+
+    if (isNaN(startDateTime.getTime()) || startDateTime.getTime() < Date.now()) {
+      const msg = 'Thời gian bắt đầu sự kiện không được nằm trong quá khứ';
+      setFormError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (endDate) {
+      const [endH = '23', endM = '59'] = (endTime || '23:59').split(':');
+      const [eY, eM, eD] = endDate.split('-').map(Number);
+      const endDateTime = new Date(eY, eM - 1, eD, Number(endH), Number(endM), 0);
+      if (endDateTime.getTime() < startDateTime.getTime()) {
+        const msg = 'Thời gian kết thúc sự kiện phải diễn ra sau thời gian bắt đầu!';
+        setFormError(msg);
+        toast.error(msg);
+        return;
+      }
     }
 
     // Format DD/MM/YYYY HH:mm
@@ -202,17 +243,20 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
         onClose();
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Không thể tạo sự kiện';
-        toast.error(msg);
+        setFormError(msg);
+        toast.error(msg, { duration: 6000 });
       }
     } else {
-      updateActiveEvent(payload);
       try {
-        await apiService.updateEvent(activeEvent.id || 1, payload);
-      } catch {
-        // Handled silently by local context
+        const updated = await apiService.updateEvent(activeEvent.id || 1, payload);
+        updateActiveEvent(updated);
+        toast.success('Đã lưu cấu hình Ngày/Tháng/Năm, Google Maps & WiFi thành công!');
+        onClose();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Không thể cập nhật sự kiện';
+        setFormError(msg);
+        toast.error(msg, { duration: 6000 });
       }
-      toast.success('Đã lưu cấu hình Ngày/Tháng/Năm, Google Maps & WiFi thành công!');
-      onClose();
     }
   };
 
@@ -251,6 +295,25 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Error Alert Banner */}
+        {formError && (
+          <div className="mx-6 mt-3 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 flex items-start gap-3 shadow-xs shrink-0 animate-fade-in">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="flex-1 text-xs">
+              <p className="font-bold text-rose-900 mb-0.5">⚠️ Không thể lưu sự kiện (Trùng lịch / Lỗi dữ liệu):</p>
+              <p className="leading-relaxed font-medium text-rose-700">{formError}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFormError(null)}
+              className="text-rose-400 hover:text-rose-700 p-1 rounded-lg transition-colors cursor-pointer"
+              title="Đóng thông báo"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Navigation Tabs */}
         <div className="px-6 pt-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2 shrink-0">
@@ -317,8 +380,14 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       <div className="grid grid-cols-5 gap-2">
                         <input
                           type="date"
+                          min={todayStr}
                           value={startDate}
-                          onChange={(e) => setStartDate(e.target.value)}
+                          onChange={(e) => {
+                            setStartDate(e.target.value);
+                            if (endDate && e.target.value > endDate) {
+                              setEndDate(e.target.value);
+                            }
+                          }}
                           className="col-span-3 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer"
                         />
                         <input
@@ -338,6 +407,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
                       <div className="grid grid-cols-5 gap-2">
                         <input
                           type="date"
+                          min={startDate || todayStr}
                           value={endDate}
                           onChange={(e) => setEndDate(e.target.value)}
                           className="col-span-3 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-900 font-semibold focus:outline-none focus:border-indigo-500 cursor-pointer"

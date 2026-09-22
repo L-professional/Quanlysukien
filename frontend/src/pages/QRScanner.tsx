@@ -27,11 +27,22 @@ import { apiService } from '../services/api';
 import { CheckInResult } from '../types';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
+import { useEvent } from '../context/EventContext';
 
 export const QRScanner: React.FC = () => {
   const { t } = useTranslation();
   const { hasRole } = useAuth();
+  const { events, activeEvent, setActiveEvent } = useEvent();
   const canIssueManual = hasRole(['ADMIN', 'STAFF', 'EVENT_MANAGER']);
+
+  // Selected Event to check-in for (Task 59 Requirement 2)
+  const [selectedEventId, setSelectedEventId] = useState<number>(activeEvent?.id || 1);
+
+  useEffect(() => {
+    if (activeEvent?.id) {
+      setSelectedEventId(activeEvent.id);
+    }
+  }, [activeEvent?.id]);
 
   // Camera & Stream states
   const [cameraActive, setCameraActive] = useState<boolean>(false);
@@ -71,7 +82,7 @@ export const QRScanner: React.FC = () => {
 
   // ── Web Audio API Feedback ───────────────────────────────────────────────
   const playFeedbackSound = useCallback(
-    (type: 'SUCCESS' | 'ALREADY_USED' | 'INVALID') => {
+    (type: 'SUCCESS' | 'ALREADY_USED' | 'INVALID' | 'INVALID_EVENT') => {
       if (!soundEnabled) return;
       try {
         const AudioCtx =
@@ -128,7 +139,7 @@ export const QRScanner: React.FC = () => {
       }
 
       try {
-        const res = await apiService.verifyCheckInToken(token);
+        const res = await apiService.verifyCheckInToken(token, selectedEventId);
         setResult(res);
         playFeedbackSound(res.status);
 
@@ -139,6 +150,8 @@ export const QRScanner: React.FC = () => {
           toast.success(res.message || 'Check-in thành công!');
         } else if (res.status === 'ALREADY_USED') {
           toast.warning(res.message || 'Vé đã được check-in trước đó!');
+        } else if (res.status === 'INVALID_EVENT') {
+          toast.error(res.message || 'Vé không hợp lệ cho sự kiện này!');
         } else {
           toast.error(res.message || 'Mã vé không hợp lệ!');
         }
@@ -494,6 +507,47 @@ export const QRScanner: React.FC = () => {
         </div>
       </div>
 
+      {/* Event Selection Banner (Task 59 Requirement 2) */}
+      <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 shrink-0">
+            <Layers className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-[11px] font-bold tracking-wider text-indigo-300 uppercase">
+              Sự Kiện Đang Soát Vé (Gate Context)
+            </span>
+            <h2 className="text-base font-extrabold text-white leading-tight">
+              {events.find((e) => e.id === selectedEventId)?.title || activeEvent?.title || 'EventHub AI Summit 2026'}
+            </h2>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <label htmlFor="event-selector" className="text-xs font-semibold text-slate-300 shrink-0">
+            Chọn Sự Kiện Soát Vé:
+          </label>
+          <select
+            id="event-selector"
+            value={selectedEventId}
+            onChange={(e) => {
+              const id = parseInt(e.target.value, 10);
+              setSelectedEventId(id);
+              const ev = events.find((item) => item.id === id);
+              if (ev) setActiveEvent(ev);
+              toast.info(`Đã chuyển cổng soát vé sang: ${ev?.title || id}`);
+            }}
+            className="px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+          >
+            {events.map((ev) => (
+              <option key={ev.id} value={ev.id}>
+                #{ev.id} - {ev.title}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* Manual Issue Modal */}
       {showManualIssue && canIssueManual && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150">
@@ -845,6 +899,9 @@ export const QRScanner: React.FC = () => {
                   {result.status === 'INVALID' && (
                     <XCircle className="w-9 h-9 text-rose-600 shrink-0" />
                   )}
+                  {result.status === 'INVALID_EVENT' && (
+                    <ShieldAlert className="w-9 h-9 text-rose-600 shrink-0" />
+                  )}
                 </div>
 
                 <div className="space-y-2 flex-1 min-w-0">
@@ -855,11 +912,14 @@ export const QRScanner: React.FC = () => {
                           ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
                           : result.status === 'ALREADY_USED'
                           ? 'bg-amber-100 text-amber-900 border-amber-300'
+                          : result.status === 'INVALID_EVENT'
+                          ? 'bg-rose-100 text-rose-800 border-rose-400 font-extrabold'
                           : 'bg-rose-100 text-rose-800 border-rose-300'
                       }`}
                     >
                       {result.status === 'SUCCESS' && (t('checkin.valid') || 'HỢP LỆ')}
                       {result.status === 'ALREADY_USED' && (t('checkin.alreadyUsed') || 'ĐÃ SỬ DỤNG')}
+                      {result.status === 'INVALID_EVENT' && 'SAI SỰ KIỆN'}
                       {result.status === 'INVALID' && (t('checkin.invalid') || 'KHÔNG TỒN TẠI')}
                     </span>
                     <span className="text-[10px] font-mono text-slate-500 truncate max-w-[140px]">
