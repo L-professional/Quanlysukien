@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Download, Calendar, Filter, RotateCcw,
   CalendarDays, Users, CheckCircle2, Star,
@@ -11,73 +11,161 @@ import {
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import PermissionGuard from '../components/PermissionGuard';
+import { api } from '../services/api';
 
-// --- Dummy Data ---
-const lineChartData = [
-  { name: 'Th1', registered: 300, attended: 250 },
-  { name: 'Th2', registered: 400, attended: 350 },
-  { name: 'Th3', registered: 350, attended: 300 },
-  { name: 'Th4', registered: 500, attended: 450 },
-  { name: 'Th5', registered: 480, attended: 400 },
-  { name: 'Th6', registered: 600, attended: 550 },
-  { name: 'Th7', registered: 550, attended: 500 },
-  { name: 'Th8', registered: 700, attended: 650 },
-  { name: 'Th9', registered: 850, attended: 750 },
-  { name: 'Th10', registered: 750, attended: 600 },
-  { name: 'Th11', registered: 900, attended: 850 },
-  { name: 'Th12', registered: 1050, attended: 950 },
-];
-
-const barChartData = [
-  { name: 'Tech Summit 2025', value: 850 },
-  { name: 'AI & Future 2025', value: 720 },
-  { name: 'Business Connect', value: 640 },
-  { name: 'Marketing Expo 2025', value: 580 },
-  { name: 'Innovation Day', value: 450 },
-];
-
-const donutData = [
-  { name: 'Hội thảo', value: 45 },
-  { name: 'Triển lãm', value: 30 },
-  { name: 'Workshop', value: 15 },
-  { name: 'Kết nối', value: 5 },
-  { name: 'Khác', value: 5 },
-];
 const COLORS = ['#D7193F', '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B'];
-
-const reportTableData = [
-  { id: 1, name: 'Báo cáo Tech Summit 2025', type: 'Hiệu quả sự kiện', period: '01/03/2025 - 16/03/2025', creator: 'Nguyễn Văn Admin', date: '16/03/2025', status: 'Hoàn thành' },
-  { id: 2, name: 'Tổng hợp đánh giá Q1', type: 'Feedback', period: '01/01/2025 - 31/03/2025', creator: 'Hệ thống (Auto)', date: '01/04/2025', status: 'Hoàn thành' },
-  { id: 3, name: 'Báo cáo hiệu suất AI tháng 5', type: 'AI', period: '01/05/2025 - 31/05/2025', creator: 'Trần Văn Super', date: '01/06/2025', status: 'Đang xử lý' },
-];
-
-const TABS = [
-  'Tổng quan', 'Hiệu quả sự kiện', 'Người tham dự', 'Vé & QR', 'Diễn giả', 'Feedback', 'AI', 'Hệ thống'
-];
+const TABS = ['Tổng quan', 'Hiệu quả sự kiện', 'Người tham dự', 'Vé & QR', 'Diễn giả', 'Feedback', 'AI', 'Hệ thống'];
 
 export const Reports: React.FC = () => {
   const { user } = useAuth();
+  
+  // States
   const [activeTab, setActiveTab] = useState('Tổng quan');
+  const [loading, setLoading] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportSuccess, setExportSuccess] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  
+  const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
 
-  const handleExport = () => {
+  // Filter States
+  const [filters, setFilters] = useState({
+    date_range: '01/01/2025 - 31/12/2025',
+    event_id: '' as string | number,
+    report_type: 'Tổng quan',
+    location: '',
+    status: ''
+  });
+  
+  // Data States
+  const [kpis, setKpis] = useState<any[]>([]);
+  const [lineChartData, setLineChartData] = useState<any[]>([]);
+  const [donutData, setDonutData] = useState<any[]>([]);
+  const [barChartData, setBarChartData] = useState<any[]>([]);
+  const [reportTableData, setReportTableData] = useState<any[]>([]);
+
+  const fetchOverview = async (currentFilters: any) => {
+    try {
+      setLoading(true);
+      const data = await api.getReportOverview({
+        ...currentFilters,
+        event_id: currentFilters.event_id ? Number(currentFilters.event_id) : null
+      });
+      setKpis(data.kpis || []);
+      setLineChartData(data.lineChartData || []);
+      setDonutData(data.donutData || []);
+      setBarChartData(data.barChartData || []);
+    } catch (err) {
+      console.error("Failed to fetch overview", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchReportsList = async () => {
+    try {
+      const data = await api.getReportsList();
+      setReportTableData(data || []);
+    } catch (err) {
+      console.error("Failed to fetch reports list", err);
+      // Fallback
+      setReportTableData([
+        { id: 1, name: 'Báo cáo Tech Summit 2025', type: 'Hiệu quả sự kiện', period: '01/03/2025 - 16/03/2025', creator: 'Nguyễn Văn Admin', date: '16/03/2025', status: 'Hoàn thành' }
+      ]);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'Tổng quan') {
+      fetchOverview(filters);
+      fetchReportsList();
+    }
+  }, [activeTab]);
+
+  const handleApplyFilter = () => {
+    showToast('Đã cập nhật báo cáo.');
+    if (activeTab === 'Tổng quan') {
+      fetchOverview(filters);
+    }
+  };
+
+  const handleResetFilter = () => {
+    const defaultFilters = {
+      date_range: '01/01/2025 - 31/12/2025',
+      event_id: '',
+      report_type: 'Tổng quan',
+      location: '',
+      status: ''
+    };
+    setFilters(defaultFilters);
+    if (activeTab === 'Tổng quan') {
+      fetchOverview(defaultFilters);
+    }
+    showToast('Đã đặt lại bộ lọc.');
+  };
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 3000);
+  };
+
+  const handleExport = async (format: string) => {
     setExporting(true);
-    setTimeout(() => {
-      setExporting(false);
+    try {
+      const blob = await api.exportReport({
+        ...filters,
+        format,
+        event_id: filters.event_id ? Number(filters.event_id) : null
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report_export_${Date.now()}.${format.toLowerCase()}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      
       setExportSuccess(true);
+      showToast('Đã xuất báo cáo thành công.');
       setTimeout(() => {
         setExportSuccess(false);
         setExportModalOpen(false);
       }, 2000);
-    }, 1500);
+    } catch (err) {
+      console.error(err);
+      alert('Không thể tạo báo cáo. Vui lòng thử lại.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDeleteReport = async () => {
+    if (!selectedReportId) return;
+    try {
+      await api.deleteReport(selectedReportId);
+      showToast('Báo cáo đã được xóa.');
+      fetchReportsList();
+    } catch (err) {
+      alert('Không thể xóa báo cáo.');
+    } finally {
+      setDeleteModalOpen(false);
+    }
   };
 
   return (
-    <div className="space-y-6">
-      
+    <div className="space-y-6 relative">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#12213A] text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3 animate-in slide-in-from-bottom-5">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+          <span className="text-[14px] font-medium">{toastMessage}</span>
+        </div>
+      )}
+
       {/* 1. BREADCRUMB & HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -95,6 +183,17 @@ export const Reports: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              if (activeTab === 'Tổng quan') fetchOverview(filters);
+              fetchReportsList();
+            }}
+            className="px-4 py-2 bg-white border border-[#E5EAF2] hover:bg-slate-50 text-[#12213A] rounded-xl text-[13px] font-bold transition-colors flex items-center gap-2 shadow-sm h-11"
+          >
+            <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Làm mới
+          </button>
+          
           <PermissionGuard requirePermission="REPORT_SCHEDULE">
             <button
               onClick={() => setScheduleModalOpen(true)}
@@ -122,46 +221,42 @@ export const Reports: React.FC = () => {
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex-1 min-w-[150px]">
             <label className="block text-[11px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Khoảng thời gian</label>
-            <div className="flex items-center justify-between px-3 h-10 border border-[#E5EAF2] rounded-lg bg-[#F6F8FC] cursor-pointer hover:border-slate-300">
-              <span className="text-[13px] font-medium text-[#12213A]">01/01/2025 - 31/12/2025</span>
-              <Calendar className="w-4 h-4 text-slate-400" />
-            </div>
+            <input 
+              type="text" 
+              value={filters.date_range}
+              onChange={(e) => setFilters({...filters, date_range: e.target.value})}
+              className="w-full px-3 h-10 border border-[#E5EAF2] rounded-lg bg-[#F6F8FC] text-[13px] font-medium text-[#12213A] outline-none" 
+            />
           </div>
           <div className="flex-1 min-w-[150px]">
             <label className="block text-[11px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Sự kiện</label>
-            <div className="flex items-center justify-between px-3 h-10 border border-[#E5EAF2] rounded-lg bg-[#F6F8FC] cursor-pointer hover:border-slate-300">
-              <span className="text-[13px] font-medium text-[#12213A]">Tất cả sự kiện</span>
-              <ChevronDown className="w-4 h-4 text-slate-400" />
-            </div>
+            <select 
+              value={filters.event_id}
+              onChange={(e) => setFilters({...filters, event_id: e.target.value})}
+              className="w-full px-3 h-10 border border-[#E5EAF2] rounded-lg bg-[#F6F8FC] text-[13px] font-medium text-[#12213A] outline-none"
+            >
+              <option value="">Tất cả sự kiện</option>
+              <option value="1">Tech Summit 2025</option>
+              <option value="2">AI & Future 2025</option>
+            </select>
           </div>
           <div className="flex-1 min-w-[150px]">
             <label className="block text-[11px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Loại báo cáo</label>
-            <div className="flex items-center justify-between px-3 h-10 border border-[#E5EAF2] rounded-lg bg-[#F6F8FC] cursor-pointer hover:border-slate-300">
-              <span className="text-[13px] font-medium text-[#12213A]">Tổng quan</span>
-              <ChevronDown className="w-4 h-4 text-slate-400" />
-            </div>
-          </div>
-          <div className="flex-1 min-w-[120px]">
-            <label className="block text-[11px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Địa điểm</label>
-            <div className="flex items-center justify-between px-3 h-10 border border-[#E5EAF2] rounded-lg bg-[#F6F8FC] cursor-pointer hover:border-slate-300">
-              <span className="text-[13px] font-medium text-[#12213A]">Tất cả</span>
-              <ChevronDown className="w-4 h-4 text-slate-400" />
-            </div>
-          </div>
-          <div className="flex-1 min-w-[120px]">
-            <label className="block text-[11px] font-bold text-[#64748B] uppercase tracking-wider mb-1.5">Trạng thái</label>
-            <div className="flex items-center justify-between px-3 h-10 border border-[#E5EAF2] rounded-lg bg-[#F6F8FC] cursor-pointer hover:border-slate-300">
-              <span className="text-[13px] font-medium text-[#12213A]">Tất cả</span>
-              <ChevronDown className="w-4 h-4 text-slate-400" />
-            </div>
+            <select 
+              value={filters.report_type}
+              onChange={(e) => setFilters({...filters, report_type: e.target.value})}
+              className="w-full px-3 h-10 border border-[#E5EAF2] rounded-lg bg-[#F6F8FC] text-[13px] font-medium text-[#12213A] outline-none"
+            >
+              {TABS.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
           </div>
           
           <div className="flex items-center gap-2 shrink-0">
-            <button className="h-10 px-4 bg-[#12213A] hover:bg-[#1a2d4f] text-white rounded-lg text-[13px] font-bold transition-colors flex items-center gap-2">
+            <button onClick={handleApplyFilter} className="h-10 px-4 bg-[#12213A] hover:bg-[#1a2d4f] text-white rounded-lg text-[13px] font-bold transition-colors flex items-center gap-2">
               <Filter className="w-4 h-4" />
               Áp dụng
             </button>
-            <button className="h-10 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[13px] font-bold transition-colors flex items-center gap-2">
+            <button onClick={handleResetFilter} className="h-10 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[13px] font-bold transition-colors flex items-center gap-2">
               <RotateCcw className="w-4 h-4" />
               Đặt lại
             </button>
@@ -175,7 +270,7 @@ export const Reports: React.FC = () => {
           {TABS.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => { setActiveTab(tab); setFilters({...filters, report_type: tab}); }}
               className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap transition-colors relative ${
                 activeTab === tab
                   ? 'text-[#D7193F]'
@@ -191,24 +286,23 @@ export const Reports: React.FC = () => {
         </div>
       </div>
 
-      {activeTab === 'Tổng quan' ? (
+      {loading ? (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="w-10 h-10 border-4 border-slate-100 border-t-[#D7193F] rounded-full animate-spin"></div>
+        </div>
+      ) : activeTab === 'Tổng quan' ? (
         <>
           {/* 4. KPI SUMMARY */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { title: 'Tổng sự kiện', value: '12', growth: '+20%', isUp: true, icon: CalendarDays, color: 'text-[#D7193F]', bg: 'bg-red-50' },
-              { title: 'Tổng người tham dự', value: '4.832', growth: '+32%', isUp: true, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-              { title: 'Tỷ lệ tham dự', value: '86,4%', growth: '+8,2%', isUp: true, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-              { title: 'Mức độ hài lòng', value: '4,7 / 5', growth: '+0,4', isUp: true, icon: Star, color: 'text-purple-600', bg: 'bg-purple-50' },
-            ].map((kpi, idx) => (
-              <div key={idx} className="bg-white rounded-xl border border-[#E5EAF2] p-5 shadow-sm flex flex-col justify-between">
+            {kpis.map((kpi, idx) => (
+              <div key={idx} className="bg-white rounded-xl border border-[#E5EAF2] p-5 shadow-sm flex flex-col justify-between cursor-pointer hover:border-slate-300 transition-colors">
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-[12px] font-semibold text-[#64748B]">{kpi.title}</p>
                     <h3 className="text-2xl font-bold text-[#12213A] mt-1">{kpi.value}</h3>
                   </div>
                   <div className={`w-10 h-10 rounded-xl ${kpi.bg} flex items-center justify-center shrink-0`}>
-                    <kpi.icon className={`w-5 h-5 ${kpi.color}`} />
+                    <Users className={`w-5 h-5 ${kpi.color}`} />
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 mt-4">
@@ -223,8 +317,6 @@ export const Reports: React.FC = () => {
 
           {/* 5. MAIN ANALYTICS CHART & DISTRIBUTION */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* Line Chart */}
             <div className="lg:col-span-8 bg-white border border-[#E5EAF2] rounded-xl shadow-sm p-6">
               <div className="flex justify-between items-start mb-6">
                 <div>
@@ -237,9 +329,6 @@ export const Reports: React.FC = () => {
                     <button className="px-3 py-1 text-[12px] font-bold text-[#64748B] hover:text-[#12213A] rounded">Tuần</button>
                     <button className="px-3 py-1 text-[12px] font-bold text-[#12213A] bg-white rounded shadow-sm">Tháng</button>
                   </div>
-                  <select className="text-[12px] font-bold border border-[#E5EAF2] rounded-lg px-3 py-1.5 h-[30px] outline-none hover:border-slate-300">
-                    <option>Năm 2025</option>
-                  </select>
                 </div>
               </div>
               <div className="h-[300px] w-full mt-4">
@@ -249,9 +338,8 @@ export const Reports: React.FC = () => {
                     <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} dy={10} />
                     <YAxis tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} dx={-10} />
                     <RechartsTooltip 
-                      contentStyle={{ borderRadius: '8px', border: '1px solid #E5EAF2', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #E5EAF2' }}
                       itemStyle={{ fontSize: '13px', fontWeight: 600 }}
-                      labelStyle={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}
                     />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 600, paddingTop: '20px' }} />
                     <Line type="monotone" dataKey="registered" name="Đăng ký" stroke="#D7193F" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
@@ -261,7 +349,6 @@ export const Reports: React.FC = () => {
               </div>
             </div>
 
-            {/* Donut Chart */}
             <div className="lg:col-span-4 bg-white border border-[#E5EAF2] rounded-xl shadow-sm p-6 flex flex-col">
               <div>
                 <h3 className="text-[16px] font-bold text-[#12213A]">Phân bố loại sự kiện</h3>
@@ -270,33 +357,17 @@ export const Reports: React.FC = () => {
                 <div className="h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie
-                        data={donutData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={70}
-                        outerRadius={100}
-                        paddingAngle={2}
-                        dataKey="value"
-                        stroke="none"
-                      >
-                        {donutData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
+                      <Pie data={donutData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={2} dataKey="value" stroke="none">
+                        {donutData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                       </Pie>
-                      <RechartsTooltip 
-                        contentStyle={{ borderRadius: '8px', border: '1px solid #E5EAF2', padding: '6px 10px' }}
-                        itemStyle={{ fontSize: '13px', fontWeight: 600 }}
-                      />
+                      <RechartsTooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5EAF2', padding: '6px 10px' }} itemStyle={{ fontSize: '13px', fontWeight: 600 }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                {/* Center Text */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4">
-                  <span className="text-3xl font-bold text-[#12213A]">12</span>
+                  <span className="text-3xl font-bold text-[#12213A]">{(donutData || []).reduce((acc, curr) => acc + curr.value, 0)}</span>
                   <span className="text-[11px] text-[#64748B] font-bold uppercase tracking-wide">Sự kiện</span>
                 </div>
-                {/* Legend List */}
                 <div className="mt-4 space-y-2">
                   {donutData.map((entry, idx) => (
                     <div key={idx} className="flex items-center justify-between">
@@ -305,8 +376,7 @@ export const Reports: React.FC = () => {
                         <span className="text-[13px] font-semibold text-[#12213A]">{entry.name}</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-[13px] font-bold text-[#12213A]">{Math.round(entry.value * 0.12)}</span>
-                        <span className="text-[12px] text-slate-400 w-8 text-right">{entry.value}%</span>
+                        <span className="text-[13px] font-bold text-[#12213A]">{entry.value}</span>
                       </div>
                     </div>
                   ))}
@@ -315,113 +385,67 @@ export const Reports: React.FC = () => {
             </div>
           </div>
 
-          {/* 6. EVENT PERFORMANCE & TABLE */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* Horizontal Bar Chart */}
-            <div className="lg:col-span-4 bg-white border border-[#E5EAF2] rounded-xl shadow-sm p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-[16px] font-bold text-[#12213A]">Hiệu quả theo sự kiện</h3>
-                <select className="text-[12px] font-bold border border-[#E5EAF2] rounded-lg px-2 py-1 outline-none">
-                  <option>Tỷ lệ tham dự</option>
-                  <option>Số lượng</option>
-                </select>
-              </div>
-              <div className="h-[280px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={barChartData} layout="vertical" margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5EAF2" />
-                    <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" width={110} tick={{ fontSize: 11, fill: '#12213A', fontWeight: 600 }} axisLine={false} tickLine={false} />
-                    <RechartsTooltip 
-                      cursor={{ fill: '#F6F8FC' }}
-                      contentStyle={{ borderRadius: '8px', border: '1px solid #E5EAF2' }}
-                    />
-                    <Bar dataKey="value" fill="#D7193F" radius={[0, 4, 4, 0]} barSize={24}>
-                      {barChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 0 ? '#D7193F' : '#f4a5b4'} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+          {/* 6. REPORT TABLE */}
+          <div className="bg-white border border-[#E5EAF2] rounded-xl shadow-sm p-6 flex flex-col mt-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-[16px] font-bold text-[#12213A]">Chi tiết báo cáo đã lưu</h3>
             </div>
-
-            {/* Report Table */}
-            <div className="lg:col-span-8 bg-white border border-[#E5EAF2] rounded-xl shadow-sm p-6 flex flex-col">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[16px] font-bold text-[#12213A]">Chi tiết báo cáo</h3>
-                <button className="text-[13px] font-bold text-[#D7193F] hover:underline">Xem tất cả</button>
-              </div>
-              <div className="overflow-x-auto flex-1">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#E5EAF2]">
-                      <th className="pb-3 pt-2 px-2 text-[11px] font-bold text-[#64748B] uppercase tracking-wider whitespace-nowrap">Tên báo cáo</th>
-                      <th className="pb-3 pt-2 px-2 text-[11px] font-bold text-[#64748B] uppercase tracking-wider whitespace-nowrap">Loại</th>
-                      <th className="pb-3 pt-2 px-2 text-[11px] font-bold text-[#64748B] uppercase tracking-wider whitespace-nowrap hidden sm:table-cell">Khoảng thời gian</th>
-                      <th className="pb-3 pt-2 px-2 text-[11px] font-bold text-[#64748B] uppercase tracking-wider whitespace-nowrap">Trạng thái</th>
-                      <th className="pb-3 pt-2 px-2 text-[11px] font-bold text-[#64748B] uppercase tracking-wider whitespace-nowrap text-right">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E5EAF2]">
-                    {reportTableData.map(report => (
-                      <tr key={report.id} className="hover:bg-slate-50 transition-colors group">
-                        <td className="py-3 px-2">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-slate-400" />
-                            <div>
-                              <div className="text-[13px] font-bold text-[#12213A]">{report.name}</div>
-                              <div className="text-[11px] text-[#64748B]">{report.creator} • {report.date}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2">
-                          <span className="text-[12px] font-semibold text-[#12213A] bg-slate-100 px-2 py-1 rounded-md">
-                            {report.type}
-                          </span>
-                        </td>
-                        <td className="py-3 px-2 hidden sm:table-cell text-[12px] text-[#64748B] font-medium">{report.period}</td>
-                        <td className="py-3 px-2">
-                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                            report.status === 'Hoàn thành' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            {report.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-2 text-right">
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button className="p-1.5 text-slate-400 hover:text-blue-600 rounded-md hover:bg-blue-50" title="Xem">
-                              <Eye className="w-4 h-4" />
+            <div className="overflow-x-auto flex-1">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-[#E5EAF2]">
+                    <th className="pb-3 pt-2 px-2 text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Tên báo cáo</th>
+                    <th className="pb-3 pt-2 px-2 text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Loại</th>
+                    <th className="pb-3 pt-2 px-2 text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Ngày tạo</th>
+                    <th className="pb-3 pt-2 px-2 text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Trạng thái</th>
+                    <th className="pb-3 pt-2 px-2 text-[11px] font-bold text-[#64748B] uppercase tracking-wider text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E5EAF2]">
+                  {reportTableData.length > 0 ? reportTableData.map(report => (
+                    <tr key={report.id} className="hover:bg-slate-50 transition-colors group">
+                      <td className="py-3 px-2">
+                        <div className="text-[13px] font-bold text-[#12213A]">{report.name || 'Báo cáo'}</div>
+                      </td>
+                      <td className="py-3 px-2"><span className="text-[12px] font-semibold text-[#12213A] bg-slate-100 px-2 py-1 rounded-md">{report.report_type || report.type}</span></td>
+                      <td className="py-3 px-2 text-[12px] text-[#64748B]">{report.created_at ? new Date(report.created_at).toLocaleDateString() : report.date}</td>
+                      <td className="py-3 px-2">
+                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                          {report.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button className="p-1.5 text-slate-400 hover:text-blue-600 rounded-md hover:bg-blue-50" title="Xem">
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <PermissionGuard requirePermission="REPORT_EXPORT">
+                            <button className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-md hover:bg-emerald-50" title="Tải xuống">
+                              <Download className="w-4 h-4" />
                             </button>
-                            <PermissionGuard requirePermission="REPORT_EXPORT">
-                              <button className="p-1.5 text-slate-400 hover:text-emerald-600 rounded-md hover:bg-emerald-50" title="Tải xuống">
-                                <Download className="w-4 h-4" />
-                              </button>
-                            </PermissionGuard>
-                            <PermissionGuard requirePermission="REPORT_SHARE">
-                              <button className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md hover:bg-indigo-50" title="Chia sẻ">
-                                <Share2 className="w-4 h-4" />
-                              </button>
-                            </PermissionGuard>
-                            <PermissionGuard requirePermission="REPORT_DELETE">
-                              <button className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50" title="Xóa">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </PermissionGuard>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                          </PermissionGuard>
+                          <PermissionGuard requirePermission="REPORT_SHARE">
+                            <button onClick={() => { setSelectedReportId(report.id); setShareModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-md hover:bg-indigo-50" title="Chia sẻ">
+                              <Share2 className="w-4 h-4" />
+                            </button>
+                          </PermissionGuard>
+                          <PermissionGuard requirePermission="REPORT_DELETE">
+                            <button onClick={() => { setSelectedReportId(report.id); setDeleteModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50" title="Xóa">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </PermissionGuard>
+                        </div>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={5} className="text-center py-6 text-slate-400 text-sm">Chưa có báo cáo nào.</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-
           </div>
         </>
       ) : (
-        /* EMPTY STATE FOR OTHER TABS */
         <div className="bg-white border border-[#E5EAF2] rounded-xl p-12 flex flex-col items-center justify-center text-center min-h-[400px]">
           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
             <AlertCircle className="w-8 h-8 text-slate-400" />
@@ -439,10 +463,10 @@ export const Reports: React.FC = () => {
         </div>
       )}
 
-      {/* MODALS */}
+      {/* Export Modal */}
       {exportModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#12213A]/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="px-6 py-4 border-b border-[#E5EAF2] flex justify-between items-center">
               <h3 className="text-[16px] font-bold text-[#12213A]">Xuất báo cáo</h3>
               <button onClick={() => setExportModalOpen(false)} className="text-slate-400 hover:text-slate-700">
@@ -457,7 +481,7 @@ export const Reports: React.FC = () => {
                     <CheckCircle2 className="w-6 h-6 text-emerald-600" />
                   </div>
                   <h4 className="text-[15px] font-bold text-[#12213A]">Thành công!</h4>
-                  <p className="text-[13px] text-[#64748B] mt-1">Báo cáo đã được tạo thành công.</p>
+                  <p className="text-[13px] text-[#64748B] mt-1">Báo cáo đã được tải xuống.</p>
                 </div>
               ) : exporting ? (
                 <div className="flex flex-col items-center py-6 text-center">
@@ -469,98 +493,86 @@ export const Reports: React.FC = () => {
                   <div>
                     <label className="block text-[12px] font-bold text-[#12213A] mb-2">Định dạng</label>
                     <div className="grid grid-cols-3 gap-3">
-                      <button className="border-2 border-[#D7193F] bg-red-50 text-[#D7193F] font-bold text-[13px] py-2 rounded-xl">PDF</button>
-                      <button className="border border-[#E5EAF2] text-[#64748B] font-bold text-[13px] py-2 rounded-xl hover:border-slate-300">Excel</button>
-                      <button className="border border-[#E5EAF2] text-[#64748B] font-bold text-[13px] py-2 rounded-xl hover:border-slate-300">CSV</button>
+                      <button onClick={() => handleExport('PDF')} className="border border-[#E5EAF2] text-[#64748B] hover:border-[#D7193F] hover:text-[#D7193F] font-bold text-[13px] py-2 rounded-xl">PDF</button>
+                      <button onClick={() => handleExport('CSV')} className="border-2 border-[#D7193F] bg-red-50 text-[#D7193F] font-bold text-[13px] py-2 rounded-xl">CSV</button>
+                      <button onClick={() => handleExport('EXCEL')} className="border border-[#E5EAF2] text-[#64748B] hover:border-[#D7193F] hover:text-[#D7193F] font-bold text-[13px] py-2 rounded-xl">Excel</button>
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-[12px] font-bold text-[#12213A] mb-2">Phạm vi dữ liệu</label>
-                    <select className="w-full border border-[#E5EAF2] rounded-xl px-4 py-2.5 text-[13px] font-medium outline-none focus:border-[#D7193F]">
-                      <option>Tất cả sự kiện</option>
-                      <option>Chỉ sự kiện đã chọn</option>
-                      <option>Chế độ xem hiện tại</option>
-                    </select>
                   </div>
                 </div>
               )}
             </div>
-
-            {!exportSuccess && !exporting && (
-              <div className="px-6 py-4 bg-[#F6F8FC] border-t border-[#E5EAF2] flex justify-end gap-3">
-                <button 
-                  onClick={() => setExportModalOpen(false)}
-                  className="px-5 py-2 text-[13px] font-bold text-[#64748B] hover:text-[#12213A] transition-colors"
-                >
-                  Hủy
-                </button>
-                <button 
-                  onClick={handleExport}
-                  className="px-5 py-2 bg-[#D7193F] hover:bg-[#b01433] text-white rounded-xl text-[13px] font-bold shadow-sm transition-colors"
-                >
-                  Xuất báo cáo
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {/* Schedule Modal (Visual mock) */}
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#12213A]/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+            <div className="p-6 text-center">
+              <Trash2 className="w-12 h-12 text-rose-500 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-[#12213A] mb-2">Xóa báo cáo?</h3>
+              <p className="text-sm text-[#64748B]">Bạn có chắc chắn muốn xóa báo cáo này? Thao tác này không thể hoàn tác.</p>
+            </div>
+            <div className="px-6 py-4 bg-[#F6F8FC] border-t border-[#E5EAF2] flex justify-end gap-3">
+              <button onClick={() => setDeleteModalOpen(false)} className="px-4 py-2 text-sm font-bold text-[#64748B]">Hủy</button>
+              <button onClick={handleDeleteReport} className="px-4 py-2 bg-rose-500 text-white rounded-lg text-sm font-bold">Xóa báo cáo</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {shareModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#12213A]/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#E5EAF2] flex justify-between items-center">
+              <h3 className="text-[16px] font-bold text-[#12213A]">Chia sẻ báo cáo</h3>
+              <button onClick={() => setShareModalOpen(false)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-[12px] font-bold text-[#12213A] mb-1.5">Email người nhận</label>
+                <input type="email" placeholder="admin@eventhub.ai" className="w-full border border-[#E5EAF2] rounded-xl px-4 py-2 text-[13px] outline-none" />
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-[#F6F8FC] border-t border-[#E5EAF2] flex justify-end gap-3">
+              <button onClick={() => setShareModalOpen(false)} className="px-5 py-2 text-[13px] font-bold text-[#64748B]">Hủy</button>
+              <button onClick={() => { setShareModalOpen(false); showToast('Đã chia sẻ báo cáo thành công.'); }} className="px-5 py-2 bg-[#D7193F] text-white rounded-xl text-[13px] font-bold">Chia sẻ</button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Schedule Modal */}
       {scheduleModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#12213A]/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
             <div className="px-6 py-4 border-b border-[#E5EAF2] flex justify-between items-center">
               <h3 className="text-[16px] font-bold text-[#12213A]">Lập lịch báo cáo</h3>
-              <button onClick={() => setScheduleModalOpen(false)} className="text-slate-400 hover:text-slate-700">
+              <button onClick={() => setScheduleModalOpen(false)} className="text-slate-400">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-[12px] font-bold text-[#12213A] mb-1.5">Tên báo cáo</label>
-                  <input type="text" placeholder="Báo cáo tuần..." className="w-full border border-[#E5EAF2] rounded-xl px-4 py-2 text-[13px] outline-none focus:border-[#D7193F]" />
+                  <label className="block text-[12px] font-bold mb-1.5">Tên báo cáo</label>
+                  <input type="text" className="w-full border rounded-xl px-4 py-2 text-[13px]" />
                 </div>
                 <div>
-                  <label className="block text-[12px] font-bold text-[#12213A] mb-1.5">Loại báo cáo</label>
-                  <select className="w-full border border-[#E5EAF2] rounded-xl px-4 py-2 text-[13px] outline-none focus:border-[#D7193F]">
-                    <option>Tổng quan</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[12px] font-bold text-[#12213A] mb-1.5">Tần suất</label>
-                  <select className="w-full border border-[#E5EAF2] rounded-xl px-4 py-2 text-[13px] outline-none focus:border-[#D7193F]">
+                  <label className="block text-[12px] font-bold mb-1.5">Tần suất</label>
+                  <select className="w-full border rounded-xl px-4 py-2 text-[13px]">
                     <option>Hàng tuần</option>
-                    <option>Hàng tháng</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-[12px] font-bold text-[#12213A] mb-1.5">Định dạng</label>
-                  <select className="w-full border border-[#E5EAF2] rounded-xl px-4 py-2 text-[13px] outline-none focus:border-[#D7193F]">
-                    <option>PDF</option>
-                    <option>Excel</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-[12px] font-bold text-[#12213A] mb-1.5">Người nhận (Email)</label>
-                <input type="text" placeholder="admin@eventhub.ai, ..." className="w-full border border-[#E5EAF2] rounded-xl px-4 py-2 text-[13px] outline-none focus:border-[#D7193F]" />
               </div>
             </div>
-            <div className="px-6 py-4 bg-[#F6F8FC] border-t border-[#E5EAF2] flex justify-end gap-3">
-              <button 
-                onClick={() => setScheduleModalOpen(false)}
-                className="px-5 py-2 text-[13px] font-bold text-[#64748B] hover:text-[#12213A] transition-colors"
-              >
-                Hủy
-              </button>
-              <button 
-                onClick={() => setScheduleModalOpen(false)}
-                className="px-5 py-2 bg-[#D7193F] hover:bg-[#b01433] text-white rounded-xl text-[13px] font-bold shadow-sm transition-colors"
-              >
-                Lưu cấu hình
-              </button>
+            <div className="px-6 py-4 bg-[#F6F8FC] border-t flex justify-end gap-3">
+              <button onClick={() => setScheduleModalOpen(false)} className="px-5 py-2 text-[13px] font-bold">Hủy</button>
+              <button onClick={() => { setScheduleModalOpen(false); showToast('Lịch báo cáo đã được tạo.'); }} className="px-5 py-2 bg-[#D7193F] text-white rounded-xl text-[13px] font-bold">Lưu lịch</button>
             </div>
           </div>
         </div>

@@ -15,10 +15,12 @@ from app.api.v1.speaker import router as speaker_router
 from app.api.v1.feedback import router as feedback_router
 from app.api.v1.ai_analytics import router as ai_analytics_router
 from app.api.v1.users import router as users_router
+from app.api.v1.reports import router as reports_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(auth_router)
 api_v1_router.include_router(users_router)
+api_v1_router.include_router(reports_router, prefix="/reports")
 api_v1_router.include_router(inquiries_router)
 api_v1_router.include_router(registrations_router)
 api_v1_router.include_router(events_router)
