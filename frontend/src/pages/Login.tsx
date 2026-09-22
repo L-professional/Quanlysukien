@@ -1,508 +1,463 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { toast } from 'sonner';
+import React, { useState, useEffect } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
-  Mail,
-  Lock,
-  User,
-  Phone,
-  Sparkles,
-  LogIn,
-  UserPlus,
-  Eye,
-  EyeOff,
-  Crown,
-  Briefcase,
-  Ticket,
-  ShieldCheck,
-  Zap,
-  ArrowRight,
-  AlertCircle,
-  CheckCircle2,
-  Info,
-  Mic,
-} from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { useTranslation } from 'react-i18next';
-import { LanguageSwitcher } from '../components/LanguageSwitcher';
-import { UserRole } from '../types';
-import { GoogleAuthModal, GoogleIcon } from '../components/GoogleAuthModal';
+  Mail, Lock, User, Eye, EyeOff, ArrowRight,
+  Home, Calendar, Users, Cpu, CheckSquare, Square
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
-const QUICK_DEMO_ACCOUNTS: {
-  role: UserRole;
-  title: string;
-  badge: string;
-  email: string;
-  desc: string;
+const BG_IMG = "/assets/backgroud_login.webp";
+
+const GoogleIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </svg>
+);
+
+const MicrosoftIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5">
+    <path d="M11.4 2H2v9.4h9.4V2z" fill="#F25022"/>
+    <path d="M22 2h-9.4v9.4H22V2z" fill="#7FBA00"/>
+    <path d="M11.4 12.6H2V22h9.4v-9.4z" fill="#00A4EF"/>
+    <path d="M22 12.6h-9.4V22H22v-9.4z" fill="#FFB900"/>
+  </svg>
+);
+
+type AuthMode = "login" | "register";
+interface FormState { fullName: string; email: string; password: string; confirmPassword: string; }
+
+interface InputFieldProps {
   icon: React.FC<{ className?: string }>;
-  color: string;
-  border: string;
-}[] = [
-  {
-    role: 'ADMIN',
-    title: 'Admin Quản Trị',
-    badge: '👑 Admin',
-    email: 'admin@eventhub.ai',
-    desc: 'Toàn quyền quản trị tài khoản, cấu hình RAG & logs',
-    icon: Crown,
-    color: 'from-amber-500/20 to-orange-500/10 text-amber-300',
-    border: 'border-amber-500/40 hover:border-amber-400',
-  },
-  {
-    role: 'SPEAKER',
-    title: 'Diễn Giả Sân Khấu',
-    badge: '🎙️ Speaker',
-    email: 'speaker@eventhub.ai',
-    desc: 'Cổng thống kê, Studio điều khiển sân khấu & Q&A Live',
-    icon: Mic,
-    color: 'from-cyan-500/20 to-teal-500/10 text-cyan-300',
-    border: 'border-cyan-500/40 hover:border-cyan-400',
-  },
-  {
-    role: 'EVENT_MANAGER',
-    title: 'Quản Lý Sự Kiện',
-    badge: '🏢 Manager',
-    email: 'manager@eventhub.ai',
-    desc: 'Khởi tạo sự kiện, sinh bài PR bằng AI & xem Dashboard',
-    icon: Briefcase,
-    color: 'from-purple-500/20 to-indigo-500/10 text-purple-300',
-    border: 'border-purple-500/40 hover:border-purple-400',
-  },
-  {
-    role: 'STAFF',
-    title: 'Nhân Viên Điều Phối',
-    badge: '🛡️ Staff',
-    email: 'staff@eventhub.ai',
-    desc: 'Soát vé QR, duyệt & tinh chỉnh phản hồi AI Concierge',
-    icon: ShieldCheck,
-    color: 'from-blue-500/20 to-cyan-500/10 text-blue-300',
-    border: 'border-blue-500/40 hover:border-blue-400',
-  },
-  {
-    role: 'ATTENDEE',
-    title: 'Khách Tham Dự',
-    badge: '🎟️ Attendee',
-    email: 'attendee@eventhub.ai',
-    desc: 'Xem lịch trình, đăng ký vé QR cá nhân & hỏi đáp RAG',
-    icon: Ticket,
-    color: 'from-emerald-500/20 to-teal-500/10 text-emerald-300',
-    border: 'border-emerald-500/40 hover:border-emerald-400',
-  },
-];
+  name: keyof FormState;
+  type?: string;
+  placeholder: string;
+  form: FormState;
+  errors: Record<string, string>;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  rightIcon?: React.FC<{ className?: string }>;
+  onRightIconClick?: () => void;
+}
+
+const InputField: React.FC<InputFieldProps> = ({
+  icon: Icon, name, type = "text", placeholder,
+  form, errors, onChange, rightIcon: RightIcon, onRightIconClick
+}) => (
+  <div className="mb-3">
+    <div className={`flex items-center bg-white border rounded-xl px-4 h-[54px] transition-all ${
+      errors[name] ? "border-red-400" : "border-gray-200 focus-within:border-[#D7193F] focus-within:shadow-sm focus-within:shadow-red-50"
+    }`}>
+      <Icon className="w-[18px] h-[18px] text-gray-400 shrink-0 mr-3" />
+      <input
+        name={name}
+        type={type}
+        placeholder={placeholder}
+        value={form[name]}
+        onChange={onChange}
+        className="flex-1 bg-transparent outline-none text-[14px] text-gray-800 placeholder-gray-400"
+        autoComplete="off"
+      />
+      {RightIcon && onRightIconClick && (
+        <button type="button" onClick={onRightIconClick} className="ml-2 text-gray-400 hover:text-gray-600 transition-colors">
+          <RightIcon className="w-[18px] h-[18px]" />
+        </button>
+      )}
+    </div>
+    {errors[name] && <p className="text-[11px] text-red-500 mt-1 ml-1">{errors[name]}</p>}
+  </div>
+);
+
+const SocialBtn: React.FC<{ onClick: () => void; children: React.ReactNode }> = ({ onClick, children }) => (
+  <button
+    onClick={onClick} type="button"
+    className="flex items-center justify-center gap-2 h-[44px] bg-white border border-gray-200 rounded-xl text-[13px] font-semibold text-gray-700 hover:border-gray-300 hover:shadow-sm transition-all"
+  >
+    {children}
+  </button>
+);
 
 export const Login: React.FC = () => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, userRole, isAuthenticated, login, register, logout, isLoading } = useAuth();
+  const { login, register: registerUser, isAuthenticated } = useAuth();
 
-  const redirectParam = searchParams.get('redirect');
-  const modeParam = searchParams.get('mode');
-
-  const [mode, setMode] = useState<'login' | 'register'>(modeParam === 'register' ? 'register' : 'login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [fullName, setFullName] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [mode, setMode] = useState<AuthMode>(
+    searchParams.get("mode") === "register" ? "register" : "login"
+  );
+  const [showPw, setShowPw] = useState(false);
+  const [showCPw, setShowCPw] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [form, setForm] = useState<FormState>({
+    fullName: "", email: "", password: "", confirmPassword: ""
+  });
 
   useEffect(() => {
-    if (modeParam === 'register') {
-      setMode('register');
-    }
-  }, [modeParam]);
+    if (isAuthenticated) navigate("/dashboard", { replace: true });
+  }, [isAuthenticated, navigate]);
 
-  const isDemoLoginEnabled = import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
+  useEffect(() => {
+    setMode(searchParams.get("mode") === "register" ? "register" : "login");
+  }, [searchParams]);
 
-  const handleRedirectAfterAuth = (_role?: UserRole) => {
-    if (
-      redirectParam &&
-      redirectParam.startsWith('/') &&
-      redirectParam !== '/' &&
-      redirectParam !== '/landing'
-    ) {
-      navigate(redirectParam, { replace: true });
-      return;
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: "" }));
+  };
+
+  const validate = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (!form.email.trim()) errs.email = "Vui lòng nhập email hoặc số điện thoại";
+    if (!form.password) errs.password = "Vui lòng nhập mật khẩu";
+    if (mode === "register") {
+      if (!form.fullName.trim()) errs.fullName = "Vui lòng nhập họ và tên";
+      if (form.password.length < 6) errs.password = "Mật khẩu phải có ít nhất 6 ký tự";
+      if (form.password !== form.confirmPassword) errs.confirmPassword = "Mật khẩu xác nhận không khớp";
     }
-    navigate('/dashboard', { replace: true });
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage('');
-
-    const trimmedEmail = email.trim();
-    if (!trimmedEmail) {
-      setErrorMessage(t('auth.errEmailRequired'));
-      return;
-    }
-
-    if (!password) {
-      setErrorMessage(t('auth.errPasswordRequired'));
-      return;
-    }
-
-    if (mode === 'login') {
-      try {
-        const success = await login(trimmedEmail, password);
-        if (success) {
-          handleRedirectAfterAuth(userRole);
-        } else {
-          setErrorMessage(t('auth.loginFailed'));
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : t('auth.loginFailed');
-        setErrorMessage(msg);
-        toast.error(msg);
+    if (!validate()) return;
+    setIsLoading(true);
+    try {
+      if (mode === "login") {
+        await login(form.email.trim(), form.password);
+        toast.success("Đăng nhập thành công!");
+        navigate("/dashboard", { replace: true });
+      } else {
+        await registerUser(form.fullName.trim(), form.email.trim(), form.password);
+        toast.success("Đăng ký thành công! Chào mừng đến với EventAI.");
+        navigate("/dashboard", { replace: true });
       }
-    } else {
-      const trimmedName = fullName.trim();
-      if (!trimmedName) {
-        setErrorMessage(t('auth.errFullNameRequired'));
-        toast.error(t('auth.errFullNameRequired'));
-        return;
-      }
-
-      if (password.length < 6) {
-        setErrorMessage(t('auth.errPasswordLength'));
-        toast.error(t('auth.errPasswordLength'));
-        return;
-      }
-
-      try {
-        // Force PARTICIPANT role for all public registrations
-        const success = await register(trimmedEmail, password, trimmedName, phoneNumber.trim());
-        if (success) {
-          handleRedirectAfterAuth('PARTICIPANT');
-        } else {
-          setErrorMessage(t('auth.registerFailed'));
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : t('auth.registerFailed');
-        setErrorMessage(msg);
-        toast.error(msg);
-      }
+    } catch (err: any) {
+      toast.error(err?.message || (mode === "login" ? "Email hoặc mật khẩu không đúng" : "Đăng ký thất bại"));
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleQuickLogin = async (acc: typeof QUICK_DEMO_ACCOUNTS[0]) => {
-    setMode('login');
-    setEmail(acc.email);
-    setPassword('123456');
-    setErrorMessage('');
-    try {
-      const success = await login(acc.email, '123456');
-      if (success) {
-        handleRedirectAfterAuth(acc.role);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : t('auth.loginFailed');
-      setErrorMessage(msg);
-    }
+  const switchMode = (m: AuthMode) => {
+    setMode(m);
+    setErrors({});
+    setForm({ fullName: "", email: "", password: "", confirmPassword: "" });
+    setShowPw(false);
+    setShowCPw(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden font-sans">
-      {/* Top Language Switcher */}
-      <div className="absolute top-6 right-6 z-30">
-        <LanguageSwitcher />
-      </div>
-
-      {/* Background Glows */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-10 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
-
-      {/* Brand Header */}
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center relative z-10 px-4">
-        <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 shadow-xl shadow-indigo-600/40 mb-4 text-white">
-          <Zap className="w-8 h-8 fill-current text-white" />
+    <div
+      className="min-h-screen w-full overflow-hidden relative"
+      style={{ fontFamily: '"Be Vietnam Pro", "Plus Jakarta Sans", -apple-system, sans-serif', background: "#fff", color: "#101827" }}
+    >
+      {/* Global style override - force light mode for this page */}
+      <style>{`
+        body { background: #ffffff !important; color: #101827 !important; }
+        * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+      `}</style>
+      {/* ═══ BACKGROUND ═══ */}
+      <div className="absolute inset-0 z-0 overflow-hidden">
+        {/* Main background photo - convention center */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url(${BG_IMG})`,
+            backgroundSize: "cover",
+            backgroundPosition: "60% center",
+          }}
+        />
+        {/* Subtle left gradient for text readability ONLY - not covering whole page */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(to right, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0.60) 32%, rgba(255,255,255,0.10) 55%, rgba(255,255,255,0) 70%)"
+          }}
+        />
+        {/* Top header readability fade */}
+        <div
+          className="absolute top-0 left-0 right-0 h-24"
+          style={{ background: "linear-gradient(to bottom, rgba(255,255,255,0.55), transparent)" }}
+        />
+        {/* Top-left: small corner accent */}
+        <div className="absolute z-10 bg-[#D7193F]" style={{ width:80, height:250, top:-125, left:-60, transform:"rotate(-45deg)", opacity:0.90 }} />
+        <div className="absolute z-10 bg-[#D7193F]" style={{ width:20, height:200, top:-95, left:20, transform:"rotate(-45deg)", opacity:0.60 }} />
+        {/* Top-right red diagonals */}
+        <div className="absolute z-10 bg-[#D7193F]" style={{ width:105, height:840, top:-120, right:-52, transform:"rotate(-45deg)", opacity:0.90 }} />
+        <div className="absolute z-10 bg-[#D7193F]" style={{ width:32,  height:660, top:-70,  right:94,  transform:"rotate(-45deg)", opacity:0.68 }} />
+        <div className="absolute z-10 bg-[#D7193F]" style={{ width:10,  height:520, top:-20,  right:158, transform:"rotate(-45deg)", opacity:0.22 }} />
+        {/* Bottom-left: simple red triangle */}
+        <div className="absolute bottom-0 left-0 z-10 pointer-events-none" style={{ width: "min(50vw, 700px)", height: "min(40vh, 350px)" }}>
+          <svg viewBox="0 0 100 100" className="w-full h-full" preserveAspectRatio="none">
+            {/* Simple diagonal triangle pointing down to the right */}
+            <polygon points="0,100 0,0 100,100" fill="#720B14" opacity="0.95" />
+            <polygon points="0,100 0,30 70,100" fill="#8F0B18" opacity="0.8" />
+            <polygon points="0,100 0,60 40,100" fill="#5A0000" opacity="0.7" />
+            <polyline points="0,0 100,100" fill="none" stroke="#D7193F" strokeWidth="0.5" opacity="0.8" />
+            <polyline points="0,15 85,100" fill="none" stroke="#D7193F" strokeWidth="0.2" opacity="0.4" />
+          </svg>
         </div>
-        <h1 className="text-3xl font-black text-white tracking-tight flex items-center justify-center gap-2">
-          EventHub <span className="text-indigo-400">AI</span>
-        </h1>
-        <p className="mt-1 text-sm text-slate-400 font-medium">
-          {t('header.brandSubtitle')}
-        </p>
       </div>
 
-      {/* Main Container */}
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-xl relative z-10 px-4">
-        {/* If already authenticated alert banner */}
-        {isAuthenticated && user && (
-          <div className="mb-6 p-4 rounded-2xl bg-indigo-950/70 border border-indigo-500/40 text-xs text-slate-300 flex items-center justify-between gap-3 shadow-lg backdrop-blur-md animate-in fade-in duration-200">
-            <div className="flex items-center gap-2.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <div>
-                <span className="font-semibold text-white">{t('auth.loggedInAs')}: </span>
-                <span className="font-bold text-indigo-300">{user.full_name}</span>
-                <span className="ml-1 text-[11px] text-slate-400">({user.role_name || userRole})</span>
+      {/* ═══ HEADER ═══ */}
+      <header
+        className="relative z-50 h-[68px] flex items-center px-6 xl:px-12"
+        style={{ background:"rgba(255,255,255,0.97)", backdropFilter:"blur(8px)", borderBottom:"1px solid rgba(0,0,0,0.07)", boxShadow:"0 1px 4px rgba(0,0,0,0.05)" }}
+      >
+        <div className="w-full max-w-[1440px] mx-auto flex justify-between items-center">
+          <Link to="/" className="flex items-center gap-3">
+            <div className="w-9 h-9 flex items-center justify-center">
+              <div
+                className="w-7 h-7 rotate-45 flex items-center justify-center"
+                style={{ background:"#D7193F", boxShadow:"0 2px 6px rgba(215,25,63,0.35)" }}
+              >
+                <div className="w-3 h-3 bg-white" style={{ transform:"rotate(-45deg)" }} />
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleRedirectAfterAuth(userRole)}
-                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all text-xs flex items-center gap-1 cursor-pointer"
-              >
-                {t('auth.enterApp')} <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={logout}
-                className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium transition-all text-xs cursor-pointer"
-              >
-                {t('auth.logout')}
-              </button>
+            <div>
+              <div className="flex items-baseline">
+                <span className="text-xl font-extrabold text-[#101827] tracking-tight">Event</span>
+                <span className="text-xl font-extrabold text-[#D7193F] tracking-tight">AI</span>
+              </div>
+              <div className="text-[9px] font-semibold text-gray-400 tracking-[0.22em] leading-none mt-0.5">
+                CONNECT · CREATE · INSPIRE
+              </div>
             </div>
-          </div>
-        )}
+          </Link>
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-[13px] font-semibold text-gray-600 hover:text-[#D7193F] transition-colors group"
+          >
+            <Home className="w-[15px] h-[15px]" />
+            <span>Quay về trang chủ</span>
+            <ArrowRight className="w-[15px] h-[15px] text-[#D7193F] group-hover:translate-x-0.5 transition-transform" />
+          </Link>
+        </div>
+      </header>
 
-        <div className="bg-slate-900/90 border border-slate-800/90 rounded-3xl shadow-2xl backdrop-blur-xl overflow-hidden p-6 sm:p-8 space-y-6">
-          {/* Top Switcher Tabs */}
-          <div className="grid grid-cols-2 p-1 bg-slate-950/80 rounded-2xl border border-slate-800">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('login');
-                setErrorMessage('');
-              }}
-              className={`py-2.5 text-xs font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
-                mode === 'login'
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <LogIn className="w-4 h-4" />
-              {t('auth.login')}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('register');
-                setErrorMessage('');
-              }}
-              className={`py-2.5 text-xs font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer ${
-                mode === 'register'
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <UserPlus className="w-4 h-4" />
-              {t('auth.register')}
-            </button>
-          </div>
+      {/* ═══ MAIN ═══ */}
+      <main
+        className="relative z-20 flex items-center px-8 xl:px-14 py-8"
+        style={{ minHeight:"calc(100vh - 72px)" }}
+      >
+        <div className="w-full max-w-[1440px] mx-auto flex flex-col lg:flex-row items-center lg:items-center justify-between gap-8 lg:gap-4">
 
-          {/* Google OAuth 2.0 Sign In Button */}
-          <div>
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => setShowGoogleModal(true)}
-              className="w-full py-3 px-4 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50 group border border-slate-200"
-            >
-              <GoogleIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              <span>
-                {mode === 'login' ? t('auth.googleLogin') : t('auth.googleRegister')}
-              </span>
-            </button>
-            <p className="mt-1.5 text-center text-[10px] text-slate-400">
-              {t('events.ticketQrSubtitle')}
+          {/* LEFT – Promo Content */}
+          <div className="w-full lg:w-[50%] flex flex-col justify-center z-20">
+            <p className="text-[11px] font-bold text-[#D7193F] tracking-[0.22em] uppercase mb-4">
+              Nền tảng quản lý sự kiện tích hợp AI
             </p>
+
+            <h1 className="font-extrabold mb-4" style={{ lineHeight: 1.15 }}>
+              <span className="block text-[#101827]" style={{ fontSize:"clamp(36px,4.8vw,60px)", textShadow:"0 1px 3px rgba(255,255,255,0.6)" }}>
+                Kết nối cộng đồng
+              </span>
+              <span className="block text-[#D7193F]" style={{ fontSize:"clamp(36px,4.8vw,60px)", textShadow:"0 1px 3px rgba(255,255,255,0.5)" }}>
+                Kiến tạo giá trị
+              </span>
+            </h1>
+
+            <p className="leading-relaxed mb-8 max-w-[440px]" style={{ fontSize:"clamp(14px,1.1vw,17px)", color:"#2D3748" }}>
+              Đăng nhập hoặc tạo tài khoản để tham gia,<br/>
+              quản lý sự kiện và khám phá những trải nghiệm<br/>
+              độc đáo cùng EventAI.
+            </p>
+
+            <div className="flex flex-wrap gap-5">
+              {[
+                { icon: Calendar, title: "Tham gia sự kiện",  sub: "Dễ dàng, nhanh chóng" },
+                { icon: Users,    title: "Kết nối cộng đồng", sub: "Mở rộng cơ hội hợp tác" },
+                { icon: Cpu,      title: "Trải nghiệm AI",    sub: "Cá nhân hóa đề xuất" },
+              ].map(({ icon: Icon, title, sub }) => (
+                <div key={title} className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background:"rgba(215,25,63,0.13)", border:"1.5px solid rgba(215,25,63,0.25)" }}>
+                    <Icon className="w-[18px] h-[18px] text-[#D7193F]" strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-bold text-[#101827] leading-tight">{title}</p>
+                    <p className="text-[11px] text-[#5F6875]">{sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Brand stamp */}
+            <div className="mt-16 pt-2">
+              <p className="text-[26px] font-bold italic text-white" style={{ fontFamily:"Georgia,serif", textShadow:"0 2px 12px rgba(0,0,0,0.5)" }}>
+                EventAI
+              </p>
+              <p className="text-[11px] text-white/70 font-medium tracking-wide mt-1">
+                Hội tụ công nghệ - Kết nối tương lai
+              </p>
+              <div className="w-8 h-[1.5px] mt-2.5" style={{ background:"rgba(255,255,255,0.5)" }} />
+            </div>
           </div>
 
-          {/* Quick Demo Accounts 1-Click Login (Only when VITE_ENABLE_DEMO_LOGIN=true) */}
-          {isDemoLoginEnabled && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                  {t('auth.demoLoginTitle')}
-                </span>
-                <span className="text-[10px] text-indigo-400 bg-indigo-950/80 px-2.5 py-0.5 rounded-full border border-indigo-800/60 font-semibold">
-                  {t('auth.realApiAuth')}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {QUICK_DEMO_ACCOUNTS.map((acc) => {
-                  const Icon = acc.icon;
-                  return (
+          {/* RIGHT – Auth Card */}
+          <div className="w-full lg:w-auto flex justify-center lg:justify-end shrink-0 z-30 lg:self-center">
+            <div
+              className="w-full rounded-lg overflow-hidden"
+              style={{
+                width:"min(520px, 42vw)",
+                minWidth:"420px",
+                minHeight:"600px",
+                background:"rgba(255,255,255,0.97)",
+                backdropFilter:"blur(24px)",
+                WebkitBackdropFilter:"blur(24px)",
+                boxShadow:"0 16px 64px rgba(0,0,0,0.20), 0 2px 8px rgba(0,0,0,0.08)",
+                border:"1px solid rgba(215,25,63,0.10)",
+                display:"flex",
+                flexDirection:"column",
+              }}
+            >
+              {/* Tabs */}
+              <div className="px-8 pt-7">
+                <div className="flex">
+                  {(["login", "register"] as AuthMode[]).map((m) => (
                     <button
-                      key={acc.role}
-                      type="button"
-                      disabled={isLoading}
-                      onClick={() => handleQuickLogin(acc)}
-                      className={`p-3 rounded-2xl bg-gradient-to-br ${acc.color} border ${acc.border} text-left transition-all hover:scale-[1.02] shadow-xs group cursor-pointer disabled:opacity-50`}
+                      key={m}
+                      onClick={() => switchMode(m)}
+                      className={`flex-1 pb-3 text-[14px] font-bold text-center transition-all relative ${
+                        mode === m ? "text-[#D7193F]" : "text-[#6B7280] hover:text-[#101827]"
+                      }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <Icon className="w-3.5 h-3.5 shrink-0" />
-                          {t(`roles.${acc.role}`)}
-                        </span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-900/70 border border-slate-700/50">
-                          {acc.badge}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-400 line-clamp-1 group-hover:text-slate-200 transition-colors">
-                        {acc.desc}
-                      </p>
+                      {m === "login" ? "Đăng nhập" : "Đăng ký"}
+                      {mode === m && (
+                        <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-[#D7193F] rounded-full" />
+                      )}
                     </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Divider */}
-          {isDemoLoginEnabled && (
-            <div className="relative flex items-center justify-center">
-              <div className="border-t border-slate-800 w-full" />
-              <span className="bg-slate-900 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 shrink-0">
-                {mode === 'login' ? t('auth.orUseAccount') : t('auth.orRegisterAccount')}
-              </span>
-              <div className="border-t border-slate-800 w-full" />
-            </div>
-          )}
-
-          {/* Error message alert */}
-          {errorMessage && (
-            <div className="p-3.5 text-xs font-semibold text-rose-300 bg-rose-950/60 border border-rose-800/80 rounded-2xl flex items-center gap-2 animate-in fade-in duration-150">
-              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          {/* Auth Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'register' && (
-              <>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1.5">{t('auth.fullName')}</label>
-                  <div className="relative">
-                    <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                    <input
-                      type="text"
-                      placeholder={t('auth.fullNamePlaceholder')}
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
-                    />
-                  </div>
+                  ))}
                 </div>
+                <div className="h-px bg-gray-100" />
+              </div>
 
-                {/* RBAC Security Notice */}
-                <div className="p-3.5 bg-indigo-950/40 border border-indigo-500/30 rounded-2xl text-xs text-indigo-200/90 flex items-start gap-2.5">
-                  <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                  <div className="leading-relaxed">
-                    <p className="font-semibold text-white">RBAC:</p>
-                    <p className="text-[11px] text-slate-300 mt-0.5">
-                      {t('auth.rbacNotice')}
+              {/* Form */}
+              <div className="px-8 py-5 flex-1">
+                {mode === "login" ? (
+                  <>
+                    <div className="mb-6">
+                      <h2 className="text-[22px] font-extrabold text-[#101827]">Chào mừng trở lại!</h2>
+                      <p className="text-[13px] text-[#5F6875] mt-1.5">
+                        Vui lòng đăng nhập để tiếp tục sử dụng EventAI.
+                      </p>
+                    </div>
+
+                    <form onSubmit={handleSubmit} noValidate>
+                      <InputField icon={Mail} name="email" type="email" placeholder="Email hoặc số điện thoại" form={form} errors={errors} onChange={handleChange} />
+                      <InputField icon={Lock} name="password" type={showPw ? "text" : "password"} placeholder="Mật khẩu" form={form} errors={errors} onChange={handleChange} rightIcon={showPw ? EyeOff : Eye} onRightIconClick={() => setShowPw(v => !v)} />
+
+                      <div className="flex items-center justify-between mt-1 mb-5">
+                        <button type="button" onClick={() => setRememberMe(v => !v)} className="flex items-center gap-2 text-[13px] text-gray-600 hover:text-gray-800 transition-colors">
+                          {rememberMe ? <CheckSquare className="w-4 h-4 text-[#D7193F]" /> : <Square className="w-4 h-4 text-gray-400" />}
+                          Ghi nhớ đăng nhập
+                        </button>
+                        <button type="button" onClick={() => toast.info("Vui lòng liên hệ admin để đặt lại mật khẩu.")} className="text-[13px] font-semibold text-[#D7193F] hover:text-[#A8112A] transition-colors">
+                          Quên mật khẩu?
+                        </button>
+                      </div>
+
+                      <button
+                        type="submit" disabled={isLoading}
+                        className="w-full h-[54px] text-white font-bold text-[15px] rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+                        style={{ background:"#D7193F", boxShadow:"0 4px 20px rgba(215,25,63,0.28)" }}
+                      >
+                        {isLoading ? "Đang xử lý..." : <><span>Đăng nhập</span><ArrowRight className="w-4 h-4" /></>}
+                      </button>
+                    </form>
+
+                    <div className="mt-5">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="flex-1 h-px bg-gray-200" />
+                        <span className="text-[12px] text-gray-400 whitespace-nowrap font-medium">Hoặc đăng nhập bằng</span>
+                        <div className="flex-1 h-px bg-gray-200" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <SocialBtn onClick={() => toast.info("Tính năng Google đang phát triển.")}><GoogleIcon />Google</SocialBtn>
+                        <SocialBtn onClick={() => toast.info("Tính năng Microsoft đang phát triển.")}><MicrosoftIcon />Microsoft</SocialBtn>
+                      </div>
+                    </div>
+
+                    <p className="text-center text-[13px] text-gray-500 mt-4 mb-3">
+                      Chưa có tài khoản?{" "}
+                      <button onClick={() => switchMode("register")} className="font-bold text-[#D7193F] hover:text-[#A8112A] transition-colors">
+                        Đăng ký ngay →
+                      </button>
                     </p>
-                  </div>
-                </div>
-              </>
-            )}
 
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">{t('auth.email')}</label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                <input
-                  type="email"
-                  placeholder={t('auth.emailPlaceholder')}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
-                />
-              </div>
-            </div>
+                    {/* Demo accounts - Compact */}
+                    <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+                      <div className="w-full text-center text-[10px] text-gray-400 mb-0.5">🔑 Tài khoản demo (pw: 123456)</div>
+                      {[
+                        { label:"Admin", email:"admin@eventhub.ai",   color:"bg-amber-50 text-amber-600 border-amber-200" },
+                        { label:"Manager", email:"manager@eventhub.ai", color:"bg-purple-50 text-purple-600 border-purple-200" },
+                        { label:"Staff", email:"staff@eventhub.ai",   color:"bg-indigo-50 text-indigo-600 border-indigo-200" },
+                        { label:"Speaker", email:"speaker@eventhub.ai", color:"bg-emerald-50 text-emerald-600 border-emerald-200" },
+                        { label:"User",  email:"attendee@eventhub.ai",color:"bg-slate-50 text-slate-600 border-slate-200" },
+                      ].map(d => (
+                        <button
+                          key={d.label} type="button"
+                          onClick={() => { setForm(p=>({...p, email:d.email, password:"123456"})); toast.success(`Đã điền tài khoản ${d.label}`); }}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors hover:opacity-80 ${d.color}`}
+                        >
+                          {d.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mb-5">
+                      <h2 className="text-[22px] font-extrabold text-[#101827]">Tạo tài khoản EventAI</h2>
+                      <p className="text-[13px] text-[#5F6875] mt-1.5">Đăng ký để bắt đầu trải nghiệm EventAI.</p>
+                    </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-slate-300">{t('auth.password')}</label>
-                {mode === 'login' && (
-                  <span className="text-[11px] text-indigo-400 font-semibold cursor-pointer hover:underline">
-                    {t('auth.forgotPassword')}
-                  </span>
+                    <form onSubmit={handleSubmit} noValidate>
+                      <InputField icon={User} name="fullName" placeholder="Họ và tên" form={form} errors={errors} onChange={handleChange} />
+                      <InputField icon={Mail} name="email" type="email" placeholder="Email hoặc số điện thoại" form={form} errors={errors} onChange={handleChange} />
+                      <InputField icon={Lock} name="password" type={showPw ? "text" : "password"} placeholder="Mật khẩu" form={form} errors={errors} onChange={handleChange} rightIcon={showPw ? EyeOff : Eye} onRightIconClick={() => setShowPw(v => !v)} />
+                      <InputField icon={Lock} name="confirmPassword" type={showCPw ? "text" : "password"} placeholder="Xác nhận mật khẩu" form={form} errors={errors} onChange={handleChange} rightIcon={showCPw ? EyeOff : Eye} onRightIconClick={() => setShowCPw(v => !v)} />
+
+                      <button
+                        type="submit" disabled={isLoading}
+                        className="w-full h-[54px] text-white font-bold text-[15px] rounded-xl flex items-center justify-center gap-2 transition-all mt-2 disabled:opacity-60"
+                        style={{ background:"#D7193F", boxShadow:"0 4px 20px rgba(215,25,63,0.28)" }}
+                      >
+                        {isLoading ? "Đang xử lý..." : <><span>Đăng ký ngay</span><ArrowRight className="w-4 h-4" /></>}
+                      </button>
+                    </form>
+
+                    <div className="mt-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="flex-1 h-px bg-gray-200" />
+                        <span className="text-[12px] text-gray-400 whitespace-nowrap font-medium">Hoặc đăng ký bằng</span>
+                        <div className="flex-1 h-px bg-gray-200" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <SocialBtn onClick={() => toast.info("Tính năng Google đang phát triển.")}><GoogleIcon />Google</SocialBtn>
+                        <SocialBtn onClick={() => toast.info("Tính năng Microsoft đang phát triển.")}><MicrosoftIcon />Microsoft</SocialBtn>
+                      </div>
+                    </div>
+
+                    <p className="text-center text-[13px] text-gray-500 mt-4 mb-1">
+                      Đã có tài khoản?{" "}
+                      <button onClick={() => switchMode("login")} className="font-bold text-[#D7193F] hover:text-[#A8112A] transition-colors">
+                        Đăng nhập
+                      </button>
+                    </p>
+                  </>
                 )}
               </div>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder={t('auth.passwordPlaceholder')}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
             </div>
-
-            {mode === 'register' && (
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">{t('auth.phoneNumber')}</label>
-                <div className="relative">
-                  <Phone className="absolute left-3.5 top-3 w-4 h-4 text-slate-500" />
-                  <input
-                    type="text"
-                    placeholder={t('auth.phoneNumberPlaceholder')}
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
-                  />
-                </div>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full mt-4 py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
-            >
-              {isLoading ? (
-                <span className="animate-pulse flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 animate-spin" />
-                  {t('auth.authenticating')}
-                </span>
-              ) : mode === 'login' ? (
-                <>
-                  <LogIn className="w-4 h-4" />
-                  {t('auth.confirmLogin')}
-                </>
-              ) : (
-                <>
-                  <UserPlus className="w-4 h-4" />
-                  {t('auth.confirmRegister')}
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Footer Navigation Link */}
-          <div className="pt-2 text-center text-xs text-slate-400">
-            <span>{t('auth.publicCatalogPrompt')} </span>
-            <Link to="/events" className="text-indigo-400 font-bold hover:underline">
-              {t('auth.publicCatalogLink')}
-            </Link>
           </div>
-        </div>
-      </div>
 
-      {/* Google OAuth Modal */}
-      <GoogleAuthModal
-        isOpen={showGoogleModal}
-        onClose={() => setShowGoogleModal(false)}
-        onSuccess={() => handleRedirectAfterAuth('PARTICIPANT')}
-      />
+        </div>
+      </main>
     </div>
   );
 };

@@ -26,10 +26,18 @@ export default {
           purple: '#8b5cf6',
           emerald: '#10b981',
           rose: '#f43f5e',
-        }
+        },
+        'event-red': '#C8102E',
+        'event-dark-red': '#A80722',
+        'event-light-red': '#F8E8EB',
+        'event-navy': '#101827',
+        'event-text': '#182230',
+        'event-text-sec': '#5F6875',
+        'event-gray': '#F4F5F7',
+        'event-border': '#E5E7EB',
       },
       fontFamily: {
-        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+        sans: ['"Be Vietnam Pro"', 'Plus Jakarta Sans', 'Inter', 'sans-serif'],
       },
       animation: {
         'scan': 'scan 2s ease-in-out infinite',

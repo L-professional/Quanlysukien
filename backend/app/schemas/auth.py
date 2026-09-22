@@ -24,6 +24,7 @@ class UserResponse(BaseModel):
     phone_number: Optional[str] = None
     role_id: int
     role_name: Optional[str] = None
+    permissions: list[str] = []
     is_active: bool = True
     avatar_url: Optional[str] = None
     provider: Optional[str] = "local"

@@ -1,1668 +1,1139 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  Calendar,
-  Users,
-  Building2,
-  Star,
-  CheckCircle2,
-  ArrowRight,
-  ShieldCheck,
-  MapPin,
-  Search,
-  Bot,
-  BarChart3,
-  Phone,
-  Mail,
-  X,
-  QrCode,
-  Check,
-  Ticket,
-  Clock,
-  Sparkles,
-  Menu,
-} from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { apiService } from '../services/api';
-import { toast } from 'sonner';
-import { LanguageSwitcher } from '../components/LanguageSwitcher';
+import React, { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
-interface DisplayEvent {
-  id: number;
-  title: string;
-  date: string;
-  location: string;
-  description: string;
-  tag: string;
-  tagColor: string;
-  image: string;
-}
-
-const DEFAULT_FEATURED_EVENTS: DisplayEvent[] = [
-  {
-    id: 1,
-    title: 'Hội nghị Công nghệ AI 2026',
-    date: '15 Thg 4, 2026',
-    location: 'Trung tâm Hội nghị Quốc gia, Hà Nội',
-    description: 'Cập nhật xu hướng công nghệ AI mới nhất cùng các chuyên gia hàng đầu.',
-    tag: 'Công nghệ',
-    tagColor: 'bg-blue-100 text-blue-700',
-    image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: 2,
-    title: 'Diễn đàn Kinh doanh & Đổi mới',
-    date: '22 Thg 4, 2026',
-    location: 'Khách sạn Melia, Hà Nội',
-    description: 'Kết nối doanh nghiệp, chia sẻ chiến lược phát triển bền vững.',
-    tag: 'Doanh nghiệp',
-    tagColor: 'bg-indigo-100 text-indigo-700',
-    image: 'https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: 3,
-    title: 'Hội thảo Y tế & Chăm sóc sức khỏe',
-    date: '05 Thg 5, 2026',
-    location: 'Trung tâm Hội nghị Gem Center, TPHCM',
-    description: 'Cập nhật kiến thức y khoa và công nghệ chăm sóc sức khỏe hiện đại.',
-    tag: 'Y tế',
-    tagColor: 'bg-teal-100 text-teal-700',
-    image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=600&q=80',
-  },
-  {
-    id: 4,
-    title: 'Workshop Sáng tạo & Công nghệ',
-    date: '18 Thg 5, 2026',
-    location: 'The ADORA Center, TPHCM',
-    description: 'Truyền cảm hứng, kết nối cộng đồng sáng tạo trẻ.',
-    tag: 'Sáng tạo',
-    tagColor: 'bg-amber-100 text-amber-700',
-    image: 'https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=600&q=80',
-  },
-];
-
-const TESTIMONIALS = [
-  {
-    name: 'Nguyễn Thị Lan Anh',
-    role: 'Giám đốc Marketing · TechWorld',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-    comment:
-      'EventAI giúp chúng tôi tổ chức sự kiện rất chuyên nghiệp, tiết kiệm thời gian và chi phí. Đội ngũ hỗ trợ nhiệt tình, luôn sẵn sàng 24/7.',
-  },
-  {
-    name: 'Trần Minh Đức',
-    role: 'CEO · BlueOcean Group',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-    comment:
-      'Giao diện thân thiện, dễ sử dụng và nhiều tính năng hữu ích. EventAI thực sự là giải pháp tuyệt vời cho các sự kiện hiện đại.',
-  },
-  {
-    name: 'Lê Hà My',
-    role: 'Trưởng phòng Sự kiện · GoldenEvent',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=150&q=80',
-    comment:
-      'Tôi rất hài lòng với chất lượng dịch vụ và sự chuyên nghiệp của EventAI. Chắc chắn sẽ tiếp tục đồng hành trong các sự kiện sắp tới.',
-  },
-];
-
-export const LandingPage: React.FC = () => {
-  const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
-
-  // Search state in Sticky Header
-  const [searchQuery, setSearchQuery] = useState<string>('');
-
-  // Active section for Navbar link highlighting
-  const [activeSection, setActiveSection] = useState<string>('hero');
-
-  // Mobile drawer toggle
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-
-  // Resolved user full name for greeting
-  const currentUserName = user?.full_name || (() => {
-    try {
-      const stored = localStorage.getItem('eventhub_user');
-      return stored ? JSON.parse(stored)?.full_name : null;
-    } catch {
-      return null;
-    }
-  })();
-
-  // Events state
-  const [eventsList, setEventsList] = useState<DisplayEvent[]>(DEFAULT_FEATURED_EVENTS);
-
-  // Registration Modal State
-  const [registeringEvent, setRegisteringEvent] = useState<DisplayEvent | null>(null);
-  const [ticketType, setTicketType] = useState<'standard' | 'vip'>('standard');
-  const [regFullName, setRegFullName] = useState<string>('');
-  const [regEmail, setRegEmail] = useState<string>('');
-  const [regPhone, setRegPhone] = useState<string>('');
-  const [isSubmittingReg, setIsSubmittingReg] = useState<boolean>(false);
-  const [registeredTicketInfo, setRegisteredTicketInfo] = useState<{
-    ticketCode: string;
-    qrToken: string;
-    eventTitle: string;
-  } | null>(null);
-
-  // Consultation Contact Modal State
-  const [showConsultModal, setShowConsultModal] = useState<boolean>(false);
-  const [consultName, setConsultName] = useState<string>('');
-  const [consultPhone, setConsultPhone] = useState<string>('');
-  const [consultCompany, setConsultCompany] = useState<string>('');
-
-  // Load backend events on mount if available
+const LandingPage: React.FC = () => {
   useEffect(() => {
-    const fetchBackendEvents = async () => {
-      try {
-        const data = await apiService.getEvents();
-        if (data && Array.isArray(data) && data.length > 0) {
-          const mapped: DisplayEvent[] = data.slice(0, 4).map((item, idx) => ({
-            id: item.id || idx + 1,
-            title: item.title,
-            date: item.start_date || '15 Thg 10, 2026',
-            location: item.location || 'GEM Center, TP. Hồ Chí Minh',
-            description: item.description || 'Sự kiện công nghệ hàng đầu tích hợp AI.',
-            tag: idx % 2 === 0 ? 'Công nghệ' : 'Kinh doanh',
-            tagColor: idx % 2 === 0 ? 'bg-blue-100 text-blue-700' : 'bg-indigo-100 text-indigo-700',
-            image:
-              DEFAULT_FEATURED_EVENTS[idx % DEFAULT_FEATURED_EVENTS.length]?.image ||
-              'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=600&q=80',
-          }));
-          if (mapped.length >= 4) {
-            setEventsList(mapped);
-          }
-        }
-      } catch (err) {
-        console.warn('Using default featured events fallback:', err);
-      }
-    };
-    fetchBackendEvents();
-  }, []);
-
-  // Track active section for Navbar links
-  useEffect(() => {
+    // Header scroll effect
+    const header = document.getElementById('header');
+    
     const handleScroll = () => {
-      const sectionIds = ['hero', 'features', 'events', 'solutions', 'pricing', 'news', 'footer'];
-      const scrollPos = window.scrollY + 140;
-
-      for (const id of sectionIds) {
-        const el = document.getElementById(id);
-        if (el) {
-          const top = el.offsetTop;
-          const height = el.offsetHeight;
-          if (scrollPos >= top && scrollPos < top + height) {
-            setActiveSection(id);
-            break;
-          }
+        if (header) {
+            if (window.scrollY > 20) {
+                header.classList.add('glass-header');
+                header.classList.replace('border-transparent', 'border-event-border');
+            } else {
+                header.classList.remove('glass-header');
+                header.classList.replace('border-event-border', 'border-transparent');
+            }
         }
-      }
     };
+    
+    window.addEventListener('scroll', handleScroll);
+    handleScroll();
 
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    // Mobile menu toggle
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileLinks = document.querySelectorAll('.mobile-link');
+    
+    if (mobileMenuBtn && mobileMenu) {
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+            const icon = mobileMenuBtn.querySelector('i');
+            if(icon) {
+                if(mobileMenu.classList.contains('hidden')) {
+                    icon.classList.replace('ph-x', 'ph-list');
+                } else {
+                    icon.classList.replace('ph-list', 'ph-x');
+                }
+            }
+        });
+
+        mobileLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                mobileMenu.classList.add('hidden');
+                const icon = mobileMenuBtn.querySelector('i');
+                if(icon) icon.classList.replace('ph-x', 'ph-list');
+            });
+        });
+    }
+
+    // Active Navigation Highlighting
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.nav-link');
+
+    const handleNavScroll = () => {
+        let current = '';
+        sections.forEach(section => {
+            const sectionTop = (section as HTMLElement).offsetTop;
+            if (scrollY >= (sectionTop - 150)) {
+                current = section.getAttribute('id') || '';
+            }
+        });
+
+        navLinks.forEach(link => {
+            link.classList.remove('active-nav');
+            if (link.getAttribute('href')?.includes(current)) {
+                link.classList.add('active-nav');
+            }
+        });
+    };
+    window.addEventListener('scroll', handleNavScroll);
+
+    // Scroll Animation Observer (Fade up)
+    const fadeElements = document.querySelectorAll('.fade-up');
+    
+    const observerOptions = {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.1
+    };
+    
+    const observer = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('visible');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, observerOptions);
+    
+    fadeElements.forEach(el => observer.observe(el));
+    
+    return () => {
+        window.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('scroll', handleNavScroll);
+    };
   }, []);
-
-  // Filter events based on search input
-  const filteredEvents = eventsList.filter((e) => {
-    const term = searchQuery.toLowerCase().trim();
-    if (!term) return true;
-    return (
-      e.title.toLowerCase().includes(term) ||
-      e.location.toLowerCase().includes(term) ||
-      e.description.toLowerCase().includes(term) ||
-      e.tag.toLowerCase().includes(term)
-    );
-  });
-
-  // Smooth scroll handler for Anchor links & logo
-  const scrollToSection = (sectionId: string) => {
-    setIsMobileMenuOpen(false);
-    if (sectionId === 'hero' || sectionId === 'top') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const scrollToEvents = () => scrollToSection('events');
-  const scrollToFeatures = () => scrollToSection('features');
-
-  // Navigation Items Specification
-  const NAV_ITEMS = [
-    { label: 'Trang chủ', id: 'hero' },
-    { label: 'Sự kiện', id: 'events' },
-    { label: 'Tính năng', id: 'features' },
-    { label: 'Giải pháp', id: 'solutions' },
-    { label: 'Bảng giá', id: 'pricing' },
-    { label: 'Tin tức', id: 'news' },
-    { label: 'Liên hệ', id: 'footer' },
-  ];
-
-  const handleRegisterClick = (evt: DisplayEvent) => {
-    if (!isAuthenticated) {
-      toast.info('Vui lòng đăng nhập để đăng ký vé tham dự sự kiện!');
-      navigate(`/login?redirect=${encodeURIComponent('/')}&event=${encodeURIComponent(evt.title)}`);
-      return;
-    }
-
-    // Prefill user information
-    setRegFullName(user?.full_name || '');
-    setRegEmail(user?.email || '');
-    setRegPhone(user?.phone_number || '0987654321');
-    setTicketType('standard');
-    setRegisteredTicketInfo(null);
-    setRegisteringEvent(evt);
-  };
-
-  const handleConfirmRegistration = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!regFullName.trim() || !regEmail.trim()) {
-      toast.error('Vui lòng điền đầy đủ Họ tên và Email!');
-      return;
-    }
-
-    setIsSubmittingReg(true);
-    try {
-      // Simulate backend ticket registration call
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      const mockTicketCode = `TKT-${Math.floor(100000 + Math.random() * 900000)}`;
-      const mockQr = `QR_${mockTicketCode}_${Date.now()}`;
-
-      setRegisteredTicketInfo({
-        ticketCode: mockTicketCode,
-        qrToken: mockQr,
-        eventTitle: registeringEvent?.title || 'Sự kiện EventAI',
-      });
-      toast.success(`Đăng ký vé thành công cho ${registeringEvent?.title}!`);
-    } catch {
-      toast.error('Không thể hoàn tất đăng ký vé. Vui lòng thử lại!');
-    } finally {
-      setIsSubmittingReg(false);
-    }
-  };
-
-  const handleConsultSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!consultName.trim() || !consultPhone.trim()) {
-      toast.error('Vui lòng nhập tên và số điện thoại liên hệ!');
-      return;
-    }
-    toast.success('Yêu cầu tư vấn đã được gửi! Đội ngũ EventAI sẽ liên hệ trong 15 phút.');
-    setShowConsultModal(false);
-    setConsultName('');
-    setConsultPhone('');
-    setConsultCompany('');
-  };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-blue-600 selection:text-white">
-      {/* ========================================================================= */}
-      {/* 1. TOP STICKY NAVBAR (Task 55: Interactive Navbar & Dynamic Auth Header) */}
-      {/* ========================================================================= */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-100 shadow-xs transition-all duration-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between gap-3 sm:gap-4">
-          {/* Logo Brand: Click rolls smoothly to top (#hero) */}
-          <div
-            onClick={() => scrollToSection('hero')}
-            className="flex items-center gap-3 cursor-pointer select-none group"
-            title="Cuộn lên đầu trang"
-          >
-            <div className="w-10 h-10 rounded-xl bg-blue-600 group-hover:bg-blue-700 transition-colors flex items-center justify-center text-white shadow-md shadow-blue-600/30">
-              <Calendar className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-1">
-                Event<span className="text-blue-600">AI</span>
-              </div>
-              <p className="text-[10px] text-slate-500 font-medium tracking-tight">
-                Kết nối sự kiện - Kiến tạo giá trị
-              </p>
-            </div>
-          </div>
+    <div className="landing-page-wrapper bg-white text-event-text min-h-screen">
+      <style>{`
+        body { color: #182230; background-color: #FFFFFF; }
+        
+        .glass-header { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        
+        .active-nav { color: #C8102E; position: relative; }
+        .active-nav::after { content: ''; position: absolute; bottom: -24px; left: 0; width: 100%; height: 2px; background-color: #C8102E; }
+        .nav-link:hover { color: #C8102E; }
+        
+        .hero-bg { background: linear-gradient(135deg, rgba(255,255,255,1) 0%, rgba(244,245,247,0.8) 100%); position: relative; overflow: hidden; }
+        .geo-accent { position: absolute; background: #C8102E; opacity: 0.03; transform: rotate(-45deg); z-index: 0; }
+        
+        .fade-up { opacity: 0; transform: translateY(30px); transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+        .fade-up.visible { opacity: 1; transform: translateY(0); }
 
-          {/* Desktop Navigation Links */}
-          <nav className="hidden xl:flex items-center gap-6 text-xs font-semibold text-slate-600">
-            {NAV_ITEMS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => scrollToSection(item.id)}
-                className={`transition-colors cursor-pointer py-1 relative ${
-                  activeSection === item.id
-                    ? 'text-blue-600 font-bold'
-                    : 'hover:text-blue-600'
-                }`}
-              >
-                <span>{item.label}</span>
-                {activeSection === item.id && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />
-                )}
-              </button>
-            ))}
-          </nav>
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.08); }
+        
+        .image-zoom { transition: transform 0.5s ease; }
+        .card-hover:hover .image-zoom { transform: scale(1.05); }
+        
+        .btn-primary { background-color: #C8102E; color: #FFFFFF; transition: all 0.3s ease; }
+        .btn-primary:hover { background-color: #A80722; transform: translateY(-1px); }
+        .btn-secondary { background-color: transparent; border: 1px solid #C8102E; color: #C8102E; transition: all 0.3s ease; }
+        .btn-secondary:hover { background-color: #F8E8EB; }
 
-          {/* Search Bar + Auth Buttons */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Quick Search Input */}
-            <div className="relative hidden md:block w-44 lg:w-60">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') scrollToSection('events');
-                }}
-                placeholder="Tìm sự kiện, địa điểm..."
-                className="w-full pl-8 pr-7 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200/70 focus:bg-white text-xs border border-transparent focus:border-blue-500 focus:outline-none transition-all placeholder:text-slate-400"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  title="Xóa tìm kiếm"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-
-            {/* Language Switcher [VN | EN] */}
-            <LanguageSwitcher />
-
-            {/* Dynamic Auth Actions */}
-            {isAuthenticated ? (
-              <div className="flex items-center gap-2 sm:gap-3">
-                <span className="hidden lg:inline text-xs font-semibold text-slate-700">
-                  Hi, <strong className="font-bold text-slate-900">{currentUserName || 'Nguyễn Văn Quản Trị'}</strong>
+        .feature-icon-wrapper { transition: all 0.3s ease; }
+        .feature-block:hover .feature-icon-wrapper { background-color: #C8102E; color: white; }
+        
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #F4F5F7; }
+        ::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+    `}</style>
+      
+    
+    {/* HEADER */}
+    <header id="header" className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b border-transparent bg-white h-[72px] flex items-center">
+        <div className="container mx-auto px-6 xl:px-12 w-full max-w-[1440px] flex justify-between items-center">
+            
+            <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center">
+                    <div className="w-8 h-8 flex justify-center items-center">
+                        <div className="w-6 h-6 bg-event-red rotate-45 flex items-center justify-center">
+                            <div className="w-2.5 h-2.5 bg-white -rotate-45"></div>
+                        </div>
+                    </div>
+                    <span className="text-2xl font-bold ml-2 tracking-tight">
+                        <span className="text-event-navy">Event</span><span className="text-event-red">AI</span>
+                    </span>
+                </div>
+                <div className="hidden lg:block h-6 w-px bg-event-border mx-2"></div>
+                <span className="hidden lg:block text-[10px] font-semibold text-event-text-sec tracking-[0.2em] leading-[1.3] mt-1">
+                    CONNECT · CREATE<br />INSPIRE
                 </span>
-                <button
-                  type="button"
-                  onClick={() => navigate('/dashboard')}
-                  className="px-3.5 sm:px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                >
-                  <span>Vào Dashboard</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <button
-                  type="button"
-                  onClick={() => navigate('/login')}
-                  className="px-3 sm:px-4 py-2 rounded-xl text-slate-700 hover:text-blue-600 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
-                >
-                  Đăng nhập
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/login?mode=register')}
-                  className="px-3 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all cursor-pointer"
-                >
-                  Đăng ký
-                </button>
-              </div>
-            )}
+            </div>
 
-            {/* Mobile Hamburger Toggle Button */}
-            <button
-              type="button"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="xl:hidden p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
-              aria-label="Toggle menu"
-            >
-              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            <nav className="hidden xl:flex items-center gap-8 text-[14px] font-semibold text-event-text h-full">
+                <a href="#home" className="nav-link active-nav h-full flex items-center">Trang chủ</a>
+                <a href="#featured-events" className="nav-link h-full flex items-center">Sự kiện</a>
+                <a href="#services" className="nav-link h-full flex items-center">Dịch vụ</a>
+                <a href="#features" className="nav-link h-full flex items-center">Tính năng</a>
+                <a href="#about" className="nav-link h-full flex items-center">Về chúng tôi</a>
+                <a href="#news" className="nav-link h-full flex items-center">Tin tức</a>
+                <a href="#reviews" className="nav-link h-full flex items-center">Đánh giá</a>
+                <a href="#contact" className="nav-link h-full flex items-center">Liên hệ</a>
+            </nav>
+
+            <div className="hidden lg:flex items-center gap-5 shrink-0">
+                <button className="text-event-text hover:text-event-red transition-colors" aria-label="Search">
+                    <i className="ph ph-magnifying-glass text-xl"></i>
+                </button>
+                <div className="h-4 w-px bg-event-border"></div>
+                <Link to="/login" className="text-[14px] font-semibold text-event-text hover:text-event-red transition-colors flex items-center gap-2">
+                    <i className="ph ph-user text-lg"></i>
+                    Đăng nhập
+                </Link>
+                <Link to="/login?mode=register" className="btn-primary px-6 py-2.5 rounded-md text-[14px] font-semibold flex items-center gap-2">
+                    Bắt đầu
+                </Link>
+            </div>
+
+            <button className="xl:hidden text-2xl text-event-navy" id="mobile-menu-btn">
+                <i className="ph ph-list"></i>
             </button>
-          </div>
         </div>
+    </header>
 
-        {/* Mobile Navigation Drawer */}
-        {isMobileMenuOpen && (
-          <div className="xl:hidden border-t border-slate-100 bg-white px-4 py-4 space-y-4 animate-in slide-in-from-top-2 duration-200 shadow-lg">
-            {/* Mobile Search Input */}
-            <div className="relative w-full">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') scrollToSection('events');
-                }}
-                placeholder="Tìm sự kiện, địa điểm..."
-                className="w-full pl-8 pr-7 py-2 rounded-xl bg-slate-100 focus:bg-white text-xs border border-transparent focus:border-blue-500 focus:outline-none transition-all placeholder:text-slate-400"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-
-            {/* Mobile Menu Links */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              {NAV_ITEMS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => scrollToSection(item.id)}
-                  className={`text-left px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
-                    activeSection === item.id
-                      ? 'bg-blue-50 text-blue-600 font-bold'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Mobile Auth Greeting / Actions */}
-            {isAuthenticated && (
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-700">
-                  Hi, <strong className="font-bold text-slate-900">{currentUserName || 'Nguyễn Văn Quản Trị'}</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    navigate('/dashboard');
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-bold text-xs"
-                >
-                  Dashboard
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </header>
-
-      {/* ========================================================================= */}
-      {/* 2. HERO SECTION (Dark Navy Banner Khớp Visual Mockup 100%) */}
-      {/* ========================================================================= */}
-      <section id="hero" className="relative bg-[#0A1128] text-white py-16 sm:py-24 overflow-hidden border-b border-slate-800">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(37,99,235,0.25),rgba(255,255,255,0))] pointer-events-none" />
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            {/* Left 6 Cols: Hero Headline & CTAs */}
-            <div className="lg:col-span-6 space-y-6">
-              <div className="inline-block px-3 py-1 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[11px] font-bold tracking-wide uppercase">
-                NỀN TẢNG QUẢN LÝ SỰ KIỆN THÔNG MINH
-              </div>
-
-              <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-                Tạo nên những sự kiện đáng nhớ với{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-300">
-                  EventAI
-                </span>
-              </h1>
-
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl">
-                Giải pháp quản lý sự kiện toàn diện, tích hợp trí tuệ nhân tạo, giúp bạn tổ chức sự kiện chuyên nghiệp, tối ưu chi phí và mang lại trải nghiệm tuyệt vời cho người tham dự.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-4 pt-2">
-                <button
-                  type="button"
-                  onClick={scrollToEvents}
-                  className="px-6 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-blue-600/30 transition-all cursor-pointer"
-                >
-                  <span>Khám phá sự kiện</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={scrollToFeatures}
-                  className="px-6 py-3.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-white border border-slate-700 font-bold text-xs transition-all cursor-pointer"
-                >
-                  Tìm hiểu thêm
-                </button>
-              </div>
-            </div>
-
-            {/* Right Visual: Stage Auditorium Photo + 2 Floating Badges */}
-            <div className="lg:col-span-6 relative flex items-center justify-center">
-              <div className="relative w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border-4 border-slate-700/50">
-                <img
-                  src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80"
-                  alt="Event Stage Auditorium"
-                  className="w-full h-80 sm:h-96 object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0A1128]/80 via-transparent to-transparent" />
-              </div>
-
-              {/* Floating Badge 1: Top Right - AI hỗ trợ tổ chức */}
-              <div className="absolute -top-4 -right-2 sm:-right-4 bg-slate-900/95 border border-blue-500/40 rounded-2xl p-3.5 shadow-2xl backdrop-blur-md max-w-xs flex items-start gap-3 z-20">
-                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-600/40">
-                  <Bot className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-white">AI hỗ trợ tổ chức</p>
-                  <p className="text-[10px] text-slate-300 leading-snug mt-0.5">
-                    Tối ưu lịch trình, phân tích dữ liệu và gợi ý cá nhân hóa
-                  </p>
-                </div>
-              </div>
-
-              {/* Floating Badge 2: Bottom Right - Sự kiện chuyên nghiệp */}
-              <div className="absolute -bottom-5 sm:-bottom-6 right-2 sm:right-0 bg-white text-slate-900 rounded-2xl p-4 shadow-2xl border border-slate-200/90 max-w-xs z-20 space-y-2">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-blue-600" />
-                  <p className="text-xs font-bold text-slate-900">Sự kiện chuyên nghiệp</p>
-                </div>
-                <ul className="text-[11px] text-slate-600 space-y-1">
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span>Tạo sự kiện nhanh chóng</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span>Quản trị người tham dự</span>
-                  </li>
-                  <li className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span>Báo cáo thời gian thực</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
+    {/* Mobile Menu Overlay */}
+    <div id="mobile-menu" className="fixed inset-0 bg-white z-40 hidden pt-[72px] px-6">
+        <div className="flex flex-col gap-6 pt-8 pb-12 overflow-y-auto h-full text-lg font-semibold">
+            <a href="#home" className="mobile-link text-event-red">Trang chủ</a>
+            <a href="#featured-events" className="mobile-link text-event-text">Sự kiện</a>
+            <a href="#services" className="mobile-link text-event-text">Dịch vụ</a>
+            <a href="#features" className="mobile-link text-event-text">Tính năng</a>
+            <a href="#about" className="mobile-link text-event-text">Về chúng tôi</a>
+            <a href="#news" className="mobile-link text-event-text">Tin tức</a>
+            <a href="#reviews" className="mobile-link text-event-text">Đánh giá</a>
+            <a href="#contact" className="mobile-link text-event-text">Liên hệ</a>
+            <div className="h-px bg-event-border w-full my-2"></div>
+            <a href="#home" className="text-event-text flex items-center gap-2">
+                <i className="ph ph-user"></i> Đăng nhập
+            </a>
+            <a href="#home" className="bg-event-red text-white py-3 rounded-md text-center">Bắt đầu</a>
         </div>
-      </section>
+    </div>
 
-      {/* ========================================================================= */}
-      {/* 3. STATS BAR (4 Thẻ Chỉ Số Vuông Vắn Căn Giữa) */}
-      {/* ========================================================================= */}
-      <section className="bg-white py-10 border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="p-5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                <Calendar className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-2xl font-black text-slate-900">500+</p>
-                <p className="text-xs text-slate-500 font-medium">Sự kiện đã tổ chức</p>
-              </div>
+    <main className="pt-[72px]">
+        
+        {/* HERO SECTION */}
+        <section id="home" className="relative min-h-[650px] lg:h-[750px] flex items-center border-b border-event-border/50 overflow-hidden bg-white">
+            
+            {/* Full background image */}
+            <div className="absolute inset-0 w-full h-full z-0">
+                <img src="assets/backgroud_trangchu.webp" alt="Background" className="w-full h-full object-cover object-right lg:object-[85%_30%]" />
             </div>
+            
+            {/* Diagonal geometric accents (mockup matching) - Reduced size */}
+            <div className="absolute z-0 bg-event-red transform -rotate-45" style={{ width: '250px', height: '1000px', top: '-400px', right: '-200px', opacity: '0.9' }}></div>
+            <div className="absolute z-0 bg-event-red transform -rotate-45" style={{ width: '40px', height: '1000px', top: '-300px', right: '80px', opacity: '0.9' }}></div>
+            
+            {/* Left geometric accents - Reduced */}
+            <div className="absolute z-0 bg-event-red transform -rotate-45 hidden lg:block" style={{ width: '150px', height: '600px', bottom: '-300px', left: '-100px', opacity: '0.04' }}></div>
+            <div className="absolute z-0 bg-event-red transform -rotate-45 hidden lg:block" style={{ width: '20px', height: '600px', bottom: '-200px', left: '80px', opacity: '0.04' }}></div>
 
-            <div className="p-5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                <Users className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-2xl font-black text-slate-900">50.000+</p>
-                <p className="text-xs text-slate-500 font-medium">Người tham dự</p>
-              </div>
-            </div>
+            {/* White gradient overlay for text readability */}
+            <div className="absolute inset-0 z-0 bg-gradient-to-r from-white via-white/95 lg:via-white/80 to-transparent lg:w-3/4"></div>
+            
+            {/* Additional gradient for bottom fading */}
+            <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-white to-transparent z-0"></div>
 
-            <div className="p-5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                <Building2 className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-2xl font-black text-slate-900">200+</p>
-                <p className="text-xs text-slate-500 font-medium">Doanh nghiệp tin tưởng</p>
-              </div>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                <Star className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-2xl font-black text-slate-900">99.9%</p>
-                <p className="text-xs text-slate-500 font-medium">Độ ổn định hệ thống</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 4. VÌ SAO CHỌN EVENTAI? (Khối 2 Cột + Mockup Laptop / App) */}
-      {/* ========================================================================= */}
-      <section id="features" className="py-20 bg-white">
-        <span id="vi-sao-chon-eventai" className="hidden" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            {/* Left 5 Cols: Information Checklist */}
-            <div className="lg:col-span-5 space-y-6">
-              <div className="inline-block px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100">
-                GIẢI PHÁP TOÀN DIỆN
-              </div>
-
-              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight leading-tight">
-                Vì sao chọn <span className="text-blue-600">EventAI?</span>
-              </h2>
-
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                EventAI mang đến giải pháp quản lý sự kiện hiện đại, linh hoạt và dễ sử dụng. Từ khâu lên ý tưởng, tổ chức đến đánh giá sau sự kiện, tất cả đều được tích hợp trên một nền tảng duy nhất.
-              </p>
-
-              <div className="space-y-3 pt-1">
-                {[
-                  'Tiết kiệm thời gian và chi phí',
-                  'Tối ưu quy trình tổ chức',
-                  'Trải nghiệm người tham dự vượt trội',
-                  'Báo cáo chi tiết, chính xác',
-                ].map((text, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
+            <div className="container mx-auto px-6 xl:px-12 w-full max-w-[1440px] relative z-10 h-full flex flex-col justify-center pt-24 lg:pt-0">
+                
+                <div className="w-full lg:w-1/2 xl:w-5/12 flex flex-col justify-center fade-up pb-12 lg:pb-0">
+                    <div className="inline-block px-3 py-1 bg-event-light-red text-event-red text-xs font-bold tracking-wider rounded-sm mb-6 uppercase w-max border border-event-red/10">
+                        Hệ thống quản lý sự kiện tích hợp AI
                     </div>
-                    <span className="text-xs sm:text-sm font-semibold text-slate-800">{text}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-3">
-                <button
-                  type="button"
-                  onClick={scrollToEvents}
-                  className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
-                >
-                  Khám phá tính năng
-                </button>
-              </div>
-            </div>
-
-            {/* Right 7 Cols: Mockup Laptop Dashboard + Mobile Screen + 4 Badges */}
-            <div className="lg:col-span-7 relative flex items-center justify-center">
-              <div className="relative w-full max-w-xl bg-slate-900 rounded-2xl p-3 shadow-2xl border border-slate-800">
-                <div className="h-6 flex items-center gap-1.5 px-3 mb-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                </div>
-                {/* Mockup Dashboard Preview Image */}
-                <div className="rounded-xl overflow-hidden bg-slate-50 border border-slate-200">
-                  <img
-                    src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1000&q=80"
-                    alt="EventAI Dashboard System"
-                    className="w-full h-72 sm:h-80 object-cover object-top"
-                  />
-                </div>
-              </div>
-
-              {/* 4 Surrounding Floating Badges */}
-              <div className="absolute -top-4 left-4 bg-white rounded-xl p-2.5 shadow-lg border border-slate-200 flex items-center gap-2 text-xs font-bold text-slate-800">
-                <Calendar className="w-4 h-4 text-blue-600" />
-                <span>Quản lý sự kiện thông minh</span>
-              </div>
-
-              <div className="absolute -top-4 right-4 bg-white rounded-xl p-2.5 shadow-lg border border-slate-200 flex items-center gap-2 text-xs font-bold text-slate-800">
-                <Bot className="w-4 h-4 text-indigo-600" />
-                <span>AI phân tích dữ liệu</span>
-              </div>
-
-              <div className="absolute -bottom-4 left-6 bg-white rounded-xl p-2.5 shadow-lg border border-slate-200 flex items-center gap-2 text-xs font-bold text-slate-800">
-                <Users className="w-4 h-4 text-blue-600" />
-                <span>Tối ưu trải nghiệm người tham dự</span>
-              </div>
-
-              <div className="absolute -bottom-4 right-6 bg-white rounded-xl p-2.5 shadow-lg border border-slate-200 flex items-center gap-2 text-xs font-bold text-slate-800">
-                <BarChart3 className="w-4 h-4 text-emerald-600" />
-                <span>Báo cáo thời gian thực</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 5. SỰ KIỆN NỔI BẬT (4 Cột Chuẩn Mẫu + Modal Đăng Ký) */}
-      {/* ========================================================================= */}
-      <section id="events" className="py-20 bg-slate-50/70 border-y border-slate-200/80">
-        <span id="su-kien-noi-bat" className="hidden" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-            <div>
-              <span className="text-xs font-bold text-blue-600 tracking-wider uppercase">
-                ĐỪNG BỎ LỠ
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
-                Sự kiện nổi bật
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                {searchQuery ? (
-                  <span className="font-semibold text-blue-600">
-                    Kết quả tìm kiếm cho "{searchQuery}" ({filteredEvents.length} sự kiện phù hợp)
-                  </span>
-                ) : (
-                  'Khám phá các sự kiện hấp dẫn sắp diễn ra và đăng ký ngay để không bỏ lỡ!'
-                )}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navigate('/events')}
-              className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer transition-colors"
-            >
-              <span>Xem tất cả sự kiện</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Grid 4 Event Cards */}
-          {filteredEvents.length === 0 ? (
-            <div className="bg-white rounded-2xl p-10 text-center border border-slate-200 space-y-3">
-              <Calendar className="w-8 h-8 text-slate-400 mx-auto" />
-              <p className="text-sm font-bold text-slate-700">
-                Không tìm thấy sự kiện phù hợp với từ khóa "{searchQuery}"
-              </p>
-              <button
-                onClick={() => setSearchQuery('')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 cursor-pointer transition-colors"
-              >
-                Xem tất cả
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {filteredEvents.map((evt) => (
-                <div
-                  key={evt.id}
-                  className="bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
-                >
-                  <div>
-                    {/* Thumbnail with category tag */}
-                    <div className="relative h-44 overflow-hidden">
-                      <img
-                        src={evt.image}
-                        alt={evt.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <span
-                        className={`absolute top-3 left-3 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${evt.tagColor} shadow-xs`}
-                      >
-                        {evt.tag}
-                      </span>
-                    </div>
-
-                    <div className="p-4 space-y-3">
-                      <div className="flex items-center gap-1.5 text-[11px] text-blue-600 font-semibold">
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>{evt.date}</span>
-                      </div>
-
-                      <h3 className="text-sm font-bold text-slate-900 line-clamp-2 leading-snug group-hover:text-blue-600 transition-colors">
-                        {evt.title}
-                      </h3>
-
-                      <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
-                        {evt.description}
-                      </p>
-
-                      <div className="flex items-center gap-1.5 text-[11px] text-slate-500 pt-1">
-                        <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-                        <span className="truncate">{evt.location}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 pt-0">
-                    <button
-                      type="button"
-                      onClick={() => handleRegisterClick(evt)}
-                      className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
-                    >
-                      <span>Đăng ký ngay</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 6. CTA BANNER (Tổ chức sự kiện chuyên nghiệp cùng EventAI - Solutions) */}
-      {/* ========================================================================= */}
-      <section id="solutions" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-slate-50/80 rounded-3xl p-8 sm:p-12 border border-slate-200">
-            <div className="lg:col-span-5 space-y-5">
-              <span className="text-xs font-bold text-blue-600 uppercase tracking-wider">
-                SẴN SÀNG CHO SỰ KIỆN TIẾP THEO
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 leading-tight">
-                Tổ chức sự kiện chuyên nghiệp cùng{' '}
-                <span className="text-blue-600">EventAI</span>
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Trải nghiệm nền tảng quản lý sự kiện thông minh với công nghệ AI hàng đầu. Dễ dàng tạo, quản lý và theo dõi mọi sự kiện của bạn.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={scrollToEvents}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
-                >
-                  Đăng ký ngay
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowConsultModal(true)}
-                  className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs transition-colors cursor-pointer"
-                >
-                  Liên hệ tư vấn
-                </button>
-              </div>
-            </div>
-
-            <div className="lg:col-span-4 rounded-2xl overflow-hidden shadow-lg border border-slate-200">
-              <img
-                src="https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80"
-                alt="Professional Event Management"
-                className="w-full h-56 object-cover"
-              />
-            </div>
-
-            <div className="lg:col-span-3 space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                  <Phone className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-900">Hỗ trợ 24/7</p>
-                  <p className="text-[11px] text-slate-500">Luôn đồng hành cùng bạn</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-900">Bảo mật tuyệt đối</p>
-                  <p className="text-[11px] text-slate-500">An toàn dữ liệu người dùng</p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center shrink-0">
-                  <SlidersIcon className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-slate-900">Tùy chỉnh linh hoạt</p>
-                  <p className="text-[11px] text-slate-500">Phù hợp mọi loại sự kiện</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 6.5. BẢNG GIÁ DỊCH VỤ (Pricing Section - Task 55) */}
-      {/* ========================================================================= */}
-      <section id="pricing" className="py-20 bg-slate-50/70 border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <span className="text-xs font-bold text-blue-600 tracking-wider uppercase">
-              BẢNG GIÁ DỊCH VỤ LINH HOẠT
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Lựa chọn gói giải pháp tối ưu cho sự kiện
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-500">
-              Minh bạch chi phí, nâng cấp hoặc tùy biến theo quy mô tổ chức của bạn bất cứ lúc nào
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-            {/* Tier 1: Khởi tạo (Starter) */}
-            <div className="bg-white rounded-3xl p-7 border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-              <div className="space-y-5">
-                <div className="space-y-1.5">
-                  <h3 className="text-lg font-bold text-slate-900">Gói Khởi Tạo</h3>
-                  <p className="text-xs text-slate-500">Dành cho câu lạc bộ, sự kiện nhỏ hoặc cộng đồng</p>
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl sm:text-4xl font-black text-slate-900">0đ</span>
-                  <span className="text-xs text-slate-500 font-medium">/ sự kiện</span>
-                </div>
-                <ul className="space-y-3 text-xs text-slate-600 border-t border-slate-100 pt-5">
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Quy mô tối đa 100 khách tham dự</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Trang đăng ký & phát hành vé QR điện tử</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Check-in qua camera điện thoại cơ bản</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Báo cáo số lượng tham gia tổng quan</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="pt-6">
-                <button
-                  type="button"
-                  onClick={() => navigate(isAuthenticated ? '/dashboard' : '/login?mode=register')}
-                  className="w-full py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs transition-colors cursor-pointer text-center"
-                >
-                  Bắt đầu miễn phí
-                </button>
-              </div>
-            </div>
-
-            {/* Tier 2: Chuyên nghiệp (Pro) - Highlight */}
-            <div className="bg-gradient-to-b from-blue-900 to-indigo-950 text-white rounded-3xl p-7 border-2 border-blue-500 shadow-xl relative flex flex-col justify-between transform md:-translate-y-2">
-              <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-3.5 py-1 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-md">
-                ĐƯỢC LỰA CHỌN NHIỀU NHẤT
-              </div>
-              <div className="space-y-5">
-                <div className="space-y-1.5">
-                  <h3 className="text-lg font-bold text-white">Gói Chuyên Nghiệp</h3>
-                  <p className="text-xs text-blue-200">Cho hội thảo, diễn đàn doanh nghiệp & workshop</p>
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl sm:text-4xl font-black text-white">499.000đ</span>
-                  <span className="text-xs text-blue-300 font-medium">/ sự kiện</span>
-                </div>
-                <ul className="space-y-3 text-xs text-blue-100 border-t border-blue-800/80 pt-5">
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
-                    <span>Lên tới 1.000 khách tham dự</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
-                    <span>AI Concierge giải đáp khách tham dự 24/7</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
-                    <span>AI PR Studio tự động sinh bài truyền thông</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
-                    <span>Cổng điều khiển diễn giả & Live Q&A</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-blue-400 shrink-0" />
-                    <span>Phân tích dữ liệu & phản hồi sau sự kiện</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="pt-6">
-                <button
-                  type="button"
-                  onClick={() => navigate(isAuthenticated ? '/dashboard' : '/login?mode=register')}
-                  className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-lg shadow-blue-600/40 transition-all cursor-pointer text-center"
-                >
-                  Trải nghiệm gói Pro
-                </button>
-              </div>
-            </div>
-
-            {/* Tier 3: Doanh nghiệp (Enterprise) */}
-            <div className="bg-white rounded-3xl p-7 border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
-              <div className="space-y-5">
-                <div className="space-y-1.5">
-                  <h3 className="text-lg font-bold text-slate-900">Gói Doanh Nghiệp</h3>
-                  <p className="text-xs text-slate-500">Tập đoàn, hội nghị quy mô lớn & quốc tế</p>
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl sm:text-3xl font-black text-slate-900">Liên hệ</span>
-                  <span className="text-xs text-slate-500 font-medium">/ giải pháp tùy biến</span>
-                </div>
-                <ul className="space-y-3 text-xs text-slate-600 border-t border-slate-100 pt-5">
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Không giới hạn số lượng khách tham dự</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Kho tri thức RAG riêng biệt & bảo mật</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Tùy biến tên miền, thương hiệu & giao diện</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Đội ngũ kỹ thuật hỗ trợ On-site & SLA 99.9%</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="pt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowConsultModal(true)}
-                  className="w-full py-3 rounded-xl border border-blue-600 text-blue-600 hover:bg-blue-50 font-bold text-xs transition-colors cursor-pointer text-center"
-                >
-                  Liên hệ tư vấn
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 6.7. TIN TỨC & BÀI VIẾT NỔI BẬT (News Section - Task 55) */}
-      {/* ========================================================================= */}
-      <section id="news" className="py-20 bg-white border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-            <div>
-              <span className="text-xs font-bold text-blue-600 tracking-wider uppercase">
-                TIN TỨC & XU HƯỚNG
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight mt-1">
-                Cập nhật công nghệ sự kiện 2026
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Khám phá các bài viết chuyên sâu, kinh nghiệm tổ chức và xu hướng công nghệ mới nhất
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navigate('/events')}
-              className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 cursor-pointer transition-colors"
-            >
-              <span>Xem tất cả tin tức</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-slate-50/70 rounded-2xl overflow-hidden border border-slate-200 hover:shadow-md transition-all group flex flex-col justify-between">
-              <div>
-                <div className="relative h-44 overflow-hidden">
-                  <img
-                    src="https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=600&q=80"
-                    alt="AI in event check-in"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <span className="absolute top-3 left-3 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-600 text-white">
-                    Công nghệ AI
-                  </span>
-                </div>
-                <div className="p-5 space-y-2">
-                  <span className="text-[11px] text-slate-500">12 Thg 4, 2026 • 5 phút đọc</span>
-                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-2">
-                    Tối ưu hóa quy trình check-in bằng mã QR và AI nhận diện tự động
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-2">
-                    Giảm thời gian xếp hàng tới 80% với giải pháp quét mã thông minh đa nền tảng.
-                  </p>
-                </div>
-              </div>
-              <div className="p-5 pt-0">
-                <button
-                  type="button"
-                  onClick={() => navigate('/events')}
-                  className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Đọc tiếp</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-slate-50/70 rounded-2xl overflow-hidden border border-slate-200 hover:shadow-md transition-all group flex flex-col justify-between">
-              <div>
-                <div className="relative h-44 overflow-hidden">
-                  <img
-                    src="https://images.unsplash.com/photo-1515187029135-18ee286d815b?auto=format&fit=crop&w=600&q=80"
-                    alt="Hybrid event tips"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <span className="absolute top-3 left-3 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-600 text-white">
-                    Kinh nghiệm tổ chức
-                  </span>
-                </div>
-                <div className="p-5 space-y-2">
-                  <span className="text-[11px] text-slate-500">08 Thg 4, 2026 • 4 phút đọc</span>
-                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-2">
-                    Bí quyết tăng 200% tỷ lệ tương tác người tham gia trong hội nghị Hybrid
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-2">
-                    Cách thức kết nối khán giả trực tuyến và trực tiếp qua hệ thống Live Q&A và khảo sát thời gian thực.
-                  </p>
-                </div>
-              </div>
-              <div className="p-5 pt-0">
-                <button
-                  type="button"
-                  onClick={() => navigate('/events')}
-                  className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Đọc tiếp</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-slate-50/70 rounded-2xl overflow-hidden border border-slate-200 hover:shadow-md transition-all group flex flex-col justify-between">
-              <div>
-                <div className="relative h-44 overflow-hidden">
-                  <img
-                    src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=600&q=80"
-                    alt="Speaker control center"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <span className="absolute top-3 left-3 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-teal-600 text-white">
-                    Xu hướng 2026
-                  </span>
-                </div>
-                <div className="p-5 space-y-2">
-                  <span className="text-[11px] text-slate-500">01 Thg 4, 2026 • 6 phút đọc</span>
-                  <h3 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-2">
-                    Xu hướng thiết kế sân khấu số và kiểm soát diễn giả thời gian thực
-                  </h3>
-                  <p className="text-xs text-slate-500 line-clamp-2">
-                    Giải pháp Studio sân khấu hỗ trợ diễn giả tương tác trực quan với khán phòng và điều phối viên.
-                  </p>
-                </div>
-              </div>
-              <div className="p-5 pt-0">
-                <button
-                  type="button"
-                  onClick={() => navigate('/events')}
-                  className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Đọc tiếp</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 7. ĐÁNH GIÁ KHÁCH HÀNG (Testimonials 3 Thẻ) */}
-      {/* ========================================================================= */}
-      <section className="py-20 bg-slate-50/70 border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          <div className="text-center max-w-2xl mx-auto space-y-2">
-            <span className="text-xs font-bold text-blue-600 tracking-wider uppercase">
-              KHÁCH HÀNG NÓI GÌ VỀ CHÚNG TÔI
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Trải nghiệm thực tế từ khách hàng
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-500">
-              Hàng nghìn tổ chức, doanh nghiệp đã tin tưởng và lựa chọn EventAI
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {TESTIMONIALS.map((t, idx) => (
-              <div
-                key={idx}
-                className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={t.avatar}
-                      alt={t.name}
-                      className="w-11 h-11 rounded-full object-cover border border-slate-200"
-                    />
-                    <div>
-                      <p className="text-xs font-bold text-slate-900">{t.name}</p>
-                      <p className="text-[10px] text-slate-500">{t.role}</p>
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-600 leading-relaxed italic">
-                    "{t.comment}"
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-1 text-amber-400">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-3.5 h-3.5 fill-current" />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ========================================================================= */}
-      {/* 8. FOOTER CHUẨN MOCKUP */}
-      {/* ========================================================================= */}
-      <footer id="footer" className="bg-[#0A1128] text-slate-400 text-xs py-14">
-        <span id="lien-he" className="hidden" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 pb-12 border-b border-slate-800">
-            {/* Col 1: Logo & Slogan */}
-            <div className="lg:col-span-2 space-y-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center text-white font-bold">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <span className="text-lg font-black text-white tracking-tight">
-                  Event<span className="text-blue-400">AI</span>
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400">Kết nối sự kiện - Kiến tạo giá trị</p>
-              <p className="text-[11px] text-slate-500 leading-relaxed max-w-sm pt-1">
-                Hệ thống quản lý sự kiện thông minh tích hợp trí tuệ nhân tạo, tối ưu hoá mọi quy trình từ khởi tạo, bán vé đến báo cáo toàn diện.
-              </p>
-            </div>
-
-            {/* Col 2: Liên kết nhanh */}
-            <div className="space-y-3">
-              <p className="font-bold text-white text-xs uppercase tracking-wider">Liên kết nhanh</p>
-              <ul className="space-y-2 text-xs">
-                <li>
-                  <button onClick={() => scrollToSection('hero')} className="hover:text-white transition-colors cursor-pointer">
-                    Trang chủ
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => scrollToSection('events')} className="hover:text-white transition-colors cursor-pointer">
-                    Sự kiện
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => scrollToSection('features')} className="hover:text-white transition-colors cursor-pointer">
-                    Tính năng
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => scrollToSection('solutions')} className="hover:text-white transition-colors cursor-pointer">
-                    Giải pháp
-                  </button>
-                </li>
-              </ul>
-            </div>
-
-            {/* Col 3: Bảng giá & Tin tức */}
-            <div className="space-y-3">
-              <p className="font-bold text-white text-xs uppercase tracking-wider">Thông tin</p>
-              <ul className="space-y-2 text-xs">
-                <li>
-                  <button onClick={() => scrollToSection('pricing')} className="hover:text-white transition-colors cursor-pointer">
-                    Bảng giá
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => scrollToSection('news')} className="hover:text-white transition-colors cursor-pointer">
-                    Tin tức
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => setShowConsultModal(true)} className="hover:text-white transition-colors cursor-pointer">
-                    Liên hệ tư vấn
-                  </button>
-                </li>
-              </ul>
-            </div>
-
-            {/* Col 4: Thông tin liên hệ */}
-            <div className="space-y-3">
-              <p className="font-bold text-white text-xs uppercase tracking-wider">Thông tin liên hệ</p>
-              <ul className="space-y-2 text-[11px] text-slate-400">
-                <li className="flex items-start gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
-                  <span>Số 123 Nguyễn Văn Cừ, Long Biên, Hà Nội</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Phone className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>Hotline: 1900 1234</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Mail className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                  <span>Email: support@eventai.vn</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
-            <p>© 2026 EventAI. All rights reserved.</p>
-            <div className="flex items-center gap-5">
-              <span className="hover:text-slate-400 cursor-pointer">Chính sách bảo mật</span>
-              <span>•</span>
-              <span className="hover:text-slate-400 cursor-pointer">Điều khoản sử dụng</span>
-            </div>
-          </div>
-        </div>
-      </footer>
-
-      {/* ========================================================================= */}
-      {/* 9. MODAL XÁC NHẬN ĐĂNG KÝ SỰ KIỆN (Modal Registration Popup) */}
-      {/* ========================================================================= */}
-      {registeringEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[90vh]">
-            {/* Modal Header with Event Banner */}
-            <div className="relative h-32 overflow-hidden bg-slate-900">
-              <img
-                src={registeringEvent.image}
-                alt={registeringEvent.title}
-                className="w-full h-full object-cover opacity-60"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
-              <button
-                type="button"
-                onClick={() => setRegisteringEvent(null)}
-                className="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-900/80 text-slate-300 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <div className="absolute bottom-3 left-4 right-4 text-white">
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-600 text-white uppercase tracking-wider">
-                  {registeringEvent.tag}
-                </span>
-                <h3 className="text-sm sm:text-base font-black truncate mt-1">
-                  {registeringEvent.title}
-                </h3>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-5">
-              {registeredTicketInfo ? (
-                /* Success View with QR Code */
-                <div className="text-center py-4 space-y-4 animate-in zoom-in-95 duration-200">
-                  <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-sm">
-                    <Check className="w-7 h-7" />
-                  </div>
-                  <div>
-                    <h4 className="text-lg font-black text-slate-900">Đăng ký vé thành công!</h4>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Mã vé điện tử của bạn đã sẵn sàng và được đồng bộ vào hệ thống.
+                    
+                    <h1 className="text-[42px] sm:text-[52px] xl:text-[60px] leading-[1.3] font-extrabold tracking-tight mb-5 text-event-navy">
+                        Kiến tạo những<br />
+                        <span className="text-event-red">sự kiện đẳng cấp</span>
+                    </h1>
+                    
+                    <p className="text-event-text-sec text-[16px] sm:text-[18px] leading-relaxed mb-10 max-w-lg">
+                        Từ ý tưởng, tổ chức đến vận hành và phân tích hiệu quả – EventAI mang đến nền tảng quản lý sự kiện thông minh, tích hợp AI trong một hệ sinh thái thống nhất.
                     </p>
-                  </div>
-
-                  {/* QR Code Container */}
-                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 inline-block space-y-2">
-                    <div className="w-36 h-36 bg-white rounded-xl border border-slate-300 p-2 mx-auto flex flex-col items-center justify-center shadow-xs">
-                      <QrCode className="w-24 h-24 text-blue-600" />
-                      <span className="text-[9px] font-mono font-bold text-slate-600 mt-1">
-                        {registeredTicketInfo.ticketCode}
-                      </span>
+                    
+                    <div className="bg-white p-2 rounded-lg shadow-premium border border-event-border flex flex-col sm:flex-row gap-2 max-w-xl">
+                        <div className="flex-1 flex items-center px-4 py-2 text-event-text-sec">
+                            <i className="ph ph-magnifying-glass text-xl mr-3 text-event-red"></i>
+                            <input type="text" placeholder="Tìm kiếm sự kiện, địa điểm, dịch vụ..." className="w-full bg-transparent outline-none text-[15px] text-event-navy placeholder-event-text-sec/60" />
+                        </div>
+                        <button className="btn-primary py-3 px-8 rounded-md font-semibold shrink-0">
+                            Tìm kiếm
+                        </button>
                     </div>
-                    <div className="text-[11px] text-slate-600 font-medium">
-                      <span>Loại vé: </span>
-                      <strong className="text-blue-600 uppercase">
-                        {ticketType === 'vip' ? '👑 VIP Pass' : '🎟️ Tiêu chuẩn'}
-                      </strong>
+                    
+                    <div className="flex flex-wrap gap-x-8 gap-y-6 mt-12 pt-8 border-t border-event-border/60">
+                        <div className="flex items-start gap-3">
+                            <div className="text-event-red text-2xl mt-0.5"><i className="ph ph-calendar-check"></i></div>
+                            <div>
+                                <div className="text-2xl font-bold text-event-navy">1,200+</div>
+                                <div className="text-xs text-event-text-sec font-medium uppercase tracking-wider mt-1">Sự kiện tổ chức</div>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                            <div className="text-event-red text-2xl mt-0.5"><i className="ph ph-users"></i></div>
+                            <div>
+                                <div className="text-2xl font-bold text-event-navy">100K+</div>
+                                <div className="text-xs text-event-text-sec font-medium uppercase tracking-wider mt-1">Người tham dự</div>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-3 hidden sm:flex">
+                            <div className="text-event-red text-2xl mt-0.5"><i className="ph ph-star"></i></div>
+                            <div>
+                                <div className="text-2xl font-bold text-event-navy">96%</div>
+                                <div className="text-xs text-event-text-sec font-medium uppercase tracking-wider mt-1">Khách hài lòng</div>
+                            </div>
+                        </div>
                     </div>
-                  </div>
-
-                  <div className="flex items-center justify-center gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setRegisteringEvent(null)}
-                      className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-colors"
-                    >
-                      Đóng
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRegisteringEvent(null);
-                        navigate('/dashboard');
-                      }}
-                      className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-all flex items-center gap-1.5"
-                    >
-                      <span>Xem trong Dashboard</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
                 </div>
-              ) : (
-                /* Registration Form */
-                <form onSubmit={handleConfirmRegistration} className="space-y-4">
-                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex items-center justify-between text-xs text-slate-600">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-blue-600" />
-                      <span>{registeringEvent.date}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-rose-500 shrink-0" />
-                      <span className="truncate max-w-[180px]">{registeringEvent.location}</span>
-                    </div>
-                  </div>
-
-                  {/* Ticket Type Selector */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">Chọn loại vé tham dự</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setTicketType('standard')}
-                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                          ticketType === 'standard'
-                            ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-600/20'
-                            : 'border-slate-200 hover:border-slate-300 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-900">Vé Tiêu Chuẩn</span>
-                          <span className="text-[10px] font-extrabold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
-                            Miễn phí
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          Tham gia các phiên chính & tài liệu số
-                        </p>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setTicketType('vip')}
-                        className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                          ticketType === 'vip'
-                            ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-600/20'
-                            : 'border-slate-200 hover:border-slate-300 bg-white'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-900">Vé VIP Pass</span>
-                          <span className="text-[10px] font-extrabold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                            500.000đ
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          Hàng ghế đầu & tiệc Networking
-                        </p>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Registrant Form Inputs */}
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Họ và tên người tham dự *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={regFullName}
-                        onChange={(e) => setRegFullName(e.target.value)}
-                        placeholder="Nguyễn Văn A"
-                        className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:border-blue-500 focus:outline-none bg-slate-50/50"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Email nhận vé điện tử *
-                        </label>
-                        <input
-                          type="email"
-                          required
-                          value={regEmail}
-                          onChange={(e) => setRegEmail(e.target.value)}
-                          placeholder="example@eventai.vn"
-                          className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:border-blue-500 focus:outline-none bg-slate-50/50"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                          Số điện thoại liên hệ
-                        </label>
-                        <input
-                          type="tel"
-                          value={regPhone}
-                          onChange={(e) => setRegPhone(e.target.value)}
-                          placeholder="0987654321"
-                          className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:border-blue-500 focus:outline-none bg-slate-50/50"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2">
-                    <button
-                      type="submit"
-                      disabled={isSubmittingReg}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition-all cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      {isSubmittingReg ? (
-                        <span>Đang xử lý đăng ký vé...</span>
-                      ) : (
-                        <>
-                          <Ticket className="w-4 h-4" />
-                          <span>Xác nhận đăng ký tham dự</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
+                
             </div>
-          </div>
-        </div>
-      )}
+        </section>
 
-      {/* ========================================================================= */}
-      {/* 10. MODAL LIÊN HỆ TƯ VẤN (Consultation Modal) */}
-      {/* ========================================================================= */}
-      {showConsultModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-blue-600">
-                <Sparkles className="w-5 h-5" />
-                <h3 className="text-base font-black text-slate-900">Liên hệ tư vấn giải pháp</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowConsultModal(false)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
+        {/* WHY EVENTAI SECTION */}
+        <section className="py-20 lg:py-24 bg-white relative">
+            <div className="container mx-auto px-6 xl:px-12 max-w-[1440px]">
+                
+                <div className="text-center mb-16 fade-up">
+                    <h2 className="text-[36px] lg:text-[42px] font-bold text-event-navy mb-4">Vì sao chọn EventAI?</h2>
+                    <p className="text-event-text-sec text-[16px] max-w-2xl mx-auto">Mọi công cụ bạn cần để lên kế hoạch, quản lý và tối ưu hóa các sự kiện hiện đại, được tích hợp sức mạnh từ Trí tuệ nhân tạo.</p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+                    
+                    <div className="feature-block border border-event-border p-8 rounded-lg card-hover fade-up bg-event-gray/30">
+                        <div className="feature-icon-wrapper w-12 h-12 rounded-full bg-event-light-red text-event-red flex items-center justify-center text-2xl mb-6">
+                            <i className="ph ph-calendar-plus"></i>
+                        </div>
+                        <h3 className="text-[20px] font-bold text-event-navy mb-3">Quản lý sự kiện thông minh</h3>
+                        <p className="text-event-text-sec text-[15px] leading-relaxed">Từ việc lên lịch, phân bổ ngân sách đến điều phối nhân sự, tất cả đều được tự động hóa và quản lý tập trung.</p>
+                    </div>
+
+                    <div className="feature-block border border-event-border p-8 rounded-lg card-hover fade-up bg-event-gray/30" style={{ transitionDelay: '100ms' }}>
+                        <div className="feature-icon-wrapper w-12 h-12 rounded-full bg-event-light-red text-event-red flex items-center justify-center text-2xl mb-6">
+                            <i className="ph ph-brain"></i>
+                        </div>
+                        <h3 className="text-[20px] font-bold text-event-navy mb-3">Phân tích bằng AI</h3>
+                        <p className="text-event-text-sec text-[15px] leading-relaxed">Hệ thống AI dự báo xu hướng tham dự, tối ưu hóa không gian và đưa ra các đề xuất cải thiện hiệu quả sự kiện.</p>
+                    </div>
+
+                    <div className="feature-block border border-event-border p-8 rounded-lg card-hover fade-up bg-event-gray/30" style={{ transitionDelay: '200ms' }}>
+                        <div className="feature-icon-wrapper w-12 h-12 rounded-full bg-event-light-red text-event-red flex items-center justify-center text-2xl mb-6">
+                            <i className="ph ph-scan"></i>
+                        </div>
+                        <h3 className="text-[20px] font-bold text-event-navy mb-3">Check-in mượt mà</h3>
+                        <p className="text-event-text-sec text-[15px] leading-relaxed">Giải pháp nhận diện khuôn mặt và QR code tốc độ cao giúp giảm thiểu thời gian chờ đợi, nâng tầm trải nghiệm khách mời.</p>
+                    </div>
+
+                    <div className="feature-block border border-event-border p-8 rounded-lg card-hover fade-up bg-event-gray/30" style={{ transitionDelay: '300ms' }}>
+                        <div className="feature-icon-wrapper w-12 h-12 rounded-full bg-event-light-red text-event-red flex items-center justify-center text-2xl mb-6">
+                            <i className="ph ph-chart-line-up"></i>
+                        </div>
+                        <h3 className="text-[20px] font-bold text-event-navy mb-3">Báo cáo theo thời gian thực</h3>
+                        <p className="text-event-text-sec text-[15px] leading-relaxed">Theo dõi doanh thu, số lượng khách tham dự và phản hồi trực tiếp qua một dashboard trực quan, chi tiết.</p>
+                    </div>
+
+                    <div className="feature-block border border-event-border p-8 rounded-lg card-hover fade-up bg-event-gray/30" style={{ transitionDelay: '400ms' }}>
+                        <div className="feature-icon-wrapper w-12 h-12 rounded-full bg-event-light-red text-event-red flex items-center justify-center text-2xl mb-6">
+                            <i className="ph ph-shield-check"></i>
+                        </div>
+                        <h3 className="text-[20px] font-bold text-event-navy mb-3">Bảo mật dữ liệu tuyệt đối</h3>
+                        <p className="text-event-text-sec text-[15px] leading-relaxed">Mọi thông tin sự kiện và dữ liệu khách hàng đều được mã hóa theo tiêu chuẩn bảo mật quốc tế cao nhất.</p>
+                    </div>
+
+                    <div className="feature-block border border-event-border p-8 rounded-lg card-hover fade-up bg-event-gray/30" style={{ transitionDelay: '500ms' }}>
+                        <div className="feature-icon-wrapper w-12 h-12 rounded-full bg-event-light-red text-event-red flex items-center justify-center text-2xl mb-6">
+                            <i className="ph ph-headset"></i>
+                        </div>
+                        <h3 className="text-[20px] font-bold text-event-navy mb-3">Hỗ trợ chuyên gia 24/7</h3>
+                        <p className="text-event-text-sec text-[15px] leading-relaxed">Đội ngũ hỗ trợ sự kiện của chúng tôi luôn sẵn sàng đồng hành cùng bạn xử lý mọi tình huống phát sinh.</p>
+                    </div>
+                </div>
             </div>
+        </section>
 
-            <p className="text-xs text-slate-500">
-              Để lại thông tin để chuyên gia tư vấn của EventAI đồng hành xây dựng kế hoạch sự kiện tối ưu nhất cho bạn.
-            </p>
+        {/* FEATURED EVENTS SECTION */}
+        <section id="featured-events" className="py-24 bg-event-gray/50 border-t border-b border-event-border">
+            <div className="container mx-auto px-6 xl:px-12 max-w-[1440px]">
+                
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 fade-up">
+                    <div className="max-w-2xl">
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="w-2 h-2 bg-event-red"></div>
+                            <span className="text-event-red font-semibold text-sm tracking-wider uppercase">Khám phá</span>
+                        </div>
+                        <h2 className="text-[36px] lg:text-[42px] font-bold text-event-navy leading-[1.3]">Sự kiện nổi bật</h2>
+                        <p className="text-event-text-sec text-[16px] mt-3">Khám phá những sự kiện sắp diễn ra được tổ chức và quản lý bởi nền tảng EventAI.</p>
+                    </div>
+                    <div className="mt-6 md:mt-0">
+                        <a href="#home" className="text-event-navy font-semibold text-[15px] flex items-center gap-2 hover:text-event-red transition-colors group">
+                            Xem tất cả sự kiện 
+                            <i className="ph ph-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8">
+                    
+                    <div className="bg-white rounded-lg border border-event-border overflow-hidden card-hover fade-up">
+                        <div className="aspect-video relative overflow-hidden">
+                            <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur text-event-navy text-xs font-bold px-3 py-1 rounded-sm shadow-sm">Công nghệ</div>
+                            <img src="https://images.unsplash.com/photo-1505373877841-8d25f7d46678?ixlib=rb-4.0.3&auto=format&fit=crop&w=1112&q=80" alt="AI Technology Summit" className="w-full h-full object-cover image-zoom" />
+                        </div>
+                        <div className="p-6 flex flex-col h-[220px]">
+                            <div className="flex items-center justify-between text-xs font-semibold text-event-text-sec mb-3">
+                                <span className="flex items-center gap-1.5"><i className="ph ph-calendar-blank text-event-red text-sm"></i> 24.10.2025</span>
+                                <span className="flex items-center gap-1.5"><i className="ph ph-map-pin text-event-red text-sm"></i> Hà Nội</span>
+                            </div>
+                            <h3 className="text-[18px] font-bold text-event-navy mb-2 line-clamp-2 hover:text-event-red transition-colors cursor-pointer">AI Technology Summit 2025</h3>
+                            <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4">Hội nghị công nghệ AI lớn nhất khu vực với sự tham gia của các chuyên gia hàng đầu thế giới.</p>
+                            <div className="flex items-center justify-between mt-auto">
+                                <span className="text-xs font-semibold text-event-navy flex items-center gap-1.5"><i className="ph ph-users text-event-text-sec text-sm"></i> 2,500+</span>
+                                <a href="#home" className="btn-secondary px-4 py-1.5 rounded text-sm font-semibold">Đăng ký ngay</a>
+                            </div>
+                        </div>
+                    </div>
 
-            <form onSubmit={handleConsultSubmit} className="space-y-3">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Họ và tên của bạn *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={consultName}
-                  onChange={(e) => setConsultName(e.target.value)}
-                  placeholder="Nguyễn Văn A"
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:border-blue-500 focus:outline-none bg-slate-50/50"
-                />
-              </div>
+                    <div className="bg-white rounded-lg border border-event-border overflow-hidden card-hover fade-up" style={{ transitionDelay: '100ms' }}>
+                        <div className="aspect-video relative overflow-hidden">
+                            <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur text-event-navy text-xs font-bold px-3 py-1 rounded-sm shadow-sm">Kinh doanh</div>
+                            <img src="https://images.unsplash.com/photo-1544531586-fde5298cdd40?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80" alt="Future Business Conference" className="w-full h-full object-cover image-zoom" />
+                        </div>
+                        <div className="p-6 flex flex-col h-[220px]">
+                            <div className="flex items-center justify-between text-xs font-semibold text-event-text-sec mb-3">
+                                <span className="flex items-center gap-1.5"><i className="ph ph-calendar-blank text-event-red text-sm"></i> 12.11.2025</span>
+                                <span className="flex items-center gap-1.5"><i className="ph ph-map-pin text-event-red text-sm"></i> TP.HCM</span>
+                            </div>
+                            <h3 className="text-[18px] font-bold text-event-navy mb-2 line-clamp-2 hover:text-event-red transition-colors cursor-pointer">Future Business Conference</h3>
+                            <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4">Định hình tương lai doanh nghiệp với các chiến lược chuyển đổi số toàn diện và bền vững.</p>
+                            <div className="flex items-center justify-between mt-auto">
+                                <span className="text-xs font-semibold text-event-navy flex items-center gap-1.5"><i className="ph ph-users text-event-text-sec text-sm"></i> 1,200+</span>
+                                <a href="#home" className="btn-secondary px-4 py-1.5 rounded text-sm font-semibold">Đăng ký ngay</a>
+                            </div>
+                        </div>
+                    </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Số điện thoại *
-                </label>
-                <input
-                  type="tel"
-                  required
-                  value={consultPhone}
-                  onChange={(e) => setConsultPhone(e.target.value)}
-                  placeholder="0912 345 678"
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:border-blue-500 focus:outline-none bg-slate-50/50"
-                />
-              </div>
+                    <div className="bg-white rounded-lg border border-event-border overflow-hidden card-hover fade-up" style={{ transitionDelay: '200ms' }}>
+                        <div className="aspect-video relative overflow-hidden">
+                            <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur text-event-navy text-xs font-bold px-3 py-1 rounded-sm shadow-sm">Triển lãm</div>
+                            <img src="https://images.unsplash.com/photo-1531058020387-3be344556be6?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80" alt="Innovation Expo 2025" className="w-full h-full object-cover image-zoom" />
+                        </div>
+                        <div className="p-6 flex flex-col h-[220px]">
+                            <div className="flex items-center justify-between text-xs font-semibold text-event-text-sec mb-3">
+                                <span className="flex items-center gap-1.5"><i className="ph ph-calendar-blank text-event-red text-sm"></i> 05.12.2025</span>
+                                <span className="flex items-center gap-1.5"><i className="ph ph-map-pin text-event-red text-sm"></i> Đà Nẵng</span>
+                            </div>
+                            <h3 className="text-[18px] font-bold text-event-navy mb-2 line-clamp-2 hover:text-event-red transition-colors cursor-pointer">Innovation Expo 2025</h3>
+                            <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4">Trải nghiệm những phát minh và giải pháp sáng tạo mới nhất từ hàng trăm doanh nghiệp.</p>
+                            <div className="flex items-center justify-between mt-auto">
+                                <span className="text-xs font-semibold text-event-navy flex items-center gap-1.5"><i className="ph ph-users text-event-text-sec text-sm"></i> 5,000+</span>
+                                <a href="#home" className="btn-secondary px-4 py-1.5 rounded text-sm font-semibold">Đăng ký ngay</a>
+                            </div>
+                        </div>
+                    </div>
 
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Tên tổ chức / Doanh nghiệp
-                </label>
-                <input
-                  type="text"
-                  value={consultCompany}
-                  onChange={(e) => setConsultCompany(e.target.value)}
-                  placeholder="Công ty TNHH Giải pháp..."
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-200 focus:border-blue-500 focus:outline-none bg-slate-50/50"
-                />
-              </div>
+                    <div className="bg-white rounded-lg border border-event-border overflow-hidden card-hover fade-up" style={{ transitionDelay: '300ms' }}>
+                        <div className="aspect-video relative overflow-hidden">
+                            <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur text-event-navy text-xs font-bold px-3 py-1 rounded-sm shadow-sm">Giải trí</div>
+                            <img src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80" alt="The Horizon Music Night" className="w-full h-full object-cover image-zoom" />
+                        </div>
+                        <div className="p-6 flex flex-col h-[220px]">
+                            <div className="flex items-center justify-between text-xs font-semibold text-event-text-sec mb-3">
+                                <span className="flex items-center gap-1.5"><i className="ph ph-calendar-blank text-event-red text-sm"></i> 20.12.2025</span>
+                                <span className="flex items-center gap-1.5"><i className="ph ph-map-pin text-event-red text-sm"></i> Hà Nội</span>
+                            </div>
+                            <h3 className="text-[18px] font-bold text-event-navy mb-2 line-clamp-2 hover:text-event-red transition-colors cursor-pointer">The Horizon Music Night</h3>
+                            <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4">Đêm nhạc hoành tráng kết hợp nghệ thuật ánh sáng và âm thanh không gian đa chiều.</p>
+                            <div className="flex items-center justify-between mt-auto">
+                                <span className="text-xs font-semibold text-event-navy flex items-center gap-1.5"><i className="ph ph-users text-event-text-sec text-sm"></i> 10,000+</span>
+                                <a href="#home" className="btn-secondary px-4 py-1.5 rounded text-sm font-semibold">Mua vé</a>
+                            </div>
+                        </div>
+                    </div>
 
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
-                >
-                  Gửi yêu cầu tư vấn
-                </button>
-              </div>
-            </form>
-          </div>
+                </div>
+            </div>
+        </section>
+
+        {/* AI EVENT CONCIERGE */}
+        <section className="py-24 bg-white relative overflow-hidden">
+            {/* Background element */}
+            <div className="absolute top-0 right-0 w-1/3 h-full bg-[#FFF7F8] rounded-l-full -mr-20 z-0"></div>
+            
+            <div className="container mx-auto px-6 xl:px-12 max-w-[1440px] relative z-10">
+                <div className="flex flex-col lg:flex-row items-center justify-between gap-16">
+                    
+                    <div className="w-full lg:w-1/2 fade-up">
+                        <div className="flex items-center gap-2 mb-4">
+                            <div className="w-8 h-8 rounded-full bg-event-red/10 flex items-center justify-center">
+                                <i className="ph ph-robot text-event-red text-xl"></i>
+                            </div>
+                            <span className="text-event-red font-bold text-sm tracking-wider uppercase">Công nghệ tiên phong</span>
+                        </div>
+                        <h2 className="text-[36px] lg:text-[46px] font-bold text-event-navy leading-[1.3] mb-6">AI Event Concierge</h2>
+                        <p className="text-event-text-sec text-[18px] mb-8 max-w-lg">
+                            Trợ lý AI thông minh đồng hành cùng mọi sự kiện. Tự động đề xuất ý tưởng, tương tác và hỗ trợ khách mời, phân tích dữ liệu chuyên sâu để mang lại hiệu suất tối đa.
+                        </p>
+                        
+                        <div className="space-y-6 mb-10">
+                            <div className="flex items-start gap-4">
+                                <div className="mt-1 w-6 h-6 rounded-full bg-event-red text-white flex items-center justify-center shrink-0 text-sm">
+                                    <i className="ph ph-check"></i>
+                                </div>
+                                <div>
+                                    <h4 className="text-[16px] font-bold text-event-navy">Gợi ý sự kiện thông minh</h4>
+                                    <p className="text-event-text-sec text-[14px] mt-1">Cá nhân hóa trải nghiệm tham dự dựa trên sở thích và hành vi của khách mời.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-4">
+                                <div className="mt-1 w-6 h-6 rounded-full bg-event-red text-white flex items-center justify-center shrink-0 text-sm">
+                                    <i className="ph ph-check"></i>
+                                </div>
+                                <div>
+                                    <h4 className="text-[16px] font-bold text-event-navy">Hỗ trợ tự động lên lịch trình</h4>
+                                    <p className="text-event-text-sec text-[14px] mt-1">Sắp xếp thời gian, không gian và nguồn lực tối ưu nhất thông qua thuật toán.</p>
+                                </div>
+                            </div>
+                            <div className="flex items-start gap-4">
+                                <div className="mt-1 w-6 h-6 rounded-full bg-event-red text-white flex items-center justify-center shrink-0 text-sm">
+                                    <i className="ph ph-check"></i>
+                                </div>
+                                <div>
+                                    <h4 className="text-[16px] font-bold text-event-navy">Tương tác và hỗ trợ 24/7</h4>
+                                    <p className="text-event-text-sec text-[14px] mt-1">Giải đáp tức thì các thắc mắc của khách mời thông qua chatbot đa ngôn ngữ.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <a href="#home" className="btn-primary px-8 py-3 rounded-md font-semibold inline-flex items-center gap-2">
+                            <i className="ph ph-chat-circle-text text-lg"></i>
+                            Trò chuyện với AI
+                        </a>
+                    </div>
+                    
+                    <div className="w-full lg:w-1/2 fade-up" style={{ transitionDelay: '200ms' }}>
+                        <div className="bg-[#FFF7F8] border border-event-red/10 rounded-2xl p-6 lg:p-8 shadow-ai relative max-w-lg mx-auto">
+                            {/* Chat Interface Mockup */}
+                            <div className="flex items-center gap-4 mb-8 pb-6 border-b border-event-red/10">
+                                <div className="w-12 h-12 bg-white rounded-full shadow-sm flex items-center justify-center border border-event-border">
+                                    <i className="ph ph-robot text-event-red text-2xl"></i>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-event-navy">EventAI Assistant</h4>
+                                    <p className="text-xs text-event-text-sec flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-green-500"></span> Trực tuyến
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-5 mb-8">
+                                <div className="flex gap-4">
+                                    <div className="w-8 h-8 rounded-full bg-event-red text-white flex flex-shrink-0 items-center justify-center text-sm shadow-sm mt-1"><i className="ph ph-robot"></i></div>
+                                    <div className="bg-white border border-event-border rounded-2xl rounded-tl-none p-4 shadow-sm">
+                                        <p className="text-[14px] text-event-navy leading-relaxed">Xin chào! Tôi là Trợ lý AI của EventAI. Bạn đang muốn tổ chức hội nghị công nghệ vào tháng tới. Dựa trên quy mô 500 người, tôi đề xuất 3 địa điểm tốt nhất sau đây:</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex gap-4 flex-row-reverse">
+                                    <div className="w-8 h-8 rounded-full bg-event-navy text-white flex flex-shrink-0 items-center justify-center text-sm shadow-sm mt-1"><i className="ph ph-user"></i></div>
+                                    <div className="bg-event-navy text-white rounded-2xl rounded-tr-none p-4 shadow-sm">
+                                        <p className="text-[14px] leading-relaxed">Tuyệt vời. Hãy tạo cho tôi một bản nháp lịch trình chi tiết trong 2 ngày nhé.</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="flex gap-4">
+                                    <div className="w-8 h-8 rounded-full bg-event-red text-white flex flex-shrink-0 items-center justify-center text-sm shadow-sm mt-1"><i className="ph ph-robot"></i></div>
+                                    <div className="bg-white border border-event-border rounded-2xl rounded-tl-none p-4 shadow-sm w-full">
+                                        <p className="text-[14px] text-event-navy leading-relaxed mb-3">Đã xong! Tôi đã tạo lịch trình mẫu. Bạn có thể xem và tùy chỉnh tại đây:</p>
+                                        <div className="border border-event-border rounded-lg p-3 bg-event-gray flex items-center justify-between cursor-pointer hover:bg-event-border/50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <i className="ph ph-file-text text-event-red text-xl"></i>
+                                                <div>
+                                                    <div className="text-xs font-bold text-event-navy">Lịch trình AI Tech 2025</div>
+                                                    <div className="text-[10px] text-event-text-sec">Tạo cách đây 1 phút</div>
+                                                </div>
+                                            </div>
+                                            <i className="ph ph-arrow-right text-event-text-sec"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="relative">
+                                <input type="text" placeholder="Nhập yêu cầu của bạn..." className="w-full bg-white border border-event-border rounded-full py-3 pl-5 pr-12 text-sm text-event-navy outline-none focus:border-event-red/50 shadow-sm" />
+                                <button className="absolute right-2 top-1.5 w-8 h-8 bg-event-red text-white rounded-full flex items-center justify-center hover:bg-event-dark-red transition-colors">
+                                    <i className="ph ph-paper-plane-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </section>
+
+        {/* SERVICES SECTION */}
+        <section id="services" className="py-24 bg-event-gray/30 border-t border-event-border">
+            <div className="container mx-auto px-6 xl:px-12 max-w-[1440px]">
+                
+                <div className="text-center mb-16 fade-up">
+                    <h2 className="text-[36px] lg:text-[42px] font-bold text-event-navy mb-4">Dịch vụ</h2>
+                    <p className="text-event-text-sec text-[16px] max-w-2xl mx-auto">Giải pháp toàn diện và chuyên nghiệp cho mọi loại hình sự kiện, từ quy mô nhỏ đến các siêu sự kiện quốc tế.</p>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-12 gap-x-8">
+                    
+                    <div className="group cursor-pointer fade-up">
+                        <div className="flex items-end gap-4 mb-4 pb-4 border-b border-event-border group-hover:border-event-red transition-colors">
+                            <span className="text-3xl font-extrabold text-event-text-sec/20 group-hover:text-event-red transition-colors">01</span>
+                            <h3 className="text-[20px] font-bold text-event-navy">Tư vấn & Lên ý tưởng</h3>
+                        </div>
+                        <p className="text-event-text-sec text-[15px] mb-4 h-[72px]">Xây dựng concept sáng tạo, độc đáo và định hướng chiến lược sự kiện phù hợp với mục tiêu thương hiệu của bạn.</p>
+                        <a href="#home" className="text-event-red font-semibold text-[14px] flex items-center gap-1 group-hover:gap-2 transition-all">Khám phá <i className="ph ph-arrow-right"></i></a>
+                    </div>
+                    
+                    <div className="group cursor-pointer fade-up" style={{ transitionDelay: '100ms' }}>
+                        <div className="flex items-end gap-4 mb-4 pb-4 border-b border-event-border group-hover:border-event-red transition-colors">
+                            <span className="text-3xl font-extrabold text-event-text-sec/20 group-hover:text-event-red transition-colors">02</span>
+                            <h3 className="text-[20px] font-bold text-event-navy">Thiết kế & Dàn dựng</h3>
+                        </div>
+                        <p className="text-event-text-sec text-[15px] mb-4 h-[72px]">Thiết kế sân khấu, không gian 3D, hệ thống âm thanh ánh sáng chuyên nghiệp và thi công hạng mục chất lượng cao.</p>
+                        <a href="#home" className="text-event-red font-semibold text-[14px] flex items-center gap-1 group-hover:gap-2 transition-all">Khám phá <i className="ph ph-arrow-right"></i></a>
+                    </div>
+                    
+                    <div className="group cursor-pointer fade-up" style={{ transitionDelay: '200ms' }}>
+                        <div className="flex items-end gap-4 mb-4 pb-4 border-b border-event-border group-hover:border-event-red transition-colors">
+                            <span className="text-3xl font-extrabold text-event-text-sec/20 group-hover:text-event-red transition-colors">03</span>
+                            <h3 className="text-[20px] font-bold text-event-navy">Truyền thông & Marketing</h3>
+                        </div>
+                        <p className="text-event-text-sec text-[15px] mb-4 h-[72px]">Quảng bá đa kênh, thu hút đối tượng mục tiêu và tạo độ lan tỏa mạnh mẽ trước, trong và sau sự kiện.</p>
+                        <a href="#home" className="text-event-red font-semibold text-[14px] flex items-center gap-1 group-hover:gap-2 transition-all">Khám phá <i className="ph ph-arrow-right"></i></a>
+                    </div>
+                    
+                    <div className="group cursor-pointer fade-up" style={{ transitionDelay: '300ms' }}>
+                        <div className="flex items-end gap-4 mb-4 pb-4 border-b border-event-border group-hover:border-event-red transition-colors">
+                            <span className="text-3xl font-extrabold text-event-text-sec/20 group-hover:text-event-red transition-colors">04</span>
+                            <h3 className="text-[20px] font-bold text-event-navy">Quản lý Đăng ký & Khách mời</h3>
+                        </div>
+                        <p className="text-event-text-sec text-[15px] mb-4 h-[72px]">Hệ thống check-in thông minh, quản lý danh sách khách mời, gửi thiệp mời tự động và cá nhân hóa trải nghiệm.</p>
+                        <a href="#home" className="text-event-red font-semibold text-[14px] flex items-center gap-1 group-hover:gap-2 transition-all">Khám phá <i className="ph ph-arrow-right"></i></a>
+                    </div>
+                    
+                    <div className="group cursor-pointer fade-up" style={{ transitionDelay: '400ms' }}>
+                        <div className="flex items-end gap-4 mb-4 pb-4 border-b border-event-border group-hover:border-event-red transition-colors">
+                            <span className="text-3xl font-extrabold text-event-text-sec/20 group-hover:text-event-red transition-colors">05</span>
+                            <h3 className="text-[20px] font-bold text-event-navy">Vận hành Sự kiện</h3>
+                        </div>
+                        <p className="text-event-text-sec text-[15px] mb-4 h-[72px]">Đội ngũ điều phối chuyên nghiệp, quản lý rủi ro, đảm bảo mọi hoạt động diễn ra suôn sẻ theo đúng timeline.</p>
+                        <a href="#home" className="text-event-red font-semibold text-[14px] flex items-center gap-1 group-hover:gap-2 transition-all">Khám phá <i className="ph ph-arrow-right"></i></a>
+                    </div>
+                    
+                    <div className="group cursor-pointer fade-up" style={{ transitionDelay: '500ms' }}>
+                        <div className="flex items-end gap-4 mb-4 pb-4 border-b border-event-border group-hover:border-event-red transition-colors">
+                            <span className="text-3xl font-extrabold text-event-text-sec/20 group-hover:text-event-red transition-colors">06</span>
+                            <h3 className="text-[20px] font-bold text-event-navy">Báo cáo & Phân tích AI</h3>
+                        </div>
+                        <p className="text-event-text-sec text-[15px] mb-4 h-[72px]">Đánh giá hiệu quả (ROI), phân tích dữ liệu hành vi và đề xuất các giải pháp cải thiện cho các sự kiện tương lai.</p>
+                        <a href="#home" className="text-event-red font-semibold text-[14px] flex items-center gap-1 group-hover:gap-2 transition-all">Khám phá <i className="ph ph-arrow-right"></i></a>
+                    </div>
+                    
+                </div>
+            </div>
+        </section>
+
+        {/* FEATURES (RED SECTION) */}
+        <section id="features" className="py-24 relative overflow-hidden bg-event-dark-red">
+            {/* Background Image overlay */}
+            <div className="absolute inset-0 opacity-10">
+                <img src="https://images.unsplash.com/photo-1551818255-e6e10975bc17?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80" alt="Event Background" className="w-full h-full object-cover mix-blend-overlay" />
+            </div>
+            {/* Geometric accents */}
+            <div className="absolute w-[600px] h-[600px] bg-white opacity-5 transform rotate-45 -right-[200px] -top-[300px]"></div>
+            <div className="absolute w-[400px] h-[400px] bg-event-red transform -rotate-12 -left-[100px] -bottom-[200px]"></div>
+            
+            <div className="container mx-auto px-6 xl:px-12 max-w-[1440px] relative z-10">
+                
+                <div className="text-center mb-16 fade-up">
+                    <h2 className="text-[36px] lg:text-[46px] font-bold text-white mb-4 uppercase tracking-wider">CÔNG NGHỆ KIẾN TẠO TƯƠNG LAI SỰ KIỆN</h2>
+                    <div className="w-20 h-1 bg-white mx-auto mt-6"></div>
+                </div>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8 text-center text-white">
+                    
+                    <div className="fade-up" style={{ transitionDelay: '100ms' }}>
+                        <div className="w-16 h-16 mx-auto rounded-full border border-white/30 flex items-center justify-center text-3xl mb-4 hover:bg-white hover:text-event-dark-red transition-all cursor-pointer">
+                            <i className="ph ph-calendar-check"></i>
+                        </div>
+                        <h4 className="font-bold text-sm uppercase tracking-wider">QUẢN LÝ SỰ KIỆN</h4>
+                    </div>
+                    
+                    <div className="fade-up" style={{ transitionDelay: '200ms' }}>
+                        <div className="w-16 h-16 mx-auto rounded-full border border-white/30 flex items-center justify-center text-3xl mb-4 hover:bg-white hover:text-event-dark-red transition-all cursor-pointer">
+                            <i className="ph ph-users-three"></i>
+                        </div>
+                        <h4 className="font-bold text-sm uppercase tracking-wider">QUẢN LÝ KHÁCH MỜI</h4>
+                    </div>
+                    
+                    <div className="fade-up" style={{ transitionDelay: '300ms' }}>
+                        <div className="w-16 h-16 mx-auto rounded-full border border-white/30 flex items-center justify-center text-3xl mb-4 hover:bg-white hover:text-event-dark-red transition-all cursor-pointer">
+                            <i className="ph ph-qr-code"></i>
+                        </div>
+                        <h4 className="font-bold text-sm uppercase tracking-wider">QR CHECK-IN</h4>
+                    </div>
+                    
+                    <div className="fade-up" style={{ transitionDelay: '400ms' }}>
+                        <div className="w-16 h-16 mx-auto rounded-full border border-white/30 flex items-center justify-center text-3xl mb-4 hover:bg-white hover:text-event-dark-red transition-all cursor-pointer">
+                            <i className="ph ph-brain"></i>
+                        </div>
+                        <h4 className="font-bold text-sm uppercase tracking-wider">AI ANALYTICS</h4>
+                    </div>
+                    
+                    <div className="fade-up" style={{ transitionDelay: '500ms' }}>
+                        <div className="w-16 h-16 mx-auto rounded-full border border-white/30 flex items-center justify-center text-3xl mb-4 hover:bg-white hover:text-event-dark-red transition-all cursor-pointer">
+                            <i className="ph ph-pulse"></i>
+                        </div>
+                        <h4 className="font-bold text-sm uppercase tracking-wider">REAL-TIME MONITORING</h4>
+                    </div>
+                    
+                    <div className="fade-up" style={{ transitionDelay: '600ms' }}>
+                        <div className="w-16 h-16 mx-auto rounded-full border border-white/30 flex items-center justify-center text-3xl mb-4 hover:bg-white hover:text-event-dark-red transition-all cursor-pointer">
+                            <i className="ph ph-shield-check"></i>
+                        </div>
+                        <h4 className="font-bold text-sm uppercase tracking-wider">DATA SECURITY</h4>
+                    </div>
+                    
+                </div>
+            </div>
+        </section>
+
+        {/* ABOUT US */}
+        <section id="about" className="py-24 bg-white">
+            <div className="container mx-auto px-6 xl:px-12 max-w-[1440px]">
+                <div className="flex flex-col lg:flex-row items-center gap-16">
+                    
+                    <div className="w-full lg:w-1/2 relative fade-up">
+                        <div className="aspect-video rounded-lg overflow-hidden shadow-2xl relative z-10">
+                            <video 
+                                className="w-full h-full object-cover" 
+                                controls
+                                src="/assets/YTSave_YouTube_SON-TUNG-MTP-RA-MAT-DAI-SU-THUONG-HIEU_Media_PGQj28VZobE_001_1080p.mp4"
+                            >
+                                Trình duyệt của bạn không hỗ trợ thẻ video.
+                            </video>
+                        </div>
+                        <div className="mt-3 relative z-10">
+                            <p className="text-[13px] text-event-text-sec italic font-medium">
+                                Nguồn: SƠN TÙNG MTP RA MẮT ĐẠI SỨ THƯƠNG HIỆU - MSPACE MEDIA
+                            </p>
+                        </div>
+                        <div className="absolute -bottom-8 -right-8 w-2/3 h-2/3 bg-event-red/5 rounded-lg z-0 hidden lg:block"></div>
+                    </div>
+                    
+                    <div className="w-full lg:w-1/2 fade-up" style={{ transitionDelay: '200ms' }}>
+                        <h3 className="text-event-red font-bold uppercase tracking-wider text-sm mb-4">Về EventAI</h3>
+                        <h2 className="text-[32px] lg:text-[40px] font-bold text-event-navy leading-[1.3] mb-6">Công nghệ thay đổi cách sự kiện được kiến tạo.</h2>
+                        <p className="text-event-text-sec text-[16px] leading-relaxed mb-8">
+                            EventAI là nền tảng quản lý sự kiện thông minh được thiết kế để đơn giản hóa quá trình lập kế hoạch, vận hành, quản lý khách mời, tạo nội dung và phân tích hiệu suất. Chúng tôi tin rằng công nghệ không chỉ tối ưu hóa quy trình, mà còn giải phóng sự sáng tạo để con người có thể tập trung vào việc mang lại những trải nghiệm cảm xúc và kết nối chân thực nhất.
+                        </p>
+                        
+                        <div className="grid grid-cols-2 gap-6 mb-10">
+                            <div>
+                                <div className="text-[32px] font-bold text-event-navy mb-1">3+</div>
+                                <div className="text-[13px] text-event-text-sec uppercase font-semibold">Năm Đổi mới</div>
+                            </div>
+                            <div>
+                                <div className="text-[32px] font-bold text-event-navy mb-1">1,200+</div>
+                                <div className="text-[13px] text-event-text-sec uppercase font-semibold">Sự kiện thành công</div>
+                            </div>
+                            <div>
+                                <div className="text-[32px] font-bold text-event-navy mb-1">500+</div>
+                                <div className="text-[13px] text-event-text-sec uppercase font-semibold">Đối tác chiến lược</div>
+                            </div>
+                            <div>
+                                <div className="text-[32px] font-bold text-event-navy mb-1">100K+</div>
+                                <div className="text-[13px] text-event-text-sec uppercase font-semibold">Người tham dự</div>
+                            </div>
+                        </div>
+                        
+                        <a href="#home" className="btn-primary px-8 py-3 rounded-md font-semibold inline-flex items-center gap-2">
+                            Tìm hiểu thêm <i className="ph ph-arrow-right"></i>
+                        </a>
+                    </div>
+                    
+                </div>
+            </div>
+        </section>
+
+        {/* CUSTOMER REVIEWS */}
+        <section id="reviews" className="py-24 bg-event-gray/50 border-t border-event-border">
+            <div className="container mx-auto px-6 xl:px-12 max-w-[1440px]">
+                
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 fade-up">
+                    <div className="max-w-2xl">
+                        <h2 className="text-[36px] lg:text-[42px] font-bold text-event-navy mb-4">Đánh giá khách hàng</h2>
+                        <p className="text-event-text-sec text-[16px]">Khám phá lý do tại sao hàng trăm doanh nghiệp tin tưởng lựa chọn EventAI cho các sự kiện quan trọng của họ.</p>
+                    </div>
+                    <div className="mt-6 md:mt-0 text-right">
+                        <div className="flex items-center gap-2 text-2xl text-yellow-400 justify-end mb-1">
+                            <i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star-half fill"></i>
+                        </div>
+                        <div className="font-bold text-event-navy text-xl">4.9 / 5</div>
+                        <div className="text-sm text-event-text-sec">Dựa trên 500+ đánh giá</div>
+                    </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    
+                    <div className="bg-white p-8 rounded-lg shadow-sm border border-event-border card-hover fade-up">
+                        <div className="text-yellow-400 flex gap-1 text-sm mb-6">
+                            <i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i>
+                        </div>
+                        <p className="text-event-text-sec text-[15px] italic mb-8 flex-1 leading-relaxed">
+                            "EventAI đã giúp chúng tôi tổ chức thành công hội nghị cấp cao với 2000 khách mời. Hệ thống QR check-in siêu tốc và phân tích dữ liệu AI thực sự là một bước đột phá."
+                        </p>
+                        <div className="flex items-center gap-4 mt-auto">
+                            <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80" alt="Avatar" className="w-12 h-12 rounded-full object-cover" />
+                            <div>
+                                <h4 className="font-bold text-event-navy text-[15px]">Nguyễn Phương Thảo</h4>
+                                <p className="text-event-text-sec text-xs">Giám đốc Marketing, TechCorp</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-8 rounded-lg shadow-sm border border-event-border card-hover fade-up" style={{ transitionDelay: '100ms' }}>
+                        <div className="text-yellow-400 flex gap-1 text-sm mb-6">
+                            <i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i>
+                        </div>
+                        <p className="text-event-text-sec text-[15px] italic mb-8 flex-1 leading-relaxed">
+                            "Giao diện trực quan, dễ sử dụng. Trợ lý AI Event Concierge đã hỗ trợ cực kỳ đắc lực trong việc phản hồi thắc mắc của hàng ngàn khách tham dự cùng lúc."
+                        </p>
+                        <div className="flex items-center gap-4 mt-auto">
+                            <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80" alt="Avatar" className="w-12 h-12 rounded-full object-cover" />
+                            <div>
+                                <h4 className="font-bold text-event-navy text-[15px]">Trần Văn Hùng</h4>
+                                <p className="text-event-text-sec text-xs">Trưởng ban Tổ chức, Global Expo</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-8 rounded-lg shadow-sm border border-event-border card-hover fade-up" style={{ transitionDelay: '200ms' }}>
+                        <div className="text-yellow-400 flex gap-1 text-sm mb-6">
+                            <i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i>
+                        </div>
+                        <p className="text-event-text-sec text-[15px] italic mb-8 flex-1 leading-relaxed">
+                            "Tính năng quản lý ngân sách và báo cáo thời gian thực giúp tôi kiểm soát hoàn toàn sự kiện. Khách hàng của chúng tôi rất ấn tượng với sự chuyên nghiệp này."
+                        </p>
+                        <div className="flex items-center gap-4 mt-auto">
+                            <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80" alt="Avatar" className="w-12 h-12 rounded-full object-cover" />
+                            <div>
+                                <h4 className="font-bold text-event-navy text-[15px]">Lê Mai Anh</h4>
+                                <p className="text-event-text-sec text-xs">CEO, Apex Events</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-8 rounded-lg shadow-sm border border-event-border card-hover fade-up" style={{ transitionDelay: '300ms' }}>
+                        <div className="text-yellow-400 flex gap-1 text-sm mb-6">
+                            <i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star fill"></i><i className="ph ph-star-half fill"></i>
+                        </div>
+                        <p className="text-event-text-sec text-[15px] italic mb-8 flex-1 leading-relaxed">
+                            "Công nghệ AI thực sự tạo nên sự khác biệt. Giúp chúng tôi tối ưu chi phí, nâng cao trải nghiệm khách tham dự và đem lại một sự kiện hoàn hảo chưa từng có."
+                        </p>
+                        <div className="flex items-center gap-4 mt-auto">
+                            <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80" alt="Avatar" className="w-12 h-12 rounded-full object-cover" />
+                            <div>
+                                <h4 className="font-bold text-event-navy text-[15px]">Phạm Quang Duy</h4>
+                                <p className="text-event-text-sec text-xs">Cofounder, FutureTech VN</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </section>
+
+        {/* NEWS SECTION */}
+        <section id="news" className="py-24 bg-white border-t border-event-border">
+            <div className="container mx-auto px-6 xl:px-12 max-w-[1440px]">
+                
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 fade-up">
+                    <div className="max-w-2xl">
+                        <h2 className="text-[36px] lg:text-[42px] font-bold text-event-navy mb-4">Tin tức & Bài viết</h2>
+                        <p className="text-event-text-sec text-[16px]">Cập nhật xu hướng, kiến thức công nghệ và những câu chuyện truyền cảm hứng trong ngành tổ chức sự kiện.</p>
+                    </div>
+                    <div className="mt-6 md:mt-0">
+                        <a href="#home" className="text-event-navy font-semibold text-[15px] flex items-center gap-2 hover:text-event-red transition-colors">
+                            Xem tất cả bài viết 
+                            <i className="ph ph-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                    
+                    <div className="group cursor-pointer fade-up">
+                        <div className="aspect-[4/3] rounded-lg overflow-hidden mb-5">
+                            <img src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="News" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        </div>
+                        <div className="flex gap-4 text-xs font-semibold text-event-text-sec mb-3">
+                            <span className="text-event-red">Công nghệ</span>
+                            <span>28.09.2025</span>
+                        </div>
+                        <h3 className="text-[18px] font-bold text-event-navy mb-3 group-hover:text-event-red transition-colors line-clamp-2">Xu hướng công nghệ sự kiện 2026: AI và trải nghiệm cá nhân hóa</h3>
+                        <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4">Khám phá cách AI đang định hình lại ngành tổ chức sự kiện trong thập kỷ mới.</p>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-event-navy">
+                            <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&w=30&h=30&fit=crop" className="w-6 h-6 rounded-full" alt="Author" />
+                            Nguyễn Thị Mai
+                        </div>
+                    </div>
+
+                    <div className="group cursor-pointer fade-up" style={{ transitionDelay: '100ms' }}>
+                        <div className="aspect-[4/3] rounded-lg overflow-hidden mb-5">
+                            <img src="https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="News" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        </div>
+                        <div className="flex gap-4 text-xs font-semibold text-event-text-sec mb-3">
+                            <span className="text-event-red">Sự kiện</span>
+                            <span>25.09.2025</span>
+                        </div>
+                        <h3 className="text-[18px] font-bold text-event-navy mb-3 group-hover:text-event-red transition-colors line-clamp-2">Tổ chức sự kiện xanh – Xu hướng tất yếu của tương lai</h3>
+                        <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4">Các giải pháp bền vững và cách giảm thiểu tác động môi trường khi tổ chức sự kiện quy mô lớn.</p>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-event-navy">
+                            <img src="https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&w=30&h=30&fit=crop" className="w-6 h-6 rounded-full" alt="Author" />
+                            Đào Văn Hùng
+                        </div>
+                    </div>
+
+                    <div className="group cursor-pointer fade-up" style={{ transitionDelay: '200ms' }}>
+                        <div className="aspect-[4/3] rounded-lg overflow-hidden mb-5">
+                            <img src="https://images.unsplash.com/photo-1531482615713-2afd69097998?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="News" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        </div>
+                        <div className="flex gap-4 text-xs font-semibold text-event-text-sec mb-3">
+                            <span className="text-event-red">Kinh doanh</span>
+                            <span>15.09.2025</span>
+                        </div>
+                        <h3 className="text-[18px] font-bold text-event-navy mb-3 group-hover:text-event-red transition-colors line-clamp-2">5 bước xây dựng kịch bản sự kiện chuyên nghiệp và thu hút</h3>
+                        <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4">Bí quyết từ các chuyên gia để tạo nên một kịch bản mượt mà, ấn tượng và không thể rời mắt.</p>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-event-navy">
+                            <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&w=30&h=30&fit=crop" className="w-6 h-6 rounded-full" alt="Author" />
+                            Phạm Quang Duy
+                        </div>
+                    </div>
+
+                    <div className="group cursor-pointer fade-up" style={{ transitionDelay: '300ms' }}>
+                        <div className="aspect-[4/3] rounded-lg overflow-hidden mb-5">
+                            <img src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="News" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        </div>
+                        <div className="flex gap-4 text-xs font-semibold text-event-text-sec mb-3">
+                            <span className="text-event-red">Tin tức</span>
+                            <span>10.09.2025</span>
+                        </div>
+                        <h3 className="text-[18px] font-bold text-event-navy mb-3 group-hover:text-event-red transition-colors line-clamp-2">EventAI chính thức ra mắt phiên bản 2.0 với nhiều tính năng đột phá</h3>
+                        <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4">Tìm hiểu về những nâng cấp mới nhất giúp nền tảng EventAI trở nên mạnh mẽ hơn bao giờ hết.</p>
+                        <div className="flex items-center gap-2 text-xs font-semibold text-event-navy">
+                            <img src="https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&w=30&h=30&fit=crop" className="w-6 h-6 rounded-full" alt="Author" />
+                            Lê Mai Anh
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        {/* CTA SECTION */}
+        <section className="py-24 bg-event-dark-red relative overflow-hidden text-center text-white">
+            <div className="absolute inset-0 opacity-10">
+                <img src="https://images.unsplash.com/photo-1551818255-e6e10975bc17?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80" alt="Background" className="w-full h-full object-cover mix-blend-overlay" />
+            </div>
+            
+            <div className="container mx-auto px-6 max-w-4xl relative z-10 fade-up">
+                <h2 className="text-[36px] sm:text-[46px] lg:text-[56px] font-extrabold leading-[1.3] mb-6">SẴN SÀNG TẠO NÊN MỘT SỰ KIỆN KHÁC BIỆT?</h2>
+                <p className="text-[18px] text-white/90 mb-10 max-w-2xl mx-auto leading-relaxed">
+                    Hãy để EventAI giúp bạn chuyển hóa ý tưởng thành một sự kiện đẳng cấp, chuyên nghiệp và mang lại trải nghiệm không thể quên.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <a href="#home" className="w-full sm:w-auto bg-white text-event-red font-bold px-8 py-4 rounded-md hover:bg-event-light-red transition-colors text-[15px]">
+                        Bắt đầu ngay
+                    </a>
+                    <a href="#contact" className="w-full sm:w-auto bg-transparent border-2 border-white text-white font-bold px-8 py-4 rounded-md hover:bg-white/10 transition-colors text-[15px]">
+                        Liên hệ tư vấn
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        {/* CONTACT SECTION */}
+        <section id="contact" className="py-24 bg-event-gray/30">
+            <div className="container mx-auto px-6 xl:px-12 max-w-[1440px]">
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+                    
+                    <div className="fade-up">
+                        <div className="inline-block px-3 py-1 bg-event-red/10 text-event-red text-xs font-bold tracking-wider rounded-sm mb-4 uppercase">Hỗ trợ 24/7</div>
+                        <h2 className="text-[36px] lg:text-[42px] font-bold text-event-navy mb-6">Liên hệ với chúng tôi</h2>
+                        <p className="text-event-text-sec text-[16px] mb-10 max-w-lg">
+                            Đội ngũ chuyên gia của EventAI luôn sẵn sàng lắng nghe và cung cấp giải pháp tối ưu nhất cho sự kiện sắp tới của bạn.
+                        </p>
+                        
+                        <div className="space-y-8">
+                            <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 bg-white border border-event-border rounded-full flex items-center justify-center text-event-red text-xl shrink-0">
+                                    <i className="ph ph-map-pin"></i>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-event-navy text-[16px]">Văn phòng chính</h4>
+                                    <p className="text-event-text-sec text-[15px] mt-1">Tòa nhà TechTower, 123 Đường Tôn Dật Tiên, Phường Tân Phú, Quận 7, TP. Hồ Chí Minh</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 bg-white border border-event-border rounded-full flex items-center justify-center text-event-red text-xl shrink-0">
+                                    <i className="ph ph-phone"></i>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-event-navy text-[16px]">Điện thoại</h4>
+                                    <p className="text-event-text-sec text-[15px] mt-1">1900 1234 5678 (Hotline)<br />+84 28 3456 7890 (Office)</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-start gap-4">
+                                <div className="w-12 h-12 bg-white border border-event-border rounded-full flex items-center justify-center text-event-red text-xl shrink-0">
+                                    <i className="ph ph-envelope"></i>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-event-navy text-[16px]">Email</h4>
+                                    <p className="text-event-text-sec text-[15px] mt-1">hello@eventai.vn<br />support@eventai.vn</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="mt-12 pt-8 border-t border-event-border flex items-center gap-4">
+                            <span className="font-bold text-event-navy text-[15px]">Kết nối:</span>
+                            <a href="#home" className="w-10 h-10 bg-white border border-event-border rounded-full flex items-center justify-center text-event-text-sec hover:text-event-red hover:border-event-red transition-all"><i className="ph ph-facebook-logo text-lg"></i></a>
+                            <a href="#home" className="w-10 h-10 bg-white border border-event-border rounded-full flex items-center justify-center text-event-text-sec hover:text-event-red hover:border-event-red transition-all"><i className="ph ph-linkedin-logo text-lg"></i></a>
+                            <a href="#home" className="w-10 h-10 bg-white border border-event-border rounded-full flex items-center justify-center text-event-text-sec hover:text-event-red hover:border-event-red transition-all"><i className="ph ph-instagram-logo text-lg"></i></a>
+                            <a href="#home" className="w-10 h-10 bg-white border border-event-border rounded-full flex items-center justify-center text-event-text-sec hover:text-event-red hover:border-event-red transition-all"><i className="ph ph-youtube-logo text-lg"></i></a>
+                        </div>
+                    </div>
+                    
+                    <div className="bg-white p-8 lg:p-10 rounded-2xl shadow-premium border border-event-border fade-up" style={{ transitionDelay: '200ms' }}>
+                        <h3 className="text-[24px] font-bold text-event-navy mb-6">Gửi yêu cầu tư vấn</h3>
+                        <form className="space-y-5" onsubmit="event.preventDefault(); alert('Cảm ơn bạn! Yêu cầu đã được gửi thành công.');">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <div>
+                                    <label className="block text-sm font-semibold text-event-navy mb-2">Họ và tên *</label>
+                                    <input type="text" required className="w-full border border-event-border rounded-md px-4 py-3 text-sm focus:outline-none focus:border-event-red focus:ring-1 focus:ring-event-red transition-all bg-event-gray/30 placeholder-event-text-sec/50" placeholder="Nhập họ và tên" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-event-navy mb-2">Số điện thoại *</label>
+                                    <input type="tel" required className="w-full border border-event-border rounded-md px-4 py-3 text-sm focus:outline-none focus:border-event-red focus:ring-1 focus:ring-event-red transition-all bg-event-gray/30 placeholder-event-text-sec/50" placeholder="Nhập số điện thoại" />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-semibold text-event-navy mb-2">Email *</label>
+                                <input type="email" required className="w-full border border-event-border rounded-md px-4 py-3 text-sm focus:outline-none focus:border-event-red focus:ring-1 focus:ring-event-red transition-all bg-event-gray/30 placeholder-event-text-sec/50" placeholder="Địa chỉ email của bạn" />
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-semibold text-event-navy mb-2">Chủ đề</label>
+                                <select className="w-full border border-event-border rounded-md px-4 py-3 text-sm focus:outline-none focus:border-event-red focus:ring-1 focus:ring-event-red transition-all bg-event-gray/30">
+                                    <option>Tư vấn tổ chức sự kiện</option>
+                                    <option>Báo giá dịch vụ nền tảng</option>
+                                    <option>Hỗ trợ kỹ thuật</option>
+                                    <option>Khác</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-semibold text-event-navy mb-2">Nội dung chi tiết *</label>
+                                <textarea rows="4" required className="w-full border border-event-border rounded-md px-4 py-3 text-sm focus:outline-none focus:border-event-red focus:ring-1 focus:ring-event-red transition-all bg-event-gray/30 placeholder-event-text-sec/50" placeholder="Hãy mô tả ngắn gọn về sự kiện hoặc yêu cầu của bạn..."></textarea>
+                            </div>
+                            
+                            <button type="submit" className="w-full btn-primary font-bold py-4 rounded-md mt-2 flex items-center justify-center gap-2 text-[15px]">
+                                Gửi yêu cầu <i className="ph ph-arrow-right"></i>
+                            </button>
+                        </form>
+                    </div>
+                    
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    {/* FOOTER */}
+    <footer className="bg-event-navy text-white pt-20 pb-8 border-t-4 border-event-red">
+        <div className="container mx-auto px-6 xl:px-12 max-w-[1440px]">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 mb-16">
+                
+                <div className="lg:col-span-2">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-8 h-8 flex justify-center items-center">
+                            <div className="w-6 h-6 bg-event-red rotate-45 flex items-center justify-center">
+                                <div className="w-2.5 h-2.5 bg-event-navy -rotate-45"></div>
+                            </div>
+                        </div>
+                        <span className="text-2xl font-bold ml-2 tracking-tight">
+                            <span className="text-white">Event</span><span className="text-event-red">AI</span>
+                        </span>
+                    </div>
+                    <p className="text-event-text-sec text-[15px] mb-8 max-w-sm leading-relaxed">
+                        Nền tảng quản lý sự kiện AI hàng đầu. Tích hợp mọi công cụ bạn cần để kiến tạo những trải nghiệm đẳng cấp và tối ưu hóa hiệu suất đầu tư.
+                    </p>
+                    <div className="flex items-center gap-3">
+                        <div className="h-px w-8 bg-event-text-sec/50"></div>
+                        <span className="text-[10px] font-bold text-event-text-sec tracking-[0.2em] uppercase">
+                            CONNECT · CREATE · INSPIRE
+                        </span>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 className="font-bold text-[16px] mb-6 uppercase tracking-wider text-white">EventAI</h4>
+                    <ul className="space-y-4 text-[14px] text-event-text-sec font-medium">
+                        <li><a href="#about" className="hover:text-event-red transition-colors">Về chúng tôi</a></li>
+                        <li><a href="#services" className="hover:text-event-red transition-colors">Dịch vụ</a></li>
+                        <li><a href="#features" className="hover:text-event-red transition-colors">Tính năng AI</a></li>
+                        <li><a href="#reviews" className="hover:text-event-red transition-colors">Khách hàng</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 className="font-bold text-[16px] mb-6 uppercase tracking-wider text-white">Sự kiện</h4>
+                    <ul className="space-y-4 text-[14px] text-event-text-sec font-medium">
+                        <li><a href="#featured-events" className="hover:text-event-red transition-colors">Sự kiện nổi bật</a></li>
+                        <li><a href="#home" className="hover:text-event-red transition-colors">Sự kiện sắp diễn ra</a></li>
+                        <li><a href="#home" className="hover:text-event-red transition-colors">Hội thảo công nghệ</a></li>
+                        <li><a href="#home" className="hover:text-event-red transition-colors">Triển lãm & Expo</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 className="font-bold text-[16px] mb-6 uppercase tracking-wider text-white">Hỗ trợ</h4>
+                    <ul className="space-y-4 text-[14px] text-event-text-sec font-medium">
+                        <li><a href="#contact" className="hover:text-event-red transition-colors">Liên hệ</a></li>
+                        <li><a href="#home" className="hover:text-event-red transition-colors">Trung tâm trợ giúp</a></li>
+                        <li><a href="#home" className="hover:text-event-red transition-colors">Chính sách bảo mật</a></li>
+                        <li><a href="#home" className="hover:text-event-red transition-colors">Điều khoản dịch vụ</a></li>
+                    </ul>
+                </div>
+                
+            </div>
+            
+            <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                <p className="text-event-text-sec text-[13px]">
+                    &copy; 2025 EventAI. Tất cả quyền được bảo lưu.
+                </p>
+                <div className="flex items-center gap-6 text-[13px] text-event-text-sec font-medium">
+                    <a href="#home" className="hover:text-white transition-colors">Quy định</a>
+                    <a href="#home" className="hover:text-white transition-colors">Cookies</a>
+                    <div className="flex items-center gap-3">
+                        <i className="ph ph-globe text-lg"></i>
+                        <span>Tiếng Việt (VN)</span>
+                    </div>
+                </div>
+            </div>
         </div>
-      )}
+    </footer>
+
+    {/* Interactive Scripts */}
+    
     </div>
   );
 };
 
-const SlidersIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <line x1="4" y1="21" x2="4" y2="14" />
-    <line x1="4" y1="10" x2="4" y2="3" />
-    <line x1="12" y1="21" x2="12" y2="12" />
-    <line x1="12" y1="8" x2="12" y2="3" />
-    <line x1="20" y1="21" x2="20" y2="16" />
-    <line x1="20" y1="12" x2="20" y2="3" />
-    <line x1="1" y1="14" x2="7" y2="14" />
-    <line x1="9" y1="8" x2="15" y2="8" />
-    <line x1="17" y1="16" x2="23" y2="16" />
-  </svg>
-);
-
-export default LandingPage;
+export { LandingPage };

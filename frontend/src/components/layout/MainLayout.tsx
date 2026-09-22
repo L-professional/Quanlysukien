@@ -14,7 +14,7 @@ const pathToTab: Record<string, string> = {
   '/': 'landing',
   '/landing': 'landing',
   '/dashboard': 'dashboard',
-  '/events': 'schedule',
+  '/events': 'events',
   '/check-in': 'scanner',
   '/inquiries': 'inquiries',
   '/content-studio': 'content-studio',
@@ -30,7 +30,7 @@ const pathToTab: Record<string, string> = {
 const tabToPath: Record<string, string> = {
   landing: '/',
   dashboard: '/dashboard',
-  schedule: '/events',
+  events: '/events',
   scanner: '/check-in',
   inquiries: '/inquiries',
   'content-studio': '/content-studio',
@@ -55,7 +55,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false);
 
   const currentTab = propActiveTab || (location.pathname.startsWith('/speaker') ? 'speaker' : pathToTab[location.pathname]) || 'dashboard';
-
   const isLanding = currentTab === 'landing' || location.pathname === '/' || location.pathname === '/landing';
 
   const handleTabChange = (tab: string) => {
@@ -69,7 +68,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
   if (isLanding) {
     return (
-      <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-blue-600 selection:text-white relative">
+      <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-[#D7193F] selection:text-white relative">
         <AuthModal
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
@@ -84,13 +83,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   }
 
   return (
-    <div
-      className={`min-h-screen flex ${
-        currentTab === 'settings'
-          ? 'bg-[#0B0F19] text-slate-100'
-          : 'bg-[#F8FAFC] dark:bg-[#0B0F19] text-slate-900 dark:text-slate-100'
-      } font-sans selection:bg-indigo-500 selection:text-white relative`}
-    >
+    <div className="min-h-screen flex bg-[#F6F8FC] text-[#12213A] font-sans selection:bg-[#D7193F] selection:text-white relative">
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
@@ -116,14 +109,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
       >
         {/* Backdrop */}
         <div
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity duration-300"
+          className="fixed inset-0 bg-[#12213A]/60 backdrop-blur-sm transition-opacity duration-300"
           onClick={() => setIsMobileDrawerOpen(false)}
           aria-hidden="true"
         />
 
         {/* Sliding Drawer Container */}
         <div
-          className={`fixed inset-y-0 left-0 w-72 max-w-[85vw] bg-[#0B0F19] text-slate-200 z-50 shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col justify-between ${
+          className={`fixed inset-y-0 left-0 w-[280px] max-w-[85vw] bg-white text-[#12213A] z-50 shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col justify-between ${
             isMobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
@@ -154,22 +147,10 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
         />
 
         {/* Page Content Viewport */}
-        <main
-          className={`flex-1 overflow-y-auto ${
-            currentTab === 'landing'
-              ? 'p-0 bg-white'
-              : currentTab === 'settings'
-              ? 'bg-[#0B0F19] text-slate-100 p-3 sm:p-6 lg:p-8'
-              : 'bg-[#F8FAFC] dark:bg-[#0B0F19] p-3 sm:p-6 lg:p-8'
-          }`}
-        >
-          {currentTab === 'landing' ? (
+        <main className="flex-1 overflow-y-auto bg-[#F6F8FC] p-4 sm:p-6 lg:p-8">
+          <div className="max-w-[1400px] mx-auto">
             <Outlet />
-          ) : (
-            <div className="max-w-7xl mx-auto">
-              <Outlet />
-            </div>
-          )}
+          </div>
         </main>
       </div>
 

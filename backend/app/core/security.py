@@ -168,3 +168,48 @@ def require_roles(allowed_roles: List[str]):
 
     return role_checker
 
+
+# Simple RBAC Permissions Mapping
+ROLE_PERMISSIONS = {
+    'SUPER_ADMIN': ['*'],
+    'ADMIN': ['EVENT_VIEW', 'EVENT_CREATE', 'EVENT_EDIT', 'EVENT_DELETE', 'USER_MANAGE', 'AI_MANAGE', 'REPORT_VIEW'],
+    'EVENT_MANAGER': ['EVENT_VIEW', 'EVENT_CREATE', 'EVENT_EDIT', 'TICKET_MANAGE', 'SPEAKER_MANAGE', 'REPORT_VIEW'],
+    'STAFF': ['EVENT_VIEW', 'TICKET_SCAN'],
+    'CHECK_IN_STAFF': ['EVENT_VIEW', 'TICKET_SCAN'],
+    'SPEAKER_MANAGER': ['EVENT_VIEW', 'SPEAKER_MANAGE'],
+    'AI_EDITOR': ['EVENT_VIEW', 'AI_MANAGE'],
+    'CONTENT_MANAGER': ['EVENT_VIEW', 'CONTENT_MANAGE'],
+    'AUDITOR': ['EVENT_VIEW', 'REPORT_VIEW', 'LOG_VIEW'],
+    'SUPPORT': ['EVENT_VIEW', 'TICKET_VIEW', 'FEEDBACK_VIEW'],
+    'PARTICIPANT': ['EVENT_VIEW'],
+    'ATTENDEE': ['EVENT_VIEW'],
+    'SPEAKER': ['EVENT_VIEW']
+}
+
+def get_permissions_for_role(role_name: str) -> list[str]:
+    return ROLE_PERMISSIONS.get(role_name.upper(), ['EVENT_VIEW'])
+
+def require_permissions(required_permissions: List[str]):
+    async def permission_checker(
+        current_user: User = Depends(get_current_active_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        role_name = await get_user_role_name(current_user, db)
+        user_role_upper = (role_name or 'ATTENDEE').upper()
+        
+        user_perms = get_permissions_for_role(user_role_upper)
+        
+        # SUPER_ADMIN or user with '*' permission overrides
+        if '*' in user_perms:
+            return current_user
+            
+        has_all = all(p in user_perms for p in required_permissions)
+        
+        if not has_all:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f'Truy cập bị từ chối. Bạn không có quyền thực hiện thao tác này.',
+            )
+        return current_user
+
+    return permission_checker
