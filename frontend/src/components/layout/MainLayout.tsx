@@ -14,6 +14,7 @@ const pathToTab: Record<string, string> = {
   '/': 'landing',
   '/landing': 'landing',
   '/dashboard': 'dashboard',
+  '/reports': 'reports',
   '/events': 'events',
   '/check-in': 'scanner',
   '/inquiries': 'inquiries',
@@ -30,6 +31,7 @@ const pathToTab: Record<string, string> = {
 const tabToPath: Record<string, string> = {
   landing: '/',
   dashboard: '/dashboard',
+  reports: '/reports',
   events: '/events',
   scanner: '/check-in',
   inquiries: '/inquiries',

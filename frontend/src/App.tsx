@@ -8,6 +8,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { MainLayout } from './components/layout/MainLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import { Reports } from './pages/Reports';
 import { EventSchedule } from './components/EventSchedule';
 import { QRScanner } from './pages/QRScanner';
 import { AIConcierge } from './pages/AIConcierge';
@@ -45,6 +46,20 @@ const AppRoutes: React.FC = () => {
         />
 
         {/* Events Catalog — All roles */}
+        
+        {/* Reports - Admin, Event Manager, Auditor */}
+        <Route
+          path="reports"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'AUDITOR']}
+              onRedirect={() => navigate('/dashboard')}
+            >
+              <Reports />
+            </ProtectedRoute>
+          }
+        />
+
         <Route path="events" element={<EventSchedule />} />
 
         {/* QR Check-in — Admin, Staff, Event Manager */}
