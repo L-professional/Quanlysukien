@@ -5,14 +5,21 @@ from pydantic import BaseModel
 
 class EventBase(BaseModel):
     title: str
+    slug: Optional[str] = None
     description: Optional[str] = None
     category_id: int = 1
+    event_type: str = "Hội thảo"
     location: str
     location_address: Optional[str] = None
     google_maps_url: Optional[str] = None
+    cover_image: Optional[str] = None
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     status: str = "PUBLISHED"
+    homepage_visible: bool = False
+    featured: bool = False
+    homepage_order: int = 0
+    capacity: int = 500
 
 
 class EventCreate(EventBase):
@@ -111,3 +118,19 @@ class EventScheduleResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class EventPublishRequest(BaseModel):
+    publish: bool
+
+class EventHomepageRequest(BaseModel):
+    homepage_visible: bool
+    featured: bool
+    homepage_order: Optional[int] = None
+
+class EventPublishRequest(BaseModel):
+    publish: bool
+
+class EventHomepageRequest(BaseModel):
+    homepage_visible: bool
+    featured: bool
+    homepage_order: Optional[int] = None

@@ -2199,6 +2199,69 @@ export const apiService = {
   },
 
   // ── Demo Accounts API ────────────────────────────────────────────────────────
+  
+  async publishEvent(id: number): Promise<Event> {
+    try {
+      const response = await apiClient.post<Event>(`/events/${id}/publish`);
+      return response.data;
+    } catch {
+      const cached = localStorage.getItem('eventhub_custom_events');
+      if (cached) {
+        let items: Event[] = JSON.parse(cached);
+        items = items.map(ev => ev.id === id ? { ...ev, status: 'PUBLISHED' } : ev);
+        localStorage.setItem('eventhub_custom_events', JSON.stringify(items));
+        return items.find(ev => ev.id === id) as Event;
+      }
+      throw new Error('Fallback failed');
+    }
+  },
+
+  async duplicateEvent(id: number): Promise<Event> {
+    try {
+      const response = await apiClient.post<Event>(`/events/${id}/duplicate`);
+      return response.data;
+    } catch {
+      const cached = localStorage.getItem('eventhub_custom_events');
+      if (cached) {
+        let items: Event[] = JSON.parse(cached);
+        const original = items.find(ev => ev.id === id);
+        if (original) {
+          const clone = { ...original, id: Date.now(), title: original.title + ' (Copy)', status: 'DRAFT' as const };
+          items.unshift(clone);
+          localStorage.setItem('eventhub_custom_events', JSON.stringify(items));
+          return clone;
+        }
+      }
+      throw new Error('Fallback failed');
+    }
+  },
+
+  async updateHomepageVisibility(id: number, visible: boolean, featured: boolean = false): Promise<Event> {
+    try {
+      const response = await apiClient.patch<Event>(`/events/${id}/homepage-visibility`, { homepage_visible: visible, featured });
+      return response.data;
+    } catch {
+      const cached = localStorage.getItem('eventhub_custom_events');
+      if (cached) {
+        let items: Event[] = JSON.parse(cached);
+        items = items.map(ev => ev.id === id ? { ...ev, homepage_visible: visible, featured } : ev);
+        localStorage.setItem('eventhub_custom_events', JSON.stringify(items));
+        return items.find(ev => ev.id === id) as Event;
+      }
+      throw new Error('Fallback failed');
+    }
+  },
+
+  async exportEventsList(params?: any): Promise<Blob> {
+    try {
+      const response = await apiClient.get('/events/export', { params, responseType: 'blob' });
+      return response.data;
+    } catch {
+      const csv = 'id,title,status\n1,Test Event,PUBLISHED';
+      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    }
+  },
+
   async getDemoAccounts(): Promise<DemoAccount[]> {
     try {
       const response = await apiClient.get<DemoAccount[]>('/auth/demo-accounts');

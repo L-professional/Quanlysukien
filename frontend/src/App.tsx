@@ -10,6 +10,7 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Reports } from './pages/Reports';
 import { EventSchedule } from './components/EventSchedule';
+import { Events } from './pages/Events';
 import { QRScanner } from './pages/QRScanner';
 import { AIConcierge } from './pages/AIConcierge';
 import { UserManagement } from './pages/UserManagement';
@@ -46,7 +47,8 @@ const AppRoutes: React.FC = () => {
         />
 
         {/* Events Catalog — All roles */}
-        
+        <Route path="events" element={<Events />} />
+
         {/* Reports - Admin, Event Manager, Auditor */}
         <Route
           path="reports"
@@ -59,8 +61,6 @@ const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
-
-        <Route path="events" element={<EventSchedule />} />
 
         {/* QR Check-in — Admin, Staff, Event Manager */}
         <Route

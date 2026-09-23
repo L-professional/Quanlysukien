@@ -2,7 +2,7 @@ import enum
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 # pyrefly: ignore [missing-import]
-from sqlalchemy import Integer, String, Text, DateTime, ForeignKey, Enum
+from sqlalchemy import Integer, String, Text, DateTime, ForeignKey, Enum, Boolean
 # pyrefly: ignore [missing-import]
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -45,6 +45,17 @@ class Event(Base, TimestampMixin):
     end_date: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     capacity: Mapped[int] = mapped_column(Integer, default=500, nullable=False)
     registered_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    
+    # New Fields
+    slug: Mapped[str] = mapped_column(String(255), nullable=True, unique=True, index=True)
+    event_type: Mapped[str] = mapped_column(String(100), default="Hội thảo", nullable=True)
+    cover_image: Mapped[str] = mapped_column(String(1000), nullable=True)
+    homepage_visible: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    homepage_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    
     status: Mapped[str] = mapped_column(
         String(50),
         default=EventStatusEnum.DRAFT.value,

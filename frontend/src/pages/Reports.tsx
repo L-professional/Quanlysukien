@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import PermissionGuard from '../components/PermissionGuard';
-import { api } from '../services/api';
+import { apiService as api } from '../services/api';
 
 const COLORS = ['#D7193F', '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B'];
 const TABS = ['Tổng quan', 'Hiệu quả sự kiện', 'Người tham dự', 'Vé & QR', 'Diễn giả', 'Feedback', 'AI', 'Hệ thống'];

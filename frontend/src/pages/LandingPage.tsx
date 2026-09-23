@@ -1,7 +1,29 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { apiService as api } from '../services/api';
+ 
 import { Link } from 'react-router-dom';
 
 const LandingPage: React.FC = () => {
+
+  const [featuredEvents, setFeaturedEvents] = useState<any[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+
+  useEffect(() => {
+    const fetchHomepageEvents = async () => {
+      try {
+        const data = await api.getEvents();
+        // sort by homepage_order if available
+        const sorted = data.sort((a: any, b: any) => (a.homepage_order || 0) - (b.homepage_order || 0));
+        setFeaturedEvents(sorted);
+      } catch (err) {
+        console.error("Failed to load homepage events", err);
+      } finally {
+        setLoadingEvents(false);
+      }
+    };
+    fetchHomepageEvents();
+  }, []);
+
   useEffect(() => {
     // Header scroll effect
     const header = document.getElementById('header');
@@ -1011,7 +1033,7 @@ const LandingPage: React.FC = () => {
                     
                     <div className="bg-white p-8 lg:p-10 rounded-2xl shadow-premium border border-event-border fade-up" style={{ transitionDelay: '200ms' }}>
                         <h3 className="text-[24px] font-bold text-event-navy mb-6">Gửi yêu cầu tư vấn</h3>
-                        <form className="space-y-5" onsubmit="event.preventDefault(); alert('Cảm ơn bạn! Yêu cầu đã được gửi thành công.');">
+                        <form className="space-y-5" onSubmit="event.preventDefault(); alert('Cảm ơn bạn! Yêu cầu đã được gửi thành công.');">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 <div>
                                     <label className="block text-sm font-semibold text-event-navy mb-2">Họ và tên *</label>
