@@ -167,7 +167,7 @@ export const Dashboard: React.FC = () => {
                     dataKey="value"
                     stroke="none"
                   >
-                    {donutData.map((entry, index) => (
+                    {donutData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

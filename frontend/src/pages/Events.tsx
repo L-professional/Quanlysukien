@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Calendar, MapPin, Users, Activity, Eye, Edit, Trash2, Copy, Play, CheckCircle2, MoreVertical, X, Image as ImageIcon, Globe, FileOutput, Navigation2 } from 'lucide-react';
+import { Plus, Search, Calendar, MapPin, Users, Activity, Eye, Edit, Trash2, Copy, Play, X, Image as ImageIcon, Globe, FileOutput, Navigation2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiService as api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { PermissionGuard } from '../components/PermissionGuard';
 
 export const Events: React.FC = () => {
-  const { user } = useAuth();
+  useAuth();
   
   // State
   const [events, setEvents] = useState<any[]>([]);
@@ -15,7 +15,7 @@ export const Events: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(10);
   
   // Create Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);

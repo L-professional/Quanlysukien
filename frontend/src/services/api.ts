@@ -1344,7 +1344,7 @@ export const apiService = {
     }
   },
 
-  async getEvents(): Promise<Event[]> {
+  async getEvents(params?: any): Promise<Event[]> {
     try {
       const response = await apiClient.get<Event[]>('/events');
       if (response.data && Array.isArray(response.data)) {
@@ -2236,7 +2236,7 @@ export const apiService = {
     }
   },
 
-  async updateHomepageVisibility(id: number, visible: boolean, featured: boolean = false): Promise<Event> {
+  async updateHomepageVisibility(id: number, payload: { homepage_visible?: boolean; featured?: boolean }): Promise<Event> {
     try {
       const response = await apiClient.patch<Event>(`/events/${id}/homepage-visibility`, { homepage_visible: visible, featured });
       return response.data;
@@ -2303,6 +2303,55 @@ export const apiService = {
       ];
     }
   },
+
+  // --------------------------------------------------------
+  // Task Reports Mocks
+  // --------------------------------------------------------
+  async getReportOverview(filters: any) {
+    return {
+      kpis: [
+        { title: 'Tổng lượt đăng ký', value: 2450, growth: '+12.5%', bg: 'bg-indigo-50', color: 'text-indigo-600', isUp: true },
+        { title: 'Tỷ lệ tham dự', value: '82.4%', growth: '+4.1%', bg: 'bg-emerald-50', color: 'text-emerald-600', isUp: true },
+        { title: 'Doanh thu (VND)', value: '1.2B', growth: '+18.2%', bg: 'bg-amber-50', color: 'text-amber-600', isUp: true },
+        { title: 'Phản hồi (NPS)', value: '8.4', growth: '+0.5', bg: 'bg-rose-50', color: 'text-rose-600', isUp: true },
+      ],
+      lineChartData: [
+        { name: 'T1', registered: 120, attended: 100 },
+        { name: 'T2', registered: 200, attended: 180 },
+        { name: 'T3', registered: 300, attended: 250 },
+        { name: 'T4', registered: 400, attended: 350 },
+        { name: 'T5', registered: 500, attended: 420 },
+        { name: 'T6', registered: 650, attended: 580 },
+      ],
+      donutData: [
+        { name: 'Công nghệ', value: 45 },
+        { name: 'Tài chính', value: 25 },
+        { name: 'Y tế', value: 15 },
+        { name: 'Giáo dục', value: 10 },
+        { name: 'Khác', value: 5 },
+      ],
+      barChartData: [
+        { name: 'Tech Summit', value: 500 },
+        { name: 'AI & Future', value: 400 },
+        { name: 'Fintech 2025', value: 300 },
+        { name: 'HealthTech', value: 200 },
+        { name: 'EduTech', value: 100 },
+      ]
+    };
+  },
+
+  async getReportsList() {
+    return [
+      { id: 1, name: 'Báo cáo Tech Summit 2025', type: 'Hiệu quả sự kiện', period: '01/03/2025 - 16/03/2025', creator: 'Nguyễn Văn Admin', date: '16/03/2025', status: 'Hoàn thành' },
+      { id: 2, name: 'Báo cáo AI & Future 2025', type: 'Người tham dự', period: '01/04/2025 - 16/04/2025', creator: 'Nguyễn Văn Admin', date: '16/04/2025', status: 'Hoàn thành' }
+    ];
+  },
+
+  async exportReport(payload: any) {
+    return new Blob(['Mock data'], { type: 'text/csv' });
+  },
+
+  async deleteReport(id: number) {
+    return { success: true };
+  }
 };
-
-

@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import {
   Download, Calendar, Filter, RotateCcw,
-  CalendarDays, Users, CheckCircle2, Star,
-  AlertCircle, ChevronDown, FileText, Share2, Trash2, Eye, X, Clock
+  Users, CheckCircle2,
+  AlertCircle, Share2, Trash2, Eye, X
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend,
-  BarChart, Bar
+  PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import PermissionGuard from '../components/PermissionGuard';
@@ -17,7 +16,7 @@ const COLORS = ['#D7193F', '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B'];
 const TABS = ['Tổng quan', 'Hiệu quả sự kiện', 'Người tham dự', 'Vé & QR', 'Diễn giả', 'Feedback', 'AI', 'Hệ thống'];
 
 export const Reports: React.FC = () => {
-  const { user } = useAuth();
+  useAuth();
   
   // States
   const [activeTab, setActiveTab] = useState('Tổng quan');
@@ -45,7 +44,7 @@ export const Reports: React.FC = () => {
   const [kpis, setKpis] = useState<any[]>([]);
   const [lineChartData, setLineChartData] = useState<any[]>([]);
   const [donutData, setDonutData] = useState<any[]>([]);
-  const [barChartData, setBarChartData] = useState<any[]>([]);
+  const [_barChartData, setBarChartData] = useState<any[]>([]);
   const [reportTableData, setReportTableData] = useState<any[]>([]);
 
   const fetchOverview = async (currentFilters: any) => {
@@ -358,7 +357,7 @@ export const Reports: React.FC = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={donutData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={2} dataKey="value" stroke="none">
-                        {donutData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                        {donutData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                       </Pie>
                       <RechartsTooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5EAF2', padding: '6px 10px' }} itemStyle={{ fontSize: '13px', fontWeight: 600 }} />
                     </PieChart>
