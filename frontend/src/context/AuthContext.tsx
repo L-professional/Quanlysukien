@@ -181,7 +181,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           localStorage.setItem('eventhub_user', JSON.stringify(userData));
         })
         .catch((err) => {
-          console.warn('Failed to verify token with backend:', err);
+          // Chỉ clear user nếu là lỗi 401 (token thực sự hết hạn/không hợp lệ)
+          // Không clear nếu là Network Error (backend chưa chạy / localhost trên Vercel)
+          const status = err?.response?.status;
+          const isNetworkError = !err?.response && (
+            err?.code === 'ERR_NETWORK' ||
+            err?.code === 'ECONNREFUSED' ||
+            err?.message === 'Network Error'
+          );
+          if (status === 401) {
+            // Token không hợp lệ → clear
+            setToken(null);
+            setUser(null);
+            localStorage.removeItem('eventhub_token');
+            localStorage.removeItem('eventhub_user');
+            console.warn('Token expired or invalid, cleared session.');
+          } else if (isNetworkError) {
+            // Backend không có (Vercel/localhost) → giữ user từ localStorage
+            console.warn('Backend unreachable (Network Error), keeping local session:', err?.message);
+          } else {
+            console.warn('Failed to verify token with backend:', err);
+          }
         });
     }
   }, [token]);
