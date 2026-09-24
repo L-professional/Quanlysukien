@@ -6,7 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell
 } from 'recharts';
 
 // Dummy Data
@@ -52,7 +52,11 @@ const notifications = [
   { id: 3, text: 'Có 5 yêu cầu đăng ký diễn giả mới', time: '2 giờ trước', type: 'info' },
 ];
 
-export const Dashboard: React.FC = () => {
+export interface DashboardProps {
+  onNavigateTab?: (tab: string) => void;
+}
+
+export const Dashboard: React.FC<DashboardProps> = () => {
   const { user } = useAuth();
 
   return (
@@ -167,7 +171,7 @@ export const Dashboard: React.FC = () => {
                     dataKey="value"
                     stroke="none"
                   >
-                    {donutData.map((entry, index) => (
+                    {donutData.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

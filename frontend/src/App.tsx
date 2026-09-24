@@ -9,7 +9,6 @@ import { MainLayout } from './components/layout/MainLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Reports } from './pages/Reports';
-import { EventSchedule } from './components/EventSchedule';
 import { Events } from './pages/Events';
 import { QRScanner } from './pages/QRScanner';
 import { AIConcierge } from './pages/AIConcierge';
@@ -42,7 +41,7 @@ const AppRoutes: React.FC = () => {
         <Route
           path="dashboard"
           element={
-            <Dashboard onNavigateTab={(tab) => navigate(`/${tab === 'schedule' ? 'events' : tab}`)} />
+            <Dashboard onNavigateTab={(tab: string) => navigate(`/${tab === 'schedule' ? 'events' : tab}`)} />
           }
         />
 

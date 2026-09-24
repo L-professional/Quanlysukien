@@ -1344,9 +1344,9 @@ export const apiService = {
     }
   },
 
-  async getEvents(): Promise<Event[]> {
+  async getEvents(params?: { status?: string; search?: string; event_type?: string }): Promise<Event[]> {
     try {
-      const response = await apiClient.get<Event[]>('/events');
+      const response = await apiClient.get<Event[]>('/events', { params });
       if (response.data && Array.isArray(response.data)) {
         return response.data;
       }
@@ -2236,19 +2236,93 @@ export const apiService = {
     }
   },
 
-  async updateHomepageVisibility(id: number, visible: boolean, featured: boolean = false): Promise<Event> {
+  async updateHomepageVisibility(
+    id: number,
+    visibleOrPayload: boolean | { homepage_visible?: boolean; featured?: boolean },
+    featured: boolean = false
+  ): Promise<Event> {
+    const payload = typeof visibleOrPayload === 'boolean'
+      ? { homepage_visible: visibleOrPayload, featured }
+      : visibleOrPayload;
     try {
-      const response = await apiClient.patch<Event>(`/events/${id}/homepage-visibility`, { homepage_visible: visible, featured });
+      const response = await apiClient.patch<Event>(`/events/${id}/homepage-visibility`, payload);
       return response.data;
     } catch {
       const cached = localStorage.getItem('eventhub_custom_events');
       if (cached) {
         let items: Event[] = JSON.parse(cached);
-        items = items.map(ev => ev.id === id ? { ...ev, homepage_visible: visible, featured } : ev);
+        items = items.map(ev => ev.id === id ? { ...ev, ...payload } : ev);
         localStorage.setItem('eventhub_custom_events', JSON.stringify(items));
         return items.find(ev => ev.id === id) as Event;
       }
       throw new Error('Fallback failed');
+    }
+  },
+
+  async getReportOverview(params?: any): Promise<any> {
+    try {
+      const response = await apiClient.get('/ai-analytics/overview', { params });
+      return response.data;
+    } catch {
+      return {
+        kpis: [
+          { label: 'Tổng sự kiện', value: '24', change: '+12%', isPositive: true },
+          { label: 'Lượt tham gia', value: '8,450', change: '+18.5%', isPositive: true },
+          { label: 'Tỉ lệ check-in', value: '94.2%', change: '+3.1%', isPositive: true },
+          { label: 'Điểm hài lòng', value: '4.8/5', change: '+0.2', isPositive: true },
+        ],
+        lineChartData: [
+          { name: 'Thg 1', attendees: 3000, events: 20 },
+          { name: 'Thg 2', attendees: 4000, events: 35 },
+          { name: 'Thg 3', attendees: 3500, events: 30 },
+          { name: 'Thg 4', attendees: 5000, events: 45 },
+          { name: 'Thg 5', attendees: 4800, events: 40 },
+          { name: 'Thg 6', attendees: 6000, events: 55 },
+        ],
+        donutData: [
+          { name: 'Hội nghị', value: 45 },
+          { name: 'Workshop', value: 30 },
+          { name: 'Webinar', value: 15 },
+          { name: 'Khác', value: 10 },
+        ],
+        barChartData: [
+          { name: 'Q1', revenue: 120000000 },
+          { name: 'Q2', revenue: 180000000 },
+          { name: 'Q3', revenue: 250000000 },
+          { name: 'Q4', revenue: 310000000 },
+        ],
+      };
+    }
+  },
+
+  async getReportsList(): Promise<any[]> {
+    try {
+      const response = await apiClient.get('/ai-analytics/reports');
+      return response.data;
+    } catch {
+      return [
+        { id: 1, name: 'Báo cáo Tech Summit 2025', type: 'Hiệu quả sự kiện', period: '01/03/2025 - 16/03/2025', creator: 'Nguyễn Văn Admin', date: '16/03/2025', status: 'Hoàn thành' },
+        { id: 2, name: 'Báo cáo AI Transformation 2026', type: 'Tổng quan', period: '10/01/2026 - 20/01/2026', creator: 'Trần Thị Điều Hành', date: '21/01/2026', status: 'Hoàn thành' },
+        { id: 3, name: 'Báo cáo Check-in & Điểm danh', type: 'Vé & QR', period: '01/02/2026 - 15/02/2026', creator: 'Lê Hoàng Soát Vé', date: '16/02/2026', status: 'Hoàn thành' },
+      ];
+    }
+  },
+
+  async exportReport(params?: any): Promise<Blob> {
+    try {
+      const response = await apiClient.get('/ai-analytics/export', { params, responseType: 'blob' });
+      return response.data;
+    } catch {
+      const csv = 'id,name,type,status\n1,Report 1,Overview,SUCCESS';
+      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    }
+  },
+
+  async deleteReport(id: number): Promise<void> {
+    try {
+      await apiClient.delete(`/ai-analytics/reports/${id}`);
+    } catch {
+      // Fallback
     }
   },
 

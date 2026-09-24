@@ -17,6 +17,8 @@ const ROLE_BADGE = {
   ATTENDEE: { label: 'Attendee', icon: Ticket, color: 'bg-slate-600/30 text-slate-300 border border-slate-600/40' },
   PARTICIPANT: { label: 'Attendee', icon: Ticket, color: 'bg-slate-600/30 text-slate-300 border border-slate-600/40' },
   EVENT_MANAGER: { label: 'Event Mgr', icon: Briefcase, color: 'bg-purple-500/20 text-purple-300 border border-purple-500/30' },
+  SUPER_ADMIN: { label: 'Super Admin', icon: Crown, color: 'bg-red-500/20 text-red-300 border border-red-500/30' },
+  AUDITOR: { label: 'Auditor', icon: ShieldCheck, color: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' },
 } as const;
 
 export const Navbar: React.FC<NavbarProps> = ({

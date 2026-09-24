@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'STAFF' | 'ATTENDEE' | 'PARTICIPANT' | 'EVENT_MANAGER' | 'SPEAKER';
+export type UserRole = 'ADMIN' | 'STAFF' | 'ATTENDEE' | 'PARTICIPANT' | 'EVENT_MANAGER' | 'SPEAKER' | 'SUPER_ADMIN' | 'AUDITOR';
 
 export interface User {
   id: number;
@@ -7,6 +7,7 @@ export interface User {
   email: string;
   phone_number?: string;
   role_name?: string;
+  permissions?: string[];
   is_active?: boolean;
   avatar_url?: string;
   job_title?: string;

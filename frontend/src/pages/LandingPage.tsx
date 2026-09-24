@@ -23,6 +23,8 @@ const LandingPage: React.FC = () => {
     };
     fetchHomepageEvents();
   }, []);
+  void featuredEvents;
+  void loadingEvents;
 
   useEffect(() => {
     // Header scroll effect
@@ -1033,7 +1035,7 @@ const LandingPage: React.FC = () => {
                     
                     <div className="bg-white p-8 lg:p-10 rounded-2xl shadow-premium border border-event-border fade-up" style={{ transitionDelay: '200ms' }}>
                         <h3 className="text-[24px] font-bold text-event-navy mb-6">Gửi yêu cầu tư vấn</h3>
-                        <form className="space-y-5" onSubmit="event.preventDefault(); alert('Cảm ơn bạn! Yêu cầu đã được gửi thành công.');">
+                        <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); alert('Cảm ơn bạn! Yêu cầu đã được gửi thành công.'); }}>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 <div>
                                     <label className="block text-sm font-semibold text-event-navy mb-2">Họ và tên *</label>
@@ -1062,7 +1064,7 @@ const LandingPage: React.FC = () => {
                             
                             <div>
                                 <label className="block text-sm font-semibold text-event-navy mb-2">Nội dung chi tiết *</label>
-                                <textarea rows="4" required className="w-full border border-event-border rounded-md px-4 py-3 text-sm focus:outline-none focus:border-event-red focus:ring-1 focus:ring-event-red transition-all bg-event-gray/30 placeholder-event-text-sec/50" placeholder="Hãy mô tả ngắn gọn về sự kiện hoặc yêu cầu của bạn..."></textarea>
+                                <textarea rows={4} required className="w-full border border-event-border rounded-md px-4 py-3 text-sm focus:outline-none focus:border-event-red focus:ring-1 focus:ring-event-red transition-all bg-event-gray/30 placeholder-event-text-sec/50" placeholder="Hãy mô tả ngắn gọn về sự kiện hoặc yêu cầu của bạn..."></textarea>
                             </div>
                             
                             <button type="submit" className="w-full btn-primary font-bold py-4 rounded-md mt-2 flex items-center justify-center gap-2 text-[15px]">

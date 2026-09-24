@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, UserRole } from '../types';
+export type { UserRole };
 import { apiService } from '../services/api';
 import { toast } from 'sonner';
 
@@ -79,6 +80,23 @@ export const DEMO_PRESETS: Record<UserRole, User> = {
     full_name: 'Phạm Quốc Khách Hàng',
     email: 'attendee@eventhub.ai',
     role_name: 'ATTENDEE',
+    is_active: true,
+  },
+  SUPER_ADMIN: {
+    id: 99,
+    role_id: 99,
+    full_name: 'Nguyễn Văn Super Admin',
+    email: 'superadmin@eventhub.ai',
+    role_name: 'SUPER_ADMIN',
+    permissions: ['*'],
+    is_active: true,
+  },
+  AUDITOR: {
+    id: 98,
+    role_id: 98,
+    full_name: 'Kiểm Toán Viên',
+    email: 'auditor@eventhub.ai',
+    role_name: 'AUDITOR',
     is_active: true,
   },
 };
