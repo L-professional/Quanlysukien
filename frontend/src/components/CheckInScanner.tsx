@@ -239,7 +239,7 @@ export const CheckInScanner: React.FC = () => {
           {canIssueManual && (
             <button
               onClick={() => setShowManualIssue(true)}
-              className="p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-colors bg-indigo-900/40 border-indigo-700/50 text-indigo-300 hover:bg-indigo-900/60 hover:text-indigo-200"
+              className="p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 transition-colors bg-red-900/40 border-red-700/50 text-red-300 hover:bg-red-900/60 hover:text-indigo-200"
             >
               <UserPlus className="w-4 h-4" />
               <span>Cấp Vé Vãng Lai</span>
@@ -263,16 +263,16 @@ export const CheckInScanner: React.FC = () => {
       {/* Manual Issue Modal */}
       {showManualIssue && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-indigo-700/50 rounded-2xl max-w-md w-full shadow-2xl max-h-[88vh] flex flex-col overflow-hidden">
+          <div className="bg-slate-900 border border-red-700/50 rounded-2xl max-w-md w-full shadow-2xl max-h-[88vh] flex flex-col overflow-hidden">
             {/* Fixed Header */}
             <div className="p-5 flex items-center justify-between border-b border-slate-800 shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-indigo-900/60 border border-indigo-700/50 flex items-center justify-center">
-                  <UserPlus className="w-5 h-5 text-indigo-400" />
+                <div className="w-9 h-9 rounded-xl bg-red-900/60 border border-red-700/50 flex items-center justify-center">
+                  <UserPlus className="w-5 h-5 text-red-400" />
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-sm">Cấp Vé Vãng Lai</h3>
-                  <p className="text-indigo-400 text-xs">Walk-in Ticket Issuance</p>
+                  <p className="text-red-400 text-xs">Walk-in Ticket Issuance</p>
                 </div>
               </div>
               <button
@@ -294,7 +294,7 @@ export const CheckInScanner: React.FC = () => {
                     value={issueForm.full_name}
                     onChange={(e) => setIssueForm((f) => ({ ...f, full_name: e.target.value }))}
                     placeholder="Nguyễn Văn A"
-                    className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500/60"
+                    className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-red-500/60"
                     required
                   />
                 </div>
@@ -305,7 +305,7 @@ export const CheckInScanner: React.FC = () => {
                     value={issueForm.email}
                     onChange={(e) => setIssueForm((f) => ({ ...f, email: e.target.value }))}
                     placeholder="email@example.com"
-                    className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500/60"
+                    className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-red-500/60"
                     required
                   />
                 </div>
@@ -314,7 +314,7 @@ export const CheckInScanner: React.FC = () => {
                   <select
                     value={issueForm.ticket_type}
                     onChange={(e) => setIssueForm((f) => ({ ...f, ticket_type: e.target.value }))}
-                    className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-indigo-500/60"
+                    className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700/60 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-red-500/60"
                   >
                     <option value="Vé Vãng Lai">Vé Vãng Lai (Walk-in)</option>
                     <option value="Vé Tiêu Chuẩn">Vé Tiêu Chuẩn (Standard)</option>
@@ -336,7 +336,7 @@ export const CheckInScanner: React.FC = () => {
                 <button
                   type="submit"
                   disabled={issueLoading}
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {issueLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Ticket className="w-4 h-4" />}
                   Cấp Vé
@@ -529,9 +529,9 @@ export const CheckInScanner: React.FC = () => {
                       {result.ticketType && (
                         <div className="flex items-center justify-between text-slate-300">
                           <span className="flex items-center gap-1.5 text-slate-400">
-                            <Ticket className="w-3.5 h-3.5 text-indigo-400" /> Hạng vé:
+                            <Ticket className="w-3.5 h-3.5 text-red-400" /> Hạng vé:
                           </span>
-                          <span className="text-indigo-300 font-medium">{result.ticketType}</span>
+                          <span className="text-red-300 font-medium">{result.ticketType}</span>
                         </div>
                       )}
 

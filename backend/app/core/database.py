@@ -58,6 +58,7 @@ async def init_db() -> None:
             "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS organization VARCHAR(255);",
             "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS job_title VARCHAR(255);",
             "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS notes VARCHAR(1000);",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_event_participant ON registrations (event_id, participant_id) WHERE schedule_id IS NULL AND session_id IS NULL;",
             """
             CREATE TABLE IF NOT EXISTS session_questions (
                 id SERIAL PRIMARY KEY,

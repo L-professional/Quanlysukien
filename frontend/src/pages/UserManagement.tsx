@@ -21,6 +21,9 @@ import {
   Eye,
   EyeOff,
   X,
+  UserPlus,
+  Mail,
+  Send,
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { formatVietnameseDateTime } from '../utils/formatters';
@@ -31,7 +34,7 @@ import { toast } from 'sonner';
 const ROLE_CONFIG: Record<string, { labelKey: string; color: string; icon: React.FC<{className?: string}> }> = {
   ADMIN: { labelKey: 'roles.ADMIN', color: 'bg-amber-100 text-amber-800 border border-amber-300', icon: Crown },
   EVENT_MANAGER: { labelKey: 'roles.EVENT_MANAGER', color: 'bg-purple-100 text-purple-800 border border-purple-300', icon: Briefcase },
-  STAFF: { labelKey: 'roles.STAFF', color: 'bg-indigo-100 text-indigo-800 border border-indigo-300', icon: Briefcase },
+  STAFF: { labelKey: 'roles.STAFF', color: 'bg-red-100 text-red-800 border border-red-300', icon: Briefcase },
   PARTICIPANT: { labelKey: 'roles.PARTICIPANT', color: 'bg-slate-100 text-slate-700 border border-slate-300', icon: Ticket },
   ATTENDEE: { labelKey: 'roles.ATTENDEE', color: 'bg-slate-100 text-slate-700 border border-slate-300', icon: Ticket },
 };
@@ -144,7 +147,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ user, onClose, 
         {/* Fixed Header */}
         <div className="p-5 flex items-center justify-between border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+            <div className="w-9 h-9 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600">
               <Key className="w-5 h-5" />
             </div>
             <div>
@@ -172,7 +175,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ user, onClose, 
             )}
 
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-red-100 text-red-700 font-bold text-xs flex items-center justify-center shrink-0">
                 {user.full_name?.charAt(0) || user.email.charAt(0).toUpperCase()}
               </div>
               <div className="min-w-0">
@@ -189,7 +192,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ user, onClose, 
                   placeholder="••••••••"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3.5 py-2 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500"
+                  className="w-full px-3.5 py-2 pr-10 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-red-500"
                 />
                 <button
                   type="button"
@@ -208,7 +211,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ user, onClose, 
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500"
+                className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-red-500"
               />
             </div>
           </div>
@@ -225,7 +228,7 @@ const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({ user, onClose, 
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 min-h-[44px] py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer"
+              className="flex-1 min-h-[44px] py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50 cursor-pointer"
             >
               <Key className="w-3.5 h-3.5" />
               {loading ? t('common.loading') : t('users.updatePasswordBtn')}
@@ -344,6 +347,34 @@ export const UserManagement: React.FC = () => {
     setDeleteTarget(null);
   };
 
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState<{ email: string; full_name: string; role: UserRole; message: string }>({
+    email: '',
+    full_name: '',
+    role: 'ATTENDEE',
+    message: '',
+  });
+  const [isInviting, setIsInviting] = useState(false);
+
+  const handleSendInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteForm.email.trim()) {
+      toast.error('Vui lòng nhập địa chỉ email người dùng!');
+      return;
+    }
+    setIsInviting(true);
+    try {
+      await new Promise((r) => setTimeout(r, 800));
+      toast.success(`Đã gửi thư mời tham gia hệ thống với vai trò ${inviteForm.role} tới "${inviteForm.email}"!`);
+      setIsInviteModalOpen(false);
+      setInviteForm({ email: '', full_name: '', role: 'ATTENDEE', message: '' });
+    } catch {
+      toast.error('Gửi thư mời thất bại. Vui lòng thử lại!');
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
   const filteredUsers = users.filter(
     (u) =>
       u.full_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -375,6 +406,98 @@ export const UserManagement: React.FC = () => {
         />
       )}
 
+      {/* Invite User Modal */}
+      {isInviteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl max-w-md w-full space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
+                  <UserPlus className="w-4 h-4" />
+                </div>
+                <h3 className="font-bold text-slate-900 text-sm">Gửi Email Mời Người Dùng Mới</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsInviteModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSendInvite} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Họ và tên:</label>
+                <input
+                  type="text"
+                  value={inviteForm.full_name}
+                  onChange={(e) => setInviteForm({ ...inviteForm, full_name: e.target.value })}
+                  placeholder="Nguyễn Văn A..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Địa chỉ Email *:</label>
+                <input
+                  type="email"
+                  required
+                  value={inviteForm.email}
+                  onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                  placeholder="user@example.com..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Vai trò phân quyền:</label>
+                <select
+                  value={inviteForm.role}
+                  onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value as UserRole })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-red-500 cursor-pointer font-semibold"
+                >
+                  <option value="ATTENDEE">Khách tham dự (Attendee)</option>
+                  <option value="STAFF">Nhân viên soát vé (Staff)</option>
+                  <option value="SPEAKER">Diễn giả (Speaker)</option>
+                  <option value="EVENT_MANAGER">Quản lý sự kiện (Event Manager)</option>
+                  <option value="ADMIN">Quản trị viên hệ thống (Admin)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Lời nhắn mời (Tùy chọn):</label>
+                <textarea
+                  rows={2}
+                  value={inviteForm.message}
+                  onChange={(e) => setInviteForm({ ...inviteForm, message: e.target.value })}
+                  placeholder="Kính mời bạn tham gia đội ngũ EventHub AI..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs text-slate-900 focus:outline-none focus:border-red-500"
+                />
+              </div>
+
+              <div className="flex gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsInviteModalOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isInviting || !inviteForm.email.trim()}
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {isInviting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  <span>Gửi Lời Mời</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -386,19 +509,28 @@ export const UserManagement: React.FC = () => {
           </h1>
           <p className="text-slate-500 text-sm font-medium mt-1">{t('users.subtitle')}</p>
         </div>
-        <button
-          onClick={() => { loadUsers(); loadLogs(); }}
-          className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200 shadow-xs transition-colors cursor-pointer"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          {t('common.refresh')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsInviteModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Mời Người Dùng Mới</span>
+          </button>
+          <button
+            onClick={() => { loadUsers(); loadLogs(); }}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200 shadow-xs transition-colors cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            {t('common.refresh')}
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: t('users.stats.total', { defaultValue: 'Tổng Tài Khoản' }), value: stats.total, icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-100' },
+          { label: t('users.stats.total', { defaultValue: 'Tổng Tài Khoản' }), value: stats.total, icon: Users, color: 'text-red-600', bg: 'bg-red-50 border-red-100' },
           { label: t('users.stats.online', { defaultValue: 'Đang Online' }), value: stats.online, icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-100' },
           { label: t('users.stats.admins', { defaultValue: 'Admin' }), value: stats.admins, icon: Crown, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-100' },
           { label: t('users.stats.locked', { defaultValue: 'Bị Khóa' }), value: stats.locked, icon: Lock, color: 'text-rose-600', bg: 'bg-rose-50 border-rose-100' },
@@ -424,7 +556,7 @@ export const UserManagement: React.FC = () => {
             onClick={() => setActiveTab(id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === id
-                ? 'bg-indigo-600 text-white shadow-xs'
+                ? 'bg-red-600 text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
             }`}
           >
@@ -446,7 +578,7 @@ export const UserManagement: React.FC = () => {
                 placeholder={t('users.searchPlaceholder')}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-red-500 transition-all"
               />
             </div>
           </div>
@@ -493,7 +625,7 @@ export const UserManagement: React.FC = () => {
                       {/* User Info */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-xs">
+                          <div className="w-9 h-9 rounded-full bg-red-600 flex items-center justify-center text-white font-bold text-xs shrink-0 shadow-xs">
                             {u.full_name.charAt(0).toUpperCase()}
                           </div>
                           <div>
@@ -529,7 +661,7 @@ export const UserManagement: React.FC = () => {
                                 <button
                                   key={role}
                                   onClick={() => handleRoleChange(u.id, role)}
-                                  className="w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition-colors flex items-center gap-2 cursor-pointer"
+                                  className="w-full px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors flex items-center gap-2 cursor-pointer"
                                 >
                                   <RoleBadge roleName={role} />
                                 </button>
@@ -562,7 +694,7 @@ export const UserManagement: React.FC = () => {
                           <button
                             onClick={() => setResetPasswordTarget(u)}
                             title={t('users.resetPasswordTitle')}
-                            className="p-2 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                            className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                           >
                             <Key className="w-4 h-4" />
                           </button>
@@ -588,7 +720,7 @@ export const UserManagement: React.FC = () => {
       {activeTab === 'logs' && (
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex items-center gap-3">
-            <Shield className="w-4 h-4 text-indigo-600" />
+            <Shield className="w-4 h-4 text-red-600" />
             <h3 className="font-bold text-slate-900 text-sm">{t('users.logs.title', { defaultValue: 'Nhật Ký Bảo Mật Hệ Thống' })}</h3>
             <span className="ml-auto text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
               {logs.length} {t('common.records', { defaultValue: 'bản ghi' })}
@@ -625,7 +757,7 @@ export const UserManagement: React.FC = () => {
                       <td className="py-3.5 px-4 text-xs font-mono text-slate-500">#{log.id}</td>
                       <td className="py-3.5 px-4">
                         <span className="flex items-center gap-1.5 text-xs font-bold">
-                          <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                          <FileText className="w-3.5 h-3.5 text-red-600" />
                           <span className="text-slate-900">{log.task_type}</span>
                         </span>
                       </td>

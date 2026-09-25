@@ -54,7 +54,7 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute
               allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'AUDITOR']}
-              onRedirect={() => navigate('/dashboard')}
+              redirectTo="/dashboard"
             >
               <Reports />
             </ProtectedRoute>
@@ -66,21 +66,21 @@ const AppRoutes: React.FC = () => {
           path="check-in"
           element={
             <ProtectedRoute
-              allowedRoles={['ADMIN', 'STAFF', 'EVENT_MANAGER']}
-              onRedirect={() => navigate('/dashboard')}
+              allowedRoles={['ADMIN', 'SUPER_ADMIN', 'STAFF', 'EVENT_MANAGER']}
+              redirectTo="/dashboard"
             >
               <QRScanner />
             </ProtectedRoute>
           }
         />
 
-        {/* AI Concierge / HITL Inquiries — Admin, Staff */}
+        {/* AI Concierge / HITL Inquiries — Admin, Staff, Event Manager */}
         <Route
           path="inquiries"
           element={
             <ProtectedRoute
-              allowedRoles={['ADMIN', 'STAFF']}
-              onRedirect={() => navigate('/dashboard')}
+              allowedRoles={['ADMIN', 'SUPER_ADMIN', 'STAFF', 'EVENT_MANAGER']}
+              redirectTo="/dashboard"
             >
               <AIConcierge />
             </ProtectedRoute>
@@ -92,8 +92,8 @@ const AppRoutes: React.FC = () => {
           path="content-studio"
           element={
             <ProtectedRoute
-              allowedRoles={['ADMIN', 'EVENT_MANAGER']}
-              onRedirect={() => navigate('/dashboard')}
+              allowedRoles={['ADMIN', 'SUPER_ADMIN', 'EVENT_MANAGER']}
+              redirectTo="/dashboard"
             >
               <AIPRStudio />
             </ProtectedRoute>
@@ -105,21 +105,21 @@ const AppRoutes: React.FC = () => {
           path="knowledge-base"
           element={
             <ProtectedRoute
-              allowedRoles={['ADMIN', 'EVENT_MANAGER']}
-              onRedirect={() => navigate('/dashboard')}
+              allowedRoles={['ADMIN', 'SUPER_ADMIN', 'EVENT_MANAGER']}
+              redirectTo="/dashboard"
             >
               <KnowledgeBase />
             </ProtectedRoute>
           }
         />
 
-        {/* Feedback Summary — Admin, Staff, Event Manager */}
+        {/* Feedback Summary — Admin, Staff, Event Manager, Speaker */}
         <Route
           path="feedback"
           element={
             <ProtectedRoute
-              allowedRoles={['ADMIN', 'STAFF', 'EVENT_MANAGER']}
-              onRedirect={() => navigate('/events')}
+              allowedRoles={['ADMIN', 'SUPER_ADMIN', 'STAFF', 'EVENT_MANAGER', 'SPEAKER']}
+              redirectTo="/events"
             >
               <FeedbackSummary />
             </ProtectedRoute>
@@ -129,8 +129,8 @@ const AppRoutes: React.FC = () => {
           path="feedback-summary"
           element={
             <ProtectedRoute
-              allowedRoles={['ADMIN', 'STAFF', 'EVENT_MANAGER']}
-              onRedirect={() => navigate('/events')}
+              allowedRoles={['ADMIN', 'SUPER_ADMIN', 'STAFF', 'EVENT_MANAGER', 'SPEAKER']}
+              redirectTo="/events"
             >
               <FeedbackSummary />
             </ProtectedRoute>
@@ -143,8 +143,8 @@ const AppRoutes: React.FC = () => {
           path="users"
           element={
             <ProtectedRoute
-              allowedRoles={['ADMIN']}
-              onRedirect={() => navigate('/dashboard')}
+              allowedRoles={['ADMIN', 'SUPER_ADMIN']}
+              redirectTo="/dashboard"
             >
               <UserManagement />
             </ProtectedRoute>
@@ -154,21 +154,21 @@ const AppRoutes: React.FC = () => {
           path="admin/users"
           element={
             <ProtectedRoute
-              allowedRoles={['ADMIN']}
-              onRedirect={() => navigate('/dashboard')}
+              allowedRoles={['ADMIN', 'SUPER_ADMIN']}
+              redirectTo="/dashboard"
             >
               <UserManagement />
             </ProtectedRoute>
           }
         />
 
-        {/* System & Security Logs — Admin, Staff, Event Manager */}
+        {/* System & Security Logs — Admin only (Hidden from EVENT_MANAGER, SPEAKER, ATTENDEE) */}
         <Route
           path="logs"
           element={
             <ProtectedRoute
-              allowedRoles={['ADMIN', 'STAFF', 'EVENT_MANAGER']}
-              onRedirect={() => navigate('/dashboard')}
+              allowedRoles={['ADMIN', 'SUPER_ADMIN', 'AUDITOR']}
+              redirectTo="/dashboard"
             >
               <SystemLogs />
             </ProtectedRoute>
@@ -180,8 +180,8 @@ const AppRoutes: React.FC = () => {
           path="speaker/dashboard"
           element={
             <ProtectedRoute
-              allowedRoles={['SPEAKER', 'ADMIN', 'EVENT_MANAGER']}
-              onRedirect={() => navigate('/events')}
+              allowedRoles={['SPEAKER', 'ADMIN', 'SUPER_ADMIN', 'EVENT_MANAGER']}
+              redirectTo="/events"
             >
               <SpeakerDashboard />
             </ProtectedRoute>
@@ -193,8 +193,8 @@ const AppRoutes: React.FC = () => {
           path="speaker/session/:sessionId"
           element={
             <ProtectedRoute
-              allowedRoles={['SPEAKER', 'ADMIN', 'EVENT_MANAGER']}
-              onRedirect={() => navigate('/events')}
+              allowedRoles={['SPEAKER', 'ADMIN', 'SUPER_ADMIN', 'EVENT_MANAGER']}
+              redirectTo="/events"
             >
               <SpeakerControlCenter />
             </ProtectedRoute>
@@ -205,7 +205,10 @@ const AppRoutes: React.FC = () => {
         <Route
           path="settings"
           element={
-            <ProtectedRoute onRedirect={() => navigate('/login')}>
+            <ProtectedRoute
+              allowedRoles={['ADMIN', 'SUPER_ADMIN', 'EVENT_MANAGER', 'SPEAKER', 'ATTENDEE', 'STAFF']}
+              redirectTo="/login"
+            >
               <Settings />
             </ProtectedRoute>
           }

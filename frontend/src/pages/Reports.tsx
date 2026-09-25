@@ -13,7 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import PermissionGuard from '../components/PermissionGuard';
 import { apiService as api } from '../services/api';
 
-const COLORS = ['#D7193F', '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B'];
+const COLORS = ['#DC2626', '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B'];
 const TABS = ['Tổng quan', 'Hiệu quả sự kiện', 'Người tham dự', 'Vé & QR', 'Diễn giả', 'Feedback', 'AI', 'Hệ thống'];
 
 export const Reports: React.FC = () => {
@@ -207,7 +207,7 @@ export const Reports: React.FC = () => {
           <PermissionGuard requirePermission="REPORT_EXPORT">
             <button
               onClick={() => setExportModalOpen(true)}
-              className="px-4 py-2 bg-[#D7193F] hover:bg-[#b01433] text-white rounded-xl text-[13px] font-bold shadow-[0_4px_12px_rgba(215,25,63,0.25)] transition-colors flex items-center gap-2 h-11"
+              className="px-4 py-2 bg-[#DC2626] hover:bg-[#b01433] text-white rounded-xl text-[13px] font-bold shadow-[0_4px_12px_rgba(215,25,63,0.25)] transition-colors flex items-center gap-2 h-11"
             >
               <Download className="w-4 h-4" />
               Xuất báo cáo
@@ -273,13 +273,13 @@ export const Reports: React.FC = () => {
               onClick={() => { setActiveTab(tab); setFilters({...filters, report_type: tab}); }}
               className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap transition-colors relative ${
                 activeTab === tab
-                  ? 'text-[#D7193F]'
+                  ? 'text-[#DC2626]'
                   : 'text-[#64748B] hover:text-[#12213A]'
               }`}
             >
               {tab}
               {activeTab === tab && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#D7193F] rounded-t-full" />
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#DC2626] rounded-t-full" />
               )}
             </button>
           ))}
@@ -288,7 +288,7 @@ export const Reports: React.FC = () => {
 
       {loading ? (
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="w-10 h-10 border-4 border-slate-100 border-t-[#D7193F] rounded-full animate-spin"></div>
+          <div className="w-10 h-10 border-4 border-slate-100 border-t-[#DC2626] rounded-full animate-spin"></div>
         </div>
       ) : activeTab === 'Tổng quan' ? (
         <>
@@ -342,7 +342,7 @@ export const Reports: React.FC = () => {
                       itemStyle={{ fontSize: '13px', fontWeight: 600 }}
                     />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 600, paddingTop: '20px' }} />
-                    <Line type="monotone" dataKey="registered" name="Đăng ký" stroke="#D7193F" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    <Line type="monotone" dataKey="registered" name="Đăng ký" stroke="#DC2626" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                     <Line type="monotone" dataKey="attended" name="Đã tham dự" stroke="#3B82F6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -485,7 +485,7 @@ export const Reports: React.FC = () => {
                 </div>
               ) : exporting ? (
                 <div className="flex flex-col items-center py-6 text-center">
-                  <div className="w-10 h-10 border-4 border-slate-100 border-t-[#D7193F] rounded-full animate-spin mb-4" />
+                  <div className="w-10 h-10 border-4 border-slate-100 border-t-[#DC2626] rounded-full animate-spin mb-4" />
                   <p className="text-[13px] font-bold text-[#12213A]">Đang tạo báo cáo...</p>
                 </div>
               ) : (
@@ -493,9 +493,9 @@ export const Reports: React.FC = () => {
                   <div>
                     <label className="block text-[12px] font-bold text-[#12213A] mb-2">Định dạng</label>
                     <div className="grid grid-cols-3 gap-3">
-                      <button onClick={() => handleExport('PDF')} className="border border-[#E5EAF2] text-[#64748B] hover:border-[#D7193F] hover:text-[#D7193F] font-bold text-[13px] py-2 rounded-xl">PDF</button>
-                      <button onClick={() => handleExport('CSV')} className="border-2 border-[#D7193F] bg-red-50 text-[#D7193F] font-bold text-[13px] py-2 rounded-xl">CSV</button>
-                      <button onClick={() => handleExport('EXCEL')} className="border border-[#E5EAF2] text-[#64748B] hover:border-[#D7193F] hover:text-[#D7193F] font-bold text-[13px] py-2 rounded-xl">Excel</button>
+                      <button onClick={() => handleExport('PDF')} className="border border-[#E5EAF2] text-[#64748B] hover:border-[#DC2626] hover:text-[#DC2626] font-bold text-[13px] py-2 rounded-xl">PDF</button>
+                      <button onClick={() => handleExport('CSV')} className="border-2 border-[#DC2626] bg-red-50 text-[#DC2626] font-bold text-[13px] py-2 rounded-xl">CSV</button>
+                      <button onClick={() => handleExport('EXCEL')} className="border border-[#E5EAF2] text-[#64748B] hover:border-[#DC2626] hover:text-[#DC2626] font-bold text-[13px] py-2 rounded-xl">Excel</button>
                     </div>
                   </div>
                 </div>
@@ -540,7 +540,7 @@ export const Reports: React.FC = () => {
             </div>
             <div className="px-6 py-4 bg-[#F6F8FC] border-t border-[#E5EAF2] flex justify-end gap-3">
               <button onClick={() => setShareModalOpen(false)} className="px-5 py-2 text-[13px] font-bold text-[#64748B]">Hủy</button>
-              <button onClick={() => { setShareModalOpen(false); showToast('Đã chia sẻ báo cáo thành công.'); }} className="px-5 py-2 bg-[#D7193F] text-white rounded-xl text-[13px] font-bold">Chia sẻ</button>
+              <button onClick={() => { setShareModalOpen(false); showToast('Đã chia sẻ báo cáo thành công.'); }} className="px-5 py-2 bg-[#DC2626] text-white rounded-xl text-[13px] font-bold">Chia sẻ</button>
             </div>
           </div>
         </div>
@@ -572,7 +572,7 @@ export const Reports: React.FC = () => {
             </div>
             <div className="px-6 py-4 bg-[#F6F8FC] border-t flex justify-end gap-3">
               <button onClick={() => setScheduleModalOpen(false)} className="px-5 py-2 text-[13px] font-bold">Hủy</button>
-              <button onClick={() => { setScheduleModalOpen(false); showToast('Lịch báo cáo đã được tạo.'); }} className="px-5 py-2 bg-[#D7193F] text-white rounded-xl text-[13px] font-bold">Lưu lịch</button>
+              <button onClick={() => { setScheduleModalOpen(false); showToast('Lịch báo cáo đã được tạo.'); }} className="px-5 py-2 bg-[#DC2626] text-white rounded-xl text-[13px] font-bold">Lưu lịch</button>
             </div>
           </div>
         </div>

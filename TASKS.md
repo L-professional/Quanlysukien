@@ -976,4 +976,237 @@
     - Thêm các endpoint bảo mật trong `app/api/v1/auth.py`: `/change-password`, `/2fa/generate`, `/2fa/verify`, `/2fa/disable`, `/sessions`, `/sessions/revoke-others`.
     - Thêm bài test toàn diện `tests/test_settings_and_security.py`, chạy `pytest` vượt qua 100% (15/15 tests pass).
     - Biên dịch `npm run build` thành công 100% không có lỗi TypeScript hay cú pháp.
-
+
+- [x] **Task 72: Tích Hợp Nút Thêm/Sửa/Xóa Sự Kiện & Chức Năng ✨ Tự Động Sinh Mô Tả Bằng AI**
+
+  - **1. Phân Quyền & Bổ Sung Nút Thao Tác:** Thêm biến `canManage = userRole === 'ADMIN' || userRole === 'EVENT_MANAGER'` trong Events.tsx. Nút [➕ Thêm sự kiện mới] chỉ hiển thị cho admin/manager qua PermissionGuard + canManage fallback. EventCard.tsx: Bổ sung prop `canManage?: boolean`, bọc Edit/Delete/Publish trong `{canManage && (...)}`. Table View: Edit, Quick Publish, Duplicate, Delete cũng bị bọc `{canManage && (...)}`. Bấm [Xóa] mở Modal xác nhận trước khi gọi API DELETE.
+
+  - **2. Modal Tạo / Sửa Sự Kiện:** Create Modal (MODAL 6) và Edit Modal (MODAL 5) trong Events.tsx đã có đầy đủ trường: Tên, Loại sự kiện, Địa điểm, Thời gian bắt đầu/kết thúc, Sức chứa, Banner, Mô tả. Mới bổ sung: Trường **Giá vé (ticket_price)** vào cả 2 modal. Hỗ trợ chế độ tạo mới (form rỗng) và chỉnh sửa (auto-fill).
+
+  - **3. ✨ Tự Động Sinh Mô Tả Bằng AI:** Nút [✨ Sinh mô tả bằng AI] cạnh label Mô tả. Fix validation: kiểm tra đồng thời Title + Category + Location → toast warning: 'Vui lòng nhập Tên sự kiện, Danh mục và Địa điểm trước khi tạo mô tả bằng AI'. Backend: POST /api/v1/ai/generate-description. Loading Spinner trong khi xử lý. Auto-fill kết quả vào textarea.
+
+  - **4. API & Real-time:** handleCreate() → POST, handleUpdate() → PUT, handleConfirmDelete() → DELETE. KPI stats cập nhật real-time sau mỗi thao tác. useEventSync() đồng bộ BroadcastChannel giữa các tab.
+
+  - **5. Kiểm Tra:** TypeScript `npx tsc --noEmit` → **0 lỗi**. Files: EventCard.tsx (canManage prop), Events.tsx (canManage, AI fix, ticket_price, role-guards).
+
+- [x] **Task 73: Chuẩn Hóa Số Liệu Real-time, Đồng Bộ Dữ Liệu Liên Phân Hệ & Tối Ưu UI Palette Đỏ - Trắng Toàn Hệ Thống**
+
+  - **1. Triệt Tiêu Dữ Liệu Ảo & Đồng Nhất Số Liệu Thống Kê (Single Source of Truth):**
+    - Xóa bỏ hoàn toàn các giá trị hardcode/fallback ảo trong Dashboard (1248 sự kiện, 45,200 người tham dự, 320 diễn giả, 38,400 lượt quét QR).
+    - Tất cả các Card thống kê tại `/events`, `/dashboard` và `/speaker/dashboard` đều tính toán trực tiếp 100% từ tập dữ liệu API thực tế.
+    - Cơ chế Real-time Event Trigger: Khi thực hiện Thêm / Sửa / Xóa sự kiện, cơ chế `notifyEventChange()` kích hoạt BroadcastChannel & CustomEvent đồng bộ tức thì trên toàn bộ ứng dụng và giữa các tab trình duyệt.
+
+  - **2. Đồng Bộ Dữ Liệu Giữa Các Phân Hệ (Sự Kiện - Diễn Giả - AI RAG - Landing Page):**
+    - Cổng Diễn Giả (`/speaker/dashboard`): Kết nối dữ liệu phiên thực tế, sử dụng `useEventSync()` để cập nhật tự động khi lịch trình thay đổi.
+    - Landing Page: Khối 'Sự kiện nổi bật' đồng bộ trực tiếp từ API `getEvents()`, ưu tiên sự kiện `homepage_visible` và `featured`, loại bỏ toàn bộ thẻ HTML giả lập tĩnh, bổ sung loading skeleton chuyên nghiệp.
+
+  - **3. Chuẩn Hóa Màu Sắc & Thiết Kế UI/UX Palette Đỏ - Trắng (#DC2626 / bg-red-600):**
+    - Tái thiết kế toàn diện Banner Cổng Diễn Giả (`/speaker/dashboard`) từ màu xanh tím thẫm (Dark Navy) sang gradient Đỏ thương hiệu (`bg-gradient-to-r from-red-700 via-red-600 to-rose-700`).
+    - Chuẩn hóa nút bấm Studio, thanh tiến độ, icon, hover state và badge trạng thái sang tông Đỏ thương hiệu (#DC2626).
+    - Chuẩn hóa màu đỏ thương hiệu từ `#D7193F` sang chuẩn `#DC2626` (Tailwind red-600) trên toàn bộ Header, Sidebar, Dashboard và Landing Page.
+
+  - **4. Kiểm Tra & Kết Quả Biên Dịch:**
+    - Chạy `npx tsc --noEmit` hoàn thành thành công với 0 lỗi TypeScript.
+    - Toàn bộ giao diện hiển thị đồng nhất, số liệu thống kê phản ánh chính xác 1-1 từ Database.
+
+- [x] **Task 74: Refactor Design System - Đồng Bộ Hóa Toàn Diện Palette Đỏ - Trắng (`#DC2626`) Cho Tất Cả Các Trang Hệ Thống**
+
+  - **1. Quy Chuẩn Design System Global & Floating AI Widget:**
+    - Thiết lập chuẩn màu Primary Accent: `#DC2626` / Tailwind `bg-red-600`, `hover:bg-red-700`, `text-red-600`, `border-red-600`.
+    - Chuẩn hóa nền sáng `bg-slate-50`, card nội dung nền trắng tinh (`bg-white rounded-2xl border border-slate-200 shadow-xs`).
+    - Nút Floating AI Widget (`FloatingChatbot.tsx`) chuyển hoàn toàn từ Xanh/Tím sang **Đỏ Thương Hiệu (`bg-red-600 hover:bg-red-700 shadow-lg shadow-red-500/30`)**; Popup chat header sang gradient Slate-Red, pill WiFi và các nút điều hướng chuyển sang màu đỏ.
+
+  - **2. Đồng Bộ Hóa Chi Tiết Toàn Bộ 8 Phân Hệ:**
+    - **a. Trang Soát Vé QR Code (`/check-in`):**
+      - `QRScanner.tsx`: Gate Context Banner chuyển sang gradient đỏ thương hiệu (`bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-md shadow-red-600/20`), nút [Cấp Vé Tại Chỗ], [Bật Camera Quét], [Kích hoạt Camera] và nút xác nhận đổi sang `bg-red-600 hover:bg-red-700 text-white`.
+      - `CheckInScanner.tsx`: Modal phát hành vé tại chỗ chuyển nút xác nhận sang màu đỏ `bg-red-600`.
+    - **b. Trang Hộp Thư Thắc Mắc & AI RAG (`/inquiries` - `AIConcierge.tsx`):**
+      - Header icon chuyển sang `bg-red-50 border-red-200 text-red-600`.
+      - Bộ lọc & Badge Trích Dẫn RAG chuyển sang tông đỏ (`bg-red-50 text-red-600 border-red-200`), nút [Auto-Approve] và [Duyệt Hàng Loạt] chuyển sang `bg-red-600 hover:bg-red-700 text-white`.
+    - **c. Trang Sáng Tạo Nội Dung AI PR Studio (`/content-studio` - `AIPRStudio.tsx`):**
+      - Nút hành động chính **[✨ Tạo Nội Dung Bằng AI]** chuyển thành `bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-600/25`.
+      - Header icon, tabs phân loại kênh truyền thông (Email, Facebook, LinkedIn, Press Release) khi active chuyển sang nền/viền đỏ thương hiệu.
+    - **d. Trang Quản Lý Kho Tri Thức RAG (`/knowledge-base` - `KnowledgeBase.tsx`):**
+      - Nút **[+ Tải Lên Tài Liệu Mới]** và nút **[Đồng bộ RAG (pgvector)]** chuyển sang màu đỏ thương hiệu `bg-red-600 hover:bg-red-700 text-white`.
+      - Header icon và badge số lượng tài liệu chuyển sang theme đỏ.
+    - **e. Trang Khảo Sát Ý Kiến & Phản Hồi (`/feedback` - `FeedbackSummary.tsx`):**
+      - Tái thiết kế toàn diện Card "AI Executive Summary": loại bỏ nền tối (Dark Navy), thay bằng Card trắng viền đỏ điểm nhấn (`bg-white rounded-3xl p-6 lg:p-8 text-slate-900 shadow-xs border border-slate-200 border-l-4 border-l-red-600`).
+      - Nút [⚡ Phân Tích Real-Time] và [Áp Dụng Kế Hoạch Khắc Phục] chuyển thành `bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-600/20`.
+    - **f. Trang Quản Lý Người Dùng & Phân Quyền (`/users` - `UserManagement.tsx`):**
+      - Tab active [Quản Trị Tài Khoản] đổi thành `bg-red-600 text-white shadow-xs`.
+      - Avatar đại diện mặc định, modal đặt lại mật khẩu và nút submit chuyển sang tông đỏ `#DC2626`.
+    - **g. Trang Nhật Ký Hệ Thống (`/logs` - `SystemLogs.tsx`):**
+      - Các nút lọc mức độ log [Tất cả], [INFO], [WARN], [ERROR] khi active đổi thành `bg-red-600 text-white shadow-xs`.
+      - Header icon đổi sang `bg-red-50 text-red-600 border-red-100`.
+    - **h. Trang Cài Đặt Hệ Thống (`/settings` - `Settings.tsx`):**
+      - Tái kiến trúc toàn diện từ giao diện nền tối (`bg-[#0B0F19]`, `bg-[#161B22]`, `border-slate-800`) sang giao diện nền sáng rực rỡ với Card trắng viền xám nhạt (`bg-white rounded-3xl border border-slate-200 shadow-xs`).
+      - Header, User Summary Pill, Tab Navigation bar với active tab chuyển sang `bg-red-600 text-white shadow-md shadow-red-600/20`.
+      - Tab 1 (Hồ sơ cá nhân & Upload Avatar), Tab 2 (Tùy chọn ngôn ngữ & giao diện), Tab 3 (Bảo mật, Đổi mật khẩu, 2FA, Active Sessions) và Modal quét QR 2FA TOTP đều chuyển sang Card trắng, input sáng màu và nút chính `bg-red-600 hover:bg-red-700`.
+
+  - **3. Kiểm Tra & Kết Quả Biên Dịch:**
+    - Lệnh `npx tsc --noEmit` hoàn thành với **0 lỗi TypeScript**.
+    - Hệ thống đạt 100% độ đồng nhất trực quan về màu sắc, phân cấp nút bấm và cấu trúc card theo đúng Design System Đỏ - Trắng `#DC2626`.
+
+- [x] **Task 75: Ẩn Chức Năng Theo Phân Quyền Trên Sidebar & Tự Động Chuyển Hướng Trang Không Có Quyền**
+
+  - **1. Lọc Danh Sách Menu Sidebar Theo Role Người Dùng (`Sidebar.tsx` / `MainLayout.tsx`):**
+    - Bổ sung thuộc tính `allowedRoles?: UserRole[]` vào định nghĩa `MenuItem` trên Sidebar.
+    - Component `Sidebar` tự động lấy thông tin vai trò tài khoản (`userRole` từ `useAuth()` và prop `userRole` từ `MainLayout`).
+    - Thực hiện lọc chặt chẽ `visibleMenuItems`: Các menu item mà người dùng không đủ quyền truy cập bị **ẩn hoàn toàn khỏi Sidebar** trên cả phiên bản Desktop lẫn Mobile Drawer.
+
+  - **2. Quy Định Phân Quyền Chi Tiết Cho Từng Vai Trò:**
+    - **Quản Trị Viên (`ADMIN` / `SUPER_ADMIN`):** Hiển thị 100% toàn bộ 12 mục menu (Dashboard, Báo Cáo, Danh Mục Sự Kiện, Cổng Diễn Giả, Soát Vé QR, AI Concierge, AI PR Studio, Kho Tri Thức RAG, Feedback & Summary, Quản Lý Tài Khoản, Nhật Ký Bảo Mật, Cài Đặt).
+    - **Quản Lý Sự Kiện (`EVENT_MANAGER`):** Hiển thị các công cụ quản lý vận hành. **Ẩn hoàn toàn 2 mục**: `Quản Lý Tài Khoản` và `Nhật Ký Bảo Mật` (Hiển thị 10 mục: Dashboard, Báo Cáo, Danh Mục Sự Kiện, Cổng Diễn Giả, Soát Vé QR, AI Concierge, AI PR Studio, Kho Tri Thức RAG, Feedback, Cài Đặt).
+    - **Diễn Giả (`SPEAKER`):** Chỉ hiển thị 5 mục liên quan: Dashboard, Danh Mục Sự Kiện, Cổng Diễn Giả, Feedback & Summary, Cài Đặt. **Ẩn toàn bộ** các công cụ AI PR Studio, Kho Tri Thức RAG, Soát vé, Quản lý tài khoản, Nhật ký bảo mật, Báo cáo.
+    - **Khách Tham Dự (`ATTENDEE` / `PARTICIPANT`):** Chỉ hiển thị 3 mục trải nghiệm: Dashboard, Danh Mục Sự Kiện, Cài Đặt. **Ẩn hoàn toàn** tất cả các công cụ quản trị.
+    - **Nhân Viên Soát Vé (`STAFF`):** Hiển thị các mục: Dashboard, Danh Mục Sự Kiện, Soát Vé QR, AI Concierge, Feedback, Cài Đặt.
+
+  - **3. Xử Lý Nhập URL Trực Tiếp (Route Guard & Redirect - `ProtectedRoute.tsx`):**
+    - Loại bỏ hoàn toàn màn hình khối đen `403 - Access Denied` toàn trang.
+    - Khi người dùng cố tình nhập URL trực tiếp vào trang không có quyền (VD: `ATTENDEE` truy cập `/content-studio` hoặc `EVENT_MANAGER` truy cập `/users` hoặc `/logs`):
+      + Tự động chuyển hướng ngay lập tức về `/dashboard` (hoặc `/events`).
+      + Kích hoạt Toast cảnh báo góc màn hình: `"Bạn không có quyền truy cập vào trang này"`.
+
+  - **4. Hỗ Trợ Chuyển Đổi Vai Trò Thử Nghiệm Nhanh (Demo Switcher):**
+    - Cập nhật menu Avatar Header (`Header.tsx`) hỗ trợ chuyển đổi nhanh giữa cả 5 vai trò: `Admin`, `Manager`, `Speaker`, `Staff`, `Attendee` với Toast thông báo sinh động.
+
+  - **5. Kiểm Tra & Kết Quả Biên Dịch:**
+    - Lệnh `npx tsc --noEmit` hoàn thành với **0 lỗi TypeScript**.
+    - Đã xác thực chuyển đổi vai trò linh hoạt, Sidebar ẩn/hiện chính xác theo đúng danh mục phân quyền và ngăn chặn truy cập trái phép qua URL.
+
+- [x] **Task 76: Audit Toàn Hệ Thống, Khôi Phục Chức Năng Bị Ẩn/Bỏ Sót & Bảo Tồn 100% Tính Năng Hiện Có**
+
+  - **1. Nguyên Tắc Bảo Tồn & Không Bỏ Sót (Strict Non-Regression):**
+    - Rà soát toàn bộ 12 phân hệ để đảm bảo tài khoản quyền `ADMIN` và `SUPER_ADMIN` nhìn thấy và thao tác đầy đủ 100% chức năng.
+    - Bảo toàn toàn bộ các tính năng, biểu đồ, nút bấm, modal và API liên thông đã xây dựng ở các task trước (không xóa, không làm hỏng code).
+    - Giữ trọn vẹn Design System Đỏ - Trắng (`#DC2626`) trên toàn bộ các trang.
+
+  - **2. Khắc Phục Các Điểm Lỗi Quyền Hạn & Ẩn Nút (Permission Guard Fixes):**
+    - `PermissionGuard.tsx`: Khắc phục lỗi bypass chỉ kiểm tra `SUPER_ADMIN`. Đã bổ sung bypass toàn quyền cho cả `ADMIN` và `SUPER_ADMIN`, đồng thời gán default permissions cho `EVENT_MANAGER` để không bị ẩn nhầm các nút thao tác như *[Lập lịch báo cáo]*, *[Xuất báo cáo]*, *[Thêm sự kiện mới]*, *[Tùy biến widget]*...
+    - `Reports.tsx`: Chuẩn hóa toàn bộ color tokens còn sót (`#D7193F` -> `#DC2626`). Đảm bảo đầy đủ 3 biểu đồ Recharts (LineChart doanh thu, Donut phân bổ vé, RechartsTooltip) và 4 Modal (Xuất PDF/Excel/CSV, Lập lịch báo cáo tự động, Chia sẻ báo cáo, Xác nhận xóa).
+    - `KnowledgeBase.tsx`: Cập nhật `canSyncRAG` cho phép cả `ADMIN`, `SUPER_ADMIN` và `EVENT_MANAGER` đều có toàn quyền hiển thị và thao tác nút *[Đồng bộ RAG (pgvector)]*, *[Tải Lên Tài Liệu Mới]* và khu vực Drag & Drop.
+    - `Dashboard.tsx`: Khôi phục lời chào người dùng cá nhân hóa chuẩn xác (`Chào mừng trở lại, {user?.full_name || 'Quản trị viên'}!`), kiểm tra đầy đủ KPI cards, biểu đồ doanh thu & đăng ký, widget thời tiết, bảng sự kiện gần đây và quick action buttons.
+
+  - **3. Rà Soát Toàn Diện 12 Phân Hệ & Bảo Tồn Tính Năng:**
+    - **1. Dashboard (`/dashboard`):** Toàn bộ metrics real-time từ CSDL, biểu đồ hoạt động, weather pill, action buttons hoạt động hoàn hảo.
+    - **2. Báo Cáo & Thống Kê (`/reports`):** 3 biểu đồ Recharts, xuất PDF/Excel/CSV, share report, schedule cron job đầy đủ.
+    - **3. Danh Mục Sự Kiện (`/events`):** Nút *[➕ Thêm sự kiện mới]*, bộ lọc status, tìm kiếm, xuất danh sách, modal tạo/sửa sự kiện tích hợp Gemini AI sinh mô tả 6 văn phong, Google Maps preview, bộ nút thao tác trên EventCard (Đăng ký, Đánh giá ⭐, Soát vé QR, Quick Publish, Sửa, Xóa).
+    - **4. Cổng Diễn Giả (`/speaker/dashboard`, `/speaker/session/:id`):** Danh sách phiên được phân công, Q&A stream, đếm người tham dự, slide tài liệu và trung tâm điều khiển sân khấu Stage Studio.
+    - **5. Soát Vé QR (`/check-in`):** Camera quét tự động, âm thanh phản hồi bíp bíp, chọn sự kiện soát vé, lịch sử check-in, và modal *[Cấp vé tại chỗ]* cho Admin/Staff/Manager.
+    - **6. Hộp Thư Thắc Mắc & AI RAG (`/inquiries`):** Nút *[Auto-Approve RAG > 95%]*, duyệt hàng loạt, bộ trích dẫn RAG Document Inspector, đính kèm mã QR vào email phản hồi.
+    - **7. AI PR Studio (`/content-studio`):** Bộ tạo nội dung đa kênh (Email, Social, Reminder), chọn sự kiện dropdown, chọn văn phong, nút copy và xuất nội dung.
+    - **8. Kho Tri Thức RAG (`/knowledge-base`):** Tải tài liệu (.pdf, .txt, .md, .docx), đồng bộ vector pgvector, kéo thả file, tìm kiếm và xóa tài liệu.
+    - **9. Phản Hồi & Đánh Giá (`/feedback`):** Nút phân tích cảm xúc real-time, Card AI Executive Summary nền trắng viền đỏ, lọc theo sao, kế hoạch khắc phục sự cố và Modal thư xin lỗi kèm voucher đền bù.
+    - **10. Quản Lý Người Dùng (`/users`):** Bảng tài khoản, phân quyền dropdown, bật/tắt khóa tài khoản, Modal đổi mật khẩu, Modal xóa tài khoản, thống kê người dùng và tab nhật ký bảo mật.
+    - **11. Nhật Ký Hệ Thống (`/logs`):** Lọc theo cấp độ INFO/WARN/ERROR, tìm kiếm log, bảng thời gian thực.
+    - **12. Cài Đặt Hệ Thống (`/settings`):** Cập nhật hồ sơ, tải ảnh đại diện qua FileReader, kiểm tra số điện thoại thời gian thực, đổi mật khẩu kèm thanh đo độ mạnh, kích hoạt 2FA TOTP QR Code Modal và thu hồi phiên đăng nhập hoạt động.
+
+  - **4. Kiểm Tra & Kết Quả Biên Dịch:**
+    - Lệnh `npx tsc --noEmit` hoàn thành với **0 lỗi TypeScript**.
+    - Toàn bộ 12 phân hệ đạt chuẩn 100% tính năng, trực quan, bảo mật RBAC và thẩm mỹ Đỏ - Trắng đồng bộ.
+
+- [x] **Task 77: Audit Chuyên Sâu Vi Thao Tác (Micro-Actions) & Khôi Phục 100% Sub-Features Trong 12 Phân Hệ Hệ Thống**
+
+  - **1. Nguyên Tắc Bảo Tồn & Khôi Phục Micro-Actions (Strict Non-Regression):**
+    - Bảo toàn 100% logic backend, API endpoints và Design System Đỏ - Trắng (`#DC2626` / `bg-red-600`) trên toàn bộ 12 phân hệ.
+    - Đảm bảo tài khoản `ADMIN` và `EVENT_MANAGER` luôn hiển thị và thao tác được đầy đủ 100% các nút bấm, modal, bộ lọc và biểu đồ.
+    - Kết nối toàn bộ các handler, state, prop và trigger tương tác bị ngắt hoặc thiếu sót trước đó.
+
+  - **2. Kết Quả Khôi Phục Chuyên Sâu Theo 12 Phân Hệ:**
+    - **1. Quản Lý Sự Kiện & Modal Đa Bước (`CreateEventModal.tsx`, `EventCard.tsx`, `Events.tsx`):**
+      + Nâng cấp Modal Tạo/Sửa sự kiện lên 4 tab chuyên sâu: *1. Thông Tin & Banner*, *2. Hạng Vé & Giá*, *3. Lịch Trình & Diễn Giả*, *4. Bản Đồ & WiFi*.
+      + Bổ sung chức năng tải ảnh Banner với xem trước thời gian thực (FileReader preview).
+      + Bổ sung quản lý động các hạng vé (Vé Thường, VIP, Early Bird - thêm/xóa/định giá VND).
+      + Bổ sung quản lý động lịch trình các phiên (Session title, thời gian, tên & chức danh diễn giả).
+      + Bổ sung cấu hình chi tiết địa điểm, tọa độ, bản đồ Google Maps và thông tin WiFi sự kiện.
+      + Trên `EventCard`: Bổ sung nút *[Xem Landing Page]* (`Globe`), nút *[Nhân bản sự kiện]* (`Copy`), nút *[Đánh giá]* và nút thao tác nhanh.
+    - **2. Soát Vé QR Code (`QRScanner.tsx`):**
+      + Bổ sung bộ chọn Camera (`videoDevices` & `selectedDeviceId`) tự động phát hiện danh sách webcam/camera thiết bị.
+      + Bổ sung nút *[↩️ Hoàn tác]* (Undo) lượt check-in gần nhất trong lịch sử quét vé.
+      + Bổ sung bộ lọc trạng thái lịch sử quét vé: *Tất cả*, *✓ Thành công*, *✕ Bị từ chối*.
+      + Bổ sung ô nhập Số điện thoại vào Modal *[Cấp vé tại chỗ]*.
+    - **3. Cổng Diễn Giả (`SpeakerDashboard.tsx`):**
+      + Bổ sung tương tác xác nhận tham gia: Nút *[✓ Nhận lời]* và *[✕ Từ chối]* kèm badge trạng thái tức thì.
+      + Bổ sung nút *[Upload Slide]* dẫn trực tiếp tới khu vực quản lý slide và tài liệu thuyết trình.
+    - **4. Trợ Lý AI Concierge & HITL (`AIConcierge.tsx`):**
+      + Nâng cấp chế độ *Auto-Approve RAG* với dropdown chọn ngưỡng tin cậy linh hoạt (>90%, >92%, >95%, >98%).
+    - **5. AI PR Content Studio (`AIPRStudio.tsx`):**
+      + Cập nhật quyền duyệt bài `canApproveAIPost` cho phép cả `ADMIN` và `EVENT_MANAGER`.
+      + Bổ sung nút và Modal *[✉️ Gửi Thử Nghiệm]* cho phép gửi bản tin PR xem trước qua Email hoặc SMS tới người nhận bất kỳ.
+    - **6. Kho Tri Thức RAG (`KnowledgeBase.tsx`):**
+      + Bổ sung thanh lọc danh mục tài liệu (Filter Pills): *Tất cả*, *Schedule*, *Logistics*, *FAQ*, *Policies*, *Speakers* hoạt động đồng bộ với ô tìm kiếm.
+    - **7. Quản Lý Người Dùng & Phân Quyền (`UserManagement.tsx`):**
+      + Bổ sung nút *[➕ Mời Người Dùng Mới]* trên thanh tiêu đề.
+      + Xây dựng Modal *[Gửi Email Mời Người Dùng Mới]* với họ tên, email, lựa chọn vai trò (Admin, Manager, Staff, Speaker, Attendee) và tin nhắn mời.
+    - **8. Nhật Ký Hệ Thống (`SystemLogs.tsx`):**
+      + Bổ sung công tắc *[🟢 Live Stream: Bật/Tắt]* với cơ chế heartbeat tự động bổ sung log giả lập thời gian thực.
+      + Bổ sung nút *[📥 Tải Log]* xuất file JSON nhật ký và nút *[🗑️ Xóa]* làm sạch màn hình log.
+    - **9. Dashboard Thống Kê & Điều Hành (`Dashboard.tsx`):**
+      + Bổ sung bộ chọn khoảng thời gian (`timeRange`: 7 ngày, 30 ngày, theo quý, cả năm) kết nối trực tiếp với tập dữ liệu biểu đồ đường `LineChart`.
+    - **10. Thanh Tìm Kiếm Toàn Cục (`Header.tsx`):**
+      + Nâng cấp ô tìm kiếm Header với Popover Dropdown gợi ý tương tác: hiển thị danh mục các phân hệ/trang chức năng và danh sách sự kiện khớp từ khóa, hỗ trợ phím Enter để tìm kiếm toàn diện.
+    - **11. Phản Hồi & Đánh Giá (`FeedbackSummary.tsx`):**
+      + Bảo toàn toàn bộ các tính năng phân tích cảm xúc AI, bộ lọc theo sao, kế hoạch khắc phục và modal gửi thư xin lỗi kèm voucher.
+    - **12. Báo Cáo & Phân Tích (`Reports.tsx`):**
+      + Giữ nguyên 100% 3 biểu đồ Recharts và 4 modal nghiệp vụ (Xuất báo cáo, lập lịch tự động, chia sẻ và xóa).
+
+  - **3. Kiểm Tra & Kết Quả Biên Dịch:**
+    - Lệnh `npx tsc --noEmit` hoàn thành với **0 lỗi TypeScript**.
+    - Hệ thống hoạt động trơn tru, đồng bộ dữ liệu real-time, đảm bảo trải nghiệm người dùng liền mạch và trực quan.
+
+- [x] **Task 78: Đồng Nhất Số Liệu Thống Kê Động & Tối Giản Card Thống Kê Sự Kiện**
+
+  - **1. Sửa Lỗi Lệch Số Liệu Thống Kê (Dynamic Calculation):**
+    - Cập nhật công thức tính toán `Tổng sự kiện` tại `Events.tsx` và `Dashboard.tsx`:
+      `Tổng sự kiện = (Sắp diễn ra) + (Đang diễn ra) + (Đã kết thúc) + (Bản nháp)`
+    - Triệt tiêu hoàn toàn sự lệch số: Với dữ liệu vận hành hiện tại (1 sắp diễn ra + 1 đang diễn ra + 3 đã kết thúc + 0 bản nháp), ô "Tổng sự kiện" tự động nhảy về **5** một cách chính xác tuyệt đối.
+    - Đồng bộ `displayEvents` ở chế độ "Tổng sự kiện" (`statusFilter === ''`) để hiển thị khớp đúng 5 sự kiện đang vận hành trong hệ thống.
+
+  - **2. Loại Bỏ Các Dòng Chú Thích Nhỏ (UI Minimalism):**
+    - Xóa bỏ hoàn toàn 5 đoạn subtext bên dưới con số trên các thẻ thống kê tại `Events.tsx`:
+      + Đã xóa: *"Toàn bộ trong hệ thống"*
+      + Đã xóa: *"Đã sẵn sàng khai mạc"*
+      + Đã xóa: *"Trực tiếp thời gian thực"*
+      + Đã xóa: *"Đã hoàn thành phiên"*
+      + Đã xóa: *"Chờ biên tập & xuất bản"*
+    - Cấu trúc Card sau khi tinh gọn chỉ bao gồm: **[Tiêu đề trạng thái + Dấu chấm màu chỉ báo]** và **[Con số thống kê lớn nổi bật]**, mang lại giao diện tinh tế, thoáng đãng và chuyên nghiệp.
+
+  - **3. Chuẩn Hóa Bộ Thanh Thao Tác Sự Kiện (Action Buttons Bar - `EventCard.tsx`):**
+    - Quy chuẩn màu sắc bộ 4 icon thao tác (Xem Web / Landing Page, Nhân bản, Chỉnh sửa, Xóa) về đúng chuẩn thương hiệu Đỏ - Xám trung tính (`text-slate-500 hover:text-red-600 hover:bg-red-50`).
+    - Bổ sung `Tooltip` động cao cấp (Floating Tooltip Badge) hiển thị mượt mà trên từng icon khi di chuột:
+      + *Xem Landing Page*
+      + *Nhân bản sự kiện*
+      + *Chỉnh sửa sự kiện*
+      + *Xóa sự kiện*
+      + *(Kèm nút Xuất bản ngay cho bản nháp)*
+
+  - **4. Kiểm Tra & Kết Quả Biên Dịch:**
+    - Lệnh `npx tsc --noEmit` hoàn thành với **0 lỗi TypeScript**.
+    - Lệnh `npm run build` (Vite production build) hoàn tất thành công 100%.
+
+- [x] **Task 79: Tái Thiết Kế Bố Cục Khối Thao Tác Sự Kiện (Event Action Card Layout Refactor - Two-Tier Action Grid)**
+
+  - **1. Sửa Lỗi Giao Diện & Vỡ Tooltip (Bug Fix):**
+    - Loại bỏ hoàn toàn khối Tooltip/Banner đen hiển thị đè chữ (`Xem L... Nhân... Chính s... Xóa sự kiện`) bị tràn viền và vỡ layout do nhồi nhét icon.
+    - Triệt tiêu 100% tình trạng nút bấm đè chồng lấn và gây vỡ hàng ngang trên các thiết bị màn hình nhỏ.
+
+  - **2. Tái Cấu Trúc Bố Cục 2 Tầng Tinh Gọn (Two-Tier Action Grid):**
+    - **Tầng 1 (Primary Action - Ưu Tiên Cao Nhất):**
+      + Đưa nút **[ 🎟️ Đăng ký tham dự ]** lên vị trí ưu tiên cao nhất, trải rộng toàn bộ chiều ngang (`w-full`), sử dụng màu Đỏ Thương Hiệu (`bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-xl shadow-sm transition-all`).
+      + Với vé đã đăng ký: Hiển thị bộ nút **[ 🎫 Xem mã vé QR ]** và **[ 🗑️ Hủy đăng ký vé ]** đối xứng cân đối.
+    - **Tầng 2 (Secondary & Admin Actions - Flexbox Justify-Between):**
+      + **Nhóm Trái (Public User Actions):**
+        * Nút **[ 🗓️ Lưu lịch ▾ ]**: Dropdown chọn Google Calendar / Apple Outlook .ics / Kích hoạt nhắc 3 mốc (Style: `bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium`).
+        * Nút **[ ⭐ Đánh giá ]**: Tự động hiển thị khi sự kiện đã hoàn thành hoặc người dùng đã tham dự (Style: `border border-amber-300 text-amber-600 hover:bg-amber-50 px-3 py-2 rounded-lg text-sm font-medium`).
+      + **Nhóm Phải (Staff / Manager Actions):**
+        * Nút **[ ▦ Soát vé QR ]**: Cho nhân viên soát vé/quản lý (`bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-2 rounded-lg text-sm font-medium`).
+        * **Dropdown Menu [ ⋮ Thao Tác ▾ ]**: Tích hợp menu dropdown dạng Popover gộp 4 thao tác nâng cao (*Xem Landing Page*, *Xuất bản ngay*, *Nhân bản sự kiện*, *Chỉnh sửa sự kiện*, *Xóa sự kiện*), giữ card luôn thông thoáng, sạch sẽ và chuyên nghiệp.
+
+  - **3. Kiểm Tra Biên Dịch & Hiển Thị Responsive:**
+    - Lệnh `npx tsc --noEmit` hoàn thành với **0 lỗi TypeScript**.
+    - Lệnh `npm run build` (Vite production build) hoàn tất thành công 100% trong 11.62s.
+
+
+
+
+

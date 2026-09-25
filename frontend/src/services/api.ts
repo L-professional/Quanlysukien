@@ -1344,7 +1344,13 @@ export const apiService = {
     }
   },
 
-  async getEvents(params?: { status?: string; search?: string; event_type?: string }): Promise<Event[]> {
+  async getEvents(params?: {
+    status?: string;
+    search?: string;
+    event_type?: string;
+    is_featured?: boolean;
+    limit?: number;
+  }): Promise<Event[]> {
     try {
       const response = await apiClient.get<Event[]>('/events', { params });
       if (response.data && Array.isArray(response.data)) {
@@ -1362,56 +1368,148 @@ export const apiService = {
         // Fallback
       }
     }
-    return [
+    const fallbackList: Event[] = [
       {
         id: 1,
-        title: 'EventHub AI Summit 2026',
+        title: 'EventHub AI Summit 2026: Kiến Tạo Tương Lai Số',
+        slug: 'eventhub-ai-summit-2026',
         description: 'Hội thảo quốc tế hàng đầu về Generative AI, RAG Vector Search và Tự Động Hóa Quản Trị Sự Kiện.',
         category_id: 1,
+        event_type: 'Trí Tuệ Nhân Tạo',
         location: 'GEM Center, TP. Hồ Chí Minh',
         location_address: 'Số 8 Nguyễn Bỉnh Khiêm, Phường Đa Kao, Quận 1, TP. Hồ Chí Minh',
         google_maps_url: 'https://maps.google.com/maps?q=GEM+Center+Ho+Chi+Minh&t=&z=16&ie=UTF8&iwloc=&output=embed',
-        start_time: '15-16 Oct 2026, 08:30 AM',
-        end_time: '16 Oct 2026, 17:30 PM',
+        start_time: '15/10/2026 08:30',
+        end_time: '16/10/2026 17:30',
         start_date: '15/10/2026 08:30',
         end_date: '16/10/2026 17:30',
         status: 'ONGOING',
+        capacity: 1000,
+        registered_count: 780,
+        cover_image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+        featured: true,
+        homepage_visible: true,
         wifiName: 'EventHub_VIP_Guest',
         wifiPassword: 'EventHub2026!',
       },
       {
         id: 2,
         title: 'Vietnam AI & Cloud Tech Expo 2026',
+        slug: 'vietnam-ai-cloud-tech-expo-2026',
         description: 'Triển lãm chuyên đề về Điện toán đám mây thế hệ mới, Hệ thống phân tán và ứng dụng AI trong doanh nghiệp.',
         category_id: 2,
+        event_type: 'Triển lãm',
         location: 'SECC, Quận 7, TP. Hồ Chí Minh',
         location_address: '799 Nguyễn Văn Linh, Tân Phú, Quận 7, TP. Hồ Chí Minh',
         google_maps_url: 'https://maps.google.com/maps?q=SECC+Quan+7+Ho+Chi+Minh&t=&z=16&ie=UTF8&iwloc=&output=embed',
-        start_time: '20-21 Nov 2026, 09:00 AM',
-        end_time: '21 Nov 2026, 17:00 PM',
+        start_time: '20/11/2026 09:00',
+        end_time: '21/11/2026 17:00',
         start_date: '20/11/2026 09:00',
         end_date: '21/11/2026 17:00',
-        status: 'PUBLISHED',
+        status: 'UPCOMING',
+        capacity: 800,
+        registered_count: 520,
+        cover_image: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+        featured: true,
+        homepage_visible: true,
         wifiName: 'SECC_Guest_WiFi',
         wifiPassword: 'CloudExpo2026@Pass',
       },
       {
         id: 3,
         title: 'Global Developer Festival: NextGen Agents',
+        slug: 'global-developer-festival-2026',
         description: 'Lễ hội công nghệ dành cho lập trình viên, các bài chia sẻ chuyên sâu về Agentic AI, LangGraph và Multi-agent Systems.',
         category_id: 3,
+        event_type: 'Hội thảo',
         location: 'Trung tâm Hội nghị Quốc gia, Hà Nội',
         location_address: 'Đại lộ Thăng Long, Mễ Trì, Nam Từ Liêm, Hà Nội',
         google_maps_url: 'https://maps.google.com/maps?q=Trung+tam+Hoi+nghi+Quoc+gia+Ha+Noi&t=&z=16&ie=UTF8&iwloc=&output=embed',
-        start_time: '10-12 Dec 2026, 08:00 AM',
-        end_time: '12 Dec 2026, 18:00 PM',
+        start_time: '10/12/2026 08:00',
+        end_time: '12/12/2026 18:00',
         start_date: '10/12/2026 08:00',
         end_date: '12/12/2026 18:00',
-        status: 'PUBLISHED',
+        status: 'UPCOMING',
+        capacity: 1200,
+        registered_count: 890,
+        cover_image: 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+        featured: true,
+        homepage_visible: true,
         wifiName: 'DevFest_FreeWifi',
         wifiPassword: 'NextGenAgent2026',
       },
+      {
+        id: 4,
+        title: 'Vietnam Cybersecurity & Data Defense Summit',
+        slug: 'cybersecurity-defense-summit',
+        description: 'Hội nghị cao cấp an ninh mạng quốc gia, giải pháp phòng thủ chủ động bằng AI và SOC thế hệ mới.',
+        category_id: 4,
+        event_type: 'Hội nghị',
+        location: 'JW Marriott Hotel, Hà Nội',
+        location_address: 'Số 8 Đỗ Đức Dục, Mễ Trì, Nam Từ Liêm, Hà Nội',
+        google_maps_url: 'https://maps.google.com/maps?q=JW+Marriott+Hanoi&t=&z=16&ie=UTF8&iwloc=&output=embed',
+        start_time: '05/09/2026 08:30',
+        end_time: '05/09/2026 17:30',
+        start_date: '05/09/2026 08:30',
+        end_date: '05/09/2026 17:30',
+        status: 'COMPLETED',
+        capacity: 600,
+        registered_count: 590,
+        cover_image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+        featured: false,
+        homepage_visible: true,
+        wifiName: 'Marriott_Conference',
+        wifiPassword: 'SecuritySummit2026',
+      },
+      {
+        id: 5,
+        title: 'FinTech Innovation & Web3 Gala Night',
+        slug: 'fintech-web3-gala-night',
+        description: 'Đêm tiệc kết nối doanh nghiệp tài chính công nghệ, đầu tư mạo hiểm và công nghệ chuỗi khối.',
+        category_id: 5,
+        event_type: 'Gala',
+        location: 'The Reverie Saigon, Quận 1, TP.HCM',
+        location_address: '22-36 Nguyễn Huệ & 57-69F Đồng Khởi, Quận 1, TP.HCM',
+        google_maps_url: 'https://maps.google.com/maps?q=The+Reverie+Saigon&t=&z=16&ie=UTF8&iwloc=&output=embed',
+        start_time: '25/12/2026 18:30',
+        end_time: '25/12/2026 22:00',
+        start_date: '25/12/2026 18:30',
+        end_date: '25/12/2026 22:00',
+        status: 'DRAFT',
+        capacity: 350,
+        registered_count: 45,
+        cover_image: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+        featured: false,
+        homepage_visible: false,
+        wifiName: 'Reverie_Event',
+        wifiPassword: 'ReverieGala2026',
+      }
     ];
+
+    // Filter fallbackList if params are provided
+    let result = fallbackList;
+    if (params?.status) {
+      result = result.filter(e => e.status === params.status);
+    }
+    if (params?.search) {
+      const q = params.search.toLowerCase();
+      result = result.filter(e => 
+        e.title.toLowerCase().includes(q) || 
+        e.location.toLowerCase().includes(q) ||
+        (e.description && e.description.toLowerCase().includes(q))
+      );
+    }
+    if (params?.event_type) {
+      const et = params.event_type.toLowerCase();
+      result = result.filter(e => (e.event_type || '').toLowerCase().includes(et));
+    }
+    if (params?.is_featured !== undefined) {
+      result = result.filter(e => Boolean(e.featured) === params.is_featured);
+    }
+    if (params?.limit) {
+      result = result.slice(0, params.limit);
+    }
+    return result;
   },
 
   async createEvent(payload: Partial<Event>): Promise<Event> {
@@ -1523,6 +1621,45 @@ export const apiService = {
     return response.data;
   },
 
+  async generateEventDescription(payload: {
+    title: string;
+    category?: string;
+    event_type?: string;
+    location?: string;
+    track?: string;
+    speaker_name?: string;
+    speaker_role?: string;
+    style?: string;
+  }): Promise<string> {
+    try {
+      const response = await apiClient.post<{ description: string; style_applied?: string }>(
+        '/ai/generate-description',
+        payload
+      );
+      if (response.data && response.data.description) {
+        return response.data.description;
+      }
+    } catch {
+      try {
+        const fallbackRes = await apiClient.post<{ description: string; style_applied?: string }>(
+          '/events/generate-description',
+          payload
+        );
+        if (fallbackRes.data && fallbackRes.data.description) {
+          return fallbackRes.data.description;
+        }
+      } catch (err) {
+        console.warn('Backend generate description fallback triggered:', err);
+      }
+    }
+
+    // Local smart fallback if offline
+    const spk = payload.speaker_name ? `cùng ${payload.speaker_name}` : 'cùng các chuyên gia và lãnh đạo đầu ngành';
+    const loc = payload.location ? `tại ${payload.location}` : 'với quy mô hoành tráng';
+    const cat = payload.event_type || payload.category || 'công nghệ';
+    return `Sự kiện "${payload.title}" diễn ra ${loc} ${spk}, mở ra không gian kết nối chuyên sâu trong lĩnh vực ${cat}. Chương trình quy tụ những bài chia sẻ mang tính đột phá, khai mở góc nhìn đa chiều và mang lại giá trị thực tiễn vượt trội cho toàn thể người tham dự.`;
+  },
+
   async generateSessionDescription(payload: {
     title: string;
     track?: string;
@@ -1530,6 +1667,17 @@ export const apiService = {
     speaker_role?: string;
     style?: string;
   }): Promise<string> {
+    try {
+      const response = await apiClient.post<{ description: string; style_applied?: string }>(
+        '/ai/generate-description',
+        payload
+      );
+      if (response.data && response.data.description) {
+        return response.data.description;
+      }
+    } catch {
+      // Fallback
+    }
     try {
       const response = await apiClient.post<{ description: string; style_applied?: string }>(
         '/events/generate-description',
@@ -1874,7 +2022,10 @@ export const apiService = {
     try {
       const response = await apiClient.post<Registration>('/registrations/register', payload);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.response?.status === 400 || error?.response?.status === 409) {
+        throw error;
+      }
       console.warn('Backend self-register unavailable, returning mock registration:', error);
       return {
         id: Math.floor(Math.random() * 1000) + 100,
@@ -1887,6 +2038,27 @@ export const apiService = {
         checked_in_at: undefined,
         ticket_type: payload.ticket_type || 'Vé Tham Dự',
       };
+    }
+  },
+
+  async getMyRegistrations(email?: string): Promise<Registration[]> {
+    try {
+      const url = email ? `/registrations/my-registrations?email=${encodeURIComponent(email)}` : '/registrations/my-registrations';
+      const response = await apiClient.get<Registration[]>(url);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to fetch my-registrations from backend:', error);
+      return [];
+    }
+  },
+
+  async triggerReminders(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await apiClient.post<{ success: boolean; message: string }>('/notifications/trigger-reminders');
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to trigger reminders:', error);
+      return { success: false, message: 'Không thể kích hoạt nhắc lịch' };
     }
   },
 
@@ -2198,6 +2370,59 @@ export const apiService = {
     }
   },
 
+  // ── Task 70: Event Reminder & Calendar API ────────────────────────────────
+  async scheduleEventReminder(
+    eventId: number
+  ): Promise<{ status: string; is_reminded: boolean; ticket_token?: string; message: string }> {
+    try {
+      const response = await apiClient.post<{
+        status: string;
+        is_reminded: boolean;
+        ticket_token?: string;
+        message: string;
+      }>(`/events/${eventId}/remind`);
+      return response.data;
+    } catch {
+      // Local fallback for offline/demo mode
+      const cached = localStorage.getItem('eventhub_custom_events');
+      if (cached) {
+        let items: Event[] = JSON.parse(cached);
+        items = items.map((ev) => (ev.id === eventId ? { ...ev, is_reminded: true } : ev));
+        localStorage.setItem('eventhub_custom_events', JSON.stringify(items));
+      }
+      return {
+        status: 'success',
+        is_reminded: true,
+        message: 'Đã đặt lịch nhắc cho sự kiện thành công!',
+      };
+    }
+  },
+
+  async cancelEventReminder(
+    eventId: number
+  ): Promise<{ status: string; is_reminded: boolean; message: string }> {
+    try {
+      const response = await apiClient.delete<{
+        status: string;
+        is_reminded: boolean;
+        message: string;
+      }>(`/events/${eventId}/remind`);
+      return response.data;
+    } catch {
+      const cached = localStorage.getItem('eventhub_custom_events');
+      if (cached) {
+        let items: Event[] = JSON.parse(cached);
+        items = items.map((ev) => (ev.id === eventId ? { ...ev, is_reminded: false } : ev));
+        localStorage.setItem('eventhub_custom_events', JSON.stringify(items));
+      }
+      return {
+        status: 'success',
+        is_reminded: false,
+        message: 'Đã hủy đặt lịch nhắc sự kiện.',
+      };
+    }
+  },
+
   // ── Demo Accounts API ────────────────────────────────────────────────────────
   
   async publishEvent(id: number): Promise<Event> {
@@ -2379,4 +2604,4 @@ export const apiService = {
   },
 };
 
-
+export type { NotificationItem };

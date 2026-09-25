@@ -23,6 +23,13 @@ class Registration(Base, TimestampMixin):
             unique=True,
             postgresql_where=text("session_id IS NOT NULL"),
         ),
+        Index(
+            "uq_event_participant",
+            "event_id",
+            "participant_id",
+            unique=True,
+            postgresql_where=text("schedule_id IS NULL AND session_id IS NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

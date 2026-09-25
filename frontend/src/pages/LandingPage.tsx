@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { apiService as api } from '../services/api';
+import { useEventSync } from '../services/eventSync';
  
 import { Link } from 'react-router-dom';
 
@@ -8,23 +9,39 @@ const LandingPage: React.FC = () => {
   const [featuredEvents, setFeaturedEvents] = useState<any[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
 
-  useEffect(() => {
-    const fetchHomepageEvents = async () => {
-      try {
-        const data = await api.getEvents();
-        // sort by homepage_order if available
-        const sorted = data.sort((a: any, b: any) => (a.homepage_order || 0) - (b.homepage_order || 0));
-        setFeaturedEvents(sorted);
-      } catch (err) {
-        console.error("Failed to load homepage events", err);
-      } finally {
-        setLoadingEvents(false);
-      }
-    };
-    fetchHomepageEvents();
+  const fetchHomepageEvents = useCallback(async () => {
+    try {
+      const data = await api.getEvents();
+      // Filter: prefer homepage_visible events first, then featured
+      // Sort: featured first, then by homepage_order, then by start_time
+      const sorted = [...data].sort((a: any, b: any) => {
+        // Featured events first
+        if (b.featured && !a.featured) return 1;
+        if (a.featured && !b.featured) return -1;
+        // Homepage visible events
+        if (b.homepage_visible && !a.homepage_visible) return 1;
+        if (a.homepage_visible && !b.homepage_visible) return -1;
+        // Then by homepage_order
+        const orderA = a.homepage_order ?? 999;
+        const orderB = b.homepage_order ?? 999;
+        if (orderA !== orderB) return orderA - orderB;
+        // Finally by start_time ascending
+        return (a.start_time || '').localeCompare(b.start_time || '');
+      });
+      setFeaturedEvents(sorted);
+    } catch (err) {
+      console.error("Failed to load homepage events", err);
+    } finally {
+      setLoadingEvents(false);
+    }
   }, []);
-  void featuredEvents;
-  void loadingEvents;
+
+  useEffect(() => {
+    fetchHomepageEvents();
+  }, [fetchHomepageEvents]);
+
+  // Real-time synchronization whenever events are updated or deleted
+  useEventSync(fetchHomepageEvents);
 
   useEffect(() => {
     // Header scroll effect
@@ -383,91 +400,81 @@ const LandingPage: React.FC = () => {
                         <p className="text-event-text-sec text-[16px] mt-3">Khám phá những sự kiện sắp diễn ra được tổ chức và quản lý bởi nền tảng EventAI.</p>
                     </div>
                     <div className="mt-6 md:mt-0">
-                        <a href="#home" className="text-event-navy font-semibold text-[15px] flex items-center gap-2 hover:text-event-red transition-colors group">
+                        <Link to="/events" className="text-event-navy font-semibold text-[15px] flex items-center gap-2 hover:text-event-red transition-colors group">
                             Xem tất cả sự kiện 
                             <i className="ph ph-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
-                        </a>
+                        </Link>
                     </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8">
-                    
-                    <div className="bg-white rounded-lg border border-event-border overflow-hidden card-hover fade-up">
-                        <div className="aspect-video relative overflow-hidden">
-                            <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur text-event-navy text-xs font-bold px-3 py-1 rounded-sm shadow-sm">Công nghệ</div>
-                            <img src="https://images.unsplash.com/photo-1505373877841-8d25f7d46678?ixlib=rb-4.0.3&auto=format&fit=crop&w=1112&q=80" alt="AI Technology Summit" className="w-full h-full object-cover image-zoom" />
-                        </div>
-                        <div className="p-6 flex flex-col h-[220px]">
-                            <div className="flex items-center justify-between text-xs font-semibold text-event-text-sec mb-3">
-                                <span className="flex items-center gap-1.5"><i className="ph ph-calendar-blank text-event-red text-sm"></i> 24.10.2025</span>
-                                <span className="flex items-center gap-1.5"><i className="ph ph-map-pin text-event-red text-sm"></i> Hà Nội</span>
+                    {loadingEvents ? (
+                        // Loading skeleton cards
+                        Array.from({ length: 4 }).map((_, idx) => (
+                            <div key={idx} className="bg-white rounded-lg border border-event-border overflow-hidden animate-pulse">
+                                <div className="aspect-video bg-slate-200" />
+                                <div className="p-6 space-y-3">
+                                    <div className="h-3 bg-slate-200 rounded w-3/4" />
+                                    <div className="h-5 bg-slate-200 rounded" />
+                                    <div className="h-3 bg-slate-200 rounded w-full" />
+                                    <div className="h-3 bg-slate-200 rounded w-2/3" />
+                                    <div className="flex justify-between items-center pt-2">
+                                        <div className="h-3 bg-slate-200 rounded w-1/4" />
+                                        <div className="h-7 bg-slate-200 rounded w-1/4" />
+                                    </div>
+                                </div>
                             </div>
-                            <h3 className="text-[18px] font-bold text-event-navy mb-2 line-clamp-2 hover:text-event-red transition-colors cursor-pointer">AI Technology Summit 2025</h3>
-                            <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4">Hội nghị công nghệ AI lớn nhất khu vực với sự tham gia của các chuyên gia hàng đầu thế giới.</p>
-                            <div className="flex items-center justify-between mt-auto">
-                                <span className="text-xs font-semibold text-event-navy flex items-center gap-1.5"><i className="ph ph-users text-event-text-sec text-sm"></i> 2,500+</span>
-                                <a href="#home" className="btn-secondary px-4 py-1.5 rounded text-sm font-semibold">Đăng ký ngay</a>
-                            </div>
-                        </div>
-                    </div>
+                        ))
+                    ) : featuredEvents && featuredEvents.length > 0 ? (
+                        featuredEvents.slice(0, 4).map((evt: any, idx: number) => {
+                            const formattedDate = evt.start_time
+                                ? new Date(evt.start_time).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                : 'Sắp diễn ra';
+                            const cover = evt.cover_image || 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?ixlib=rb-4.0.3&auto=format&fit=crop&w=1112&q=80';
+                            const attendees = evt.registered_count ?? evt.attendees_count ?? 0;
+                            const maxAttendees = evt.max_attendees ? `${evt.max_attendees}` : '∞';
 
-                    <div className="bg-white rounded-lg border border-event-border overflow-hidden card-hover fade-up" style={{ transitionDelay: '100ms' }}>
-                        <div className="aspect-video relative overflow-hidden">
-                            <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur text-event-navy text-xs font-bold px-3 py-1 rounded-sm shadow-sm">Kinh doanh</div>
-                            <img src="https://images.unsplash.com/photo-1544531586-fde5298cdd40?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80" alt="Future Business Conference" className="w-full h-full object-cover image-zoom" />
+                            return (
+                                <div key={evt.id || idx} className="bg-white rounded-lg border border-event-border overflow-hidden card-hover fade-up flex flex-col" style={{ transitionDelay: `${idx * 100}ms` }}>
+                                    <div className="aspect-video relative overflow-hidden">
+                                        <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur text-event-navy text-xs font-bold px-3 py-1 rounded-sm shadow-sm">
+                                            {evt.category || 'Sự kiện'}
+                                        </div>
+                                        <img src={cover} alt={evt.title} className="w-full h-full object-cover image-zoom" />
+                                    </div>
+                                    <div className="p-6 flex flex-col flex-1">
+                                        <div className="flex items-center justify-between text-xs font-semibold text-event-text-sec mb-3">
+                                            <span className="flex items-center gap-1.5"><i className="ph ph-calendar-blank text-event-red text-sm"></i> {formattedDate}</span>
+                                            <span className="flex items-center gap-1.5 truncate max-w-[120px]"><i className="ph ph-map-pin text-event-red text-sm"></i> {evt.location || 'Trực tuyến'}</span>
+                                        </div>
+                                        <Link to="/events" className="text-[18px] font-bold text-event-navy mb-2 line-clamp-2 hover:text-event-red transition-colors cursor-pointer">
+                                            {evt.title}
+                                        </Link>
+                                        <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4 flex-1">
+                                            {evt.description || 'Tham gia cùng các chuyên gia hàng đầu để trao đổi, học hỏi và kết nối mở rộng cơ hội.'}
+                                        </p>
+                                        <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100">
+                                            <span className="text-xs font-semibold text-event-navy flex items-center gap-1.5">
+                                                <i className="ph ph-users text-event-text-sec text-sm"></i> {attendees} / {maxAttendees}
+                                            </span>
+                                            <Link to="/events" className="btn-secondary px-4 py-1.5 rounded text-sm font-semibold hover:bg-event-red hover:text-white transition-colors">
+                                                Đăng ký ngay
+                                            </Link>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-event-border p-8">
+                            <i className="ph ph-calendar-blank text-4xl text-slate-300 mb-3 block"></i>
+                            <h3 className="text-lg font-bold text-event-navy mb-1">Chưa có sự kiện nổi bật</h3>
+                            <p className="text-event-text-sec text-sm mb-4">Các sự kiện được quản lý trên hệ thống sẽ xuất hiện tại đây.</p>
+                            <Link to="/events" className="btn-secondary px-5 py-2 rounded text-sm font-semibold hover:bg-event-red hover:text-white transition-colors inline-block">
+                                Xem tất cả sự kiện
+                            </Link>
                         </div>
-                        <div className="p-6 flex flex-col h-[220px]">
-                            <div className="flex items-center justify-between text-xs font-semibold text-event-text-sec mb-3">
-                                <span className="flex items-center gap-1.5"><i className="ph ph-calendar-blank text-event-red text-sm"></i> 12.11.2025</span>
-                                <span className="flex items-center gap-1.5"><i className="ph ph-map-pin text-event-red text-sm"></i> TP.HCM</span>
-                            </div>
-                            <h3 className="text-[18px] font-bold text-event-navy mb-2 line-clamp-2 hover:text-event-red transition-colors cursor-pointer">Future Business Conference</h3>
-                            <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4">Định hình tương lai doanh nghiệp với các chiến lược chuyển đổi số toàn diện và bền vững.</p>
-                            <div className="flex items-center justify-between mt-auto">
-                                <span className="text-xs font-semibold text-event-navy flex items-center gap-1.5"><i className="ph ph-users text-event-text-sec text-sm"></i> 1,200+</span>
-                                <a href="#home" className="btn-secondary px-4 py-1.5 rounded text-sm font-semibold">Đăng ký ngay</a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg border border-event-border overflow-hidden card-hover fade-up" style={{ transitionDelay: '200ms' }}>
-                        <div className="aspect-video relative overflow-hidden">
-                            <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur text-event-navy text-xs font-bold px-3 py-1 rounded-sm shadow-sm">Triển lãm</div>
-                            <img src="https://images.unsplash.com/photo-1531058020387-3be344556be6?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80" alt="Innovation Expo 2025" className="w-full h-full object-cover image-zoom" />
-                        </div>
-                        <div className="p-6 flex flex-col h-[220px]">
-                            <div className="flex items-center justify-between text-xs font-semibold text-event-text-sec mb-3">
-                                <span className="flex items-center gap-1.5"><i className="ph ph-calendar-blank text-event-red text-sm"></i> 05.12.2025</span>
-                                <span className="flex items-center gap-1.5"><i className="ph ph-map-pin text-event-red text-sm"></i> Đà Nẵng</span>
-                            </div>
-                            <h3 className="text-[18px] font-bold text-event-navy mb-2 line-clamp-2 hover:text-event-red transition-colors cursor-pointer">Innovation Expo 2025</h3>
-                            <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4">Trải nghiệm những phát minh và giải pháp sáng tạo mới nhất từ hàng trăm doanh nghiệp.</p>
-                            <div className="flex items-center justify-between mt-auto">
-                                <span className="text-xs font-semibold text-event-navy flex items-center gap-1.5"><i className="ph ph-users text-event-text-sec text-sm"></i> 5,000+</span>
-                                <a href="#home" className="btn-secondary px-4 py-1.5 rounded text-sm font-semibold">Đăng ký ngay</a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg border border-event-border overflow-hidden card-hover fade-up" style={{ transitionDelay: '300ms' }}>
-                        <div className="aspect-video relative overflow-hidden">
-                            <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur text-event-navy text-xs font-bold px-3 py-1 rounded-sm shadow-sm">Giải trí</div>
-                            <img src="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?ixlib=rb-4.0.3&auto=format&fit=crop&w=1170&q=80" alt="The Horizon Music Night" className="w-full h-full object-cover image-zoom" />
-                        </div>
-                        <div className="p-6 flex flex-col h-[220px]">
-                            <div className="flex items-center justify-between text-xs font-semibold text-event-text-sec mb-3">
-                                <span className="flex items-center gap-1.5"><i className="ph ph-calendar-blank text-event-red text-sm"></i> 20.12.2025</span>
-                                <span className="flex items-center gap-1.5"><i className="ph ph-map-pin text-event-red text-sm"></i> Hà Nội</span>
-                            </div>
-                            <h3 className="text-[18px] font-bold text-event-navy mb-2 line-clamp-2 hover:text-event-red transition-colors cursor-pointer">The Horizon Music Night</h3>
-                            <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4">Đêm nhạc hoành tráng kết hợp nghệ thuật ánh sáng và âm thanh không gian đa chiều.</p>
-                            <div className="flex items-center justify-between mt-auto">
-                                <span className="text-xs font-semibold text-event-navy flex items-center gap-1.5"><i className="ph ph-users text-event-text-sec text-sm"></i> 10,000+</span>
-                                <a href="#home" className="btn-secondary px-4 py-1.5 rounded text-sm font-semibold">Mua vé</a>
-                            </div>
-                        </div>
-                    </div>
-
+                    )}
                 </div>
             </div>
         </section>

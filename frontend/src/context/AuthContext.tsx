@@ -185,8 +185,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   /** Check if current user has one of the allowed roles */
   const hasRole = (roles: UserRole[]): boolean => {
-    const canonicalRoles = roles.map((r) => (r === 'PARTICIPANT' ? 'ATTENDEE' : r));
+    if (!roles || roles.length === 0) return true;
     const current = userRole === 'PARTICIPANT' ? 'ATTENDEE' : userRole;
+    if (current === 'SUPER_ADMIN') return true;
+    const canonicalRoles = roles.map((r) => (r === 'PARTICIPANT' ? 'ATTENDEE' : r));
+    if (current === 'ADMIN' && canonicalRoles.includes('ADMIN')) return true;
     return canonicalRoles.includes(current);
   };
 
@@ -327,7 +330,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.setItem('eventhub_user', JSON.stringify(account));
     const roleTitles: Record<string, string> = {
       ADMIN: '👑 Quản Trị Viên (Admin)',
+      SUPER_ADMIN: '👑 Quản Trị Viên Cấp Cao (Super Admin)',
       EVENT_MANAGER: '🎯 Quản Lý Sự Kiện (Event Manager)',
+      SPEAKER: '🎤 Diễn Giả Hội Nghị (Speaker)',
       STAFF: '🎫 Nhân Viên Soát Vé & Duyệt AI (Staff)',
       ATTENDEE: '👤 Khách Tham Dự (Attendee)',
     };

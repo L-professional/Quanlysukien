@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Shield, Filter, CheckCircle2, Search, Terminal, AlertTriangle, Info, AlertCircle } from 'lucide-react';
+import { Shield, Filter, CheckCircle2, Search, Terminal, AlertTriangle, Info, AlertCircle, Download, Trash2, Radio, Play, Pause } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface LogEntry {
   id: string;
@@ -78,10 +79,50 @@ const INITIAL_LOGS: LogEntry[] = [
 
 export const SystemLogs: React.FC = () => {
   const { t } = useTranslation();
+  const [logs, setLogs] = useState<LogEntry[]>(INITIAL_LOGS);
   const [filterLevel, setFilterLevel] = useState<'ALL' | 'INFO' | 'WARN' | 'ERROR'>('ALL');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [isLiveStreaming, setIsLiveStreaming] = useState<boolean>(true);
 
-  const filteredLogs = INITIAL_LOGS.filter((log) => {
+  // Live streaming effect
+  useEffect(() => {
+    if (!isLiveStreaming) return;
+    const interval = setInterval(() => {
+      const sampleMessages = [
+        { level: 'INFO' as const, actor: 'system.qr_service', message: 'Tín hiệu heartbeat từ Turnstile Cổng A ổn định (latency 12ms)' },
+        { level: 'INFO' as const, actor: 'ai.concierge_engine', message: 'Tự động kiểm tra truy vấn RAG pgvector (Cache hit 98%)' },
+        { level: 'WARN' as const, actor: 'auth.guard', message: 'Token refresh được yêu cầu từ phiên đăng nhập người dùng' },
+      ];
+      const randomMsg = sampleMessages[Math.floor(Math.random() * sampleMessages.length)];
+      const newEntry: LogEntry = {
+        id: `log-${Date.now()}`,
+        time: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        level: randomMsg.level,
+        actor: randomMsg.actor,
+        message: randomMsg.message,
+      };
+      setLogs((prev) => [newEntry, ...prev.slice(0, 49)]);
+    }, 12000);
+    return () => clearInterval(interval);
+  }, [isLiveStreaming]);
+
+  const handleDownloadLogs = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(logs, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `eventhub_system_logs_${Date.now()}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    toast.success('Đã tải xuống tệp dữ liệu nhật ký hệ thống (.json)!');
+  };
+
+  const handleClearLogs = () => {
+    setLogs([]);
+    toast.info('Đã xóa danh sách nhật ký hiển thị tạm thời.');
+  };
+
+  const filteredLogs = logs.filter((log) => {
     const matchesLevel = filterLevel === 'ALL' || log.level === filterLevel;
     const matchesSearch =
       log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -95,8 +136,8 @@ export const SystemLogs: React.FC = () => {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-            <Shield className="w-5 h-5 text-indigo-600" />
+          <div className="w-10 h-10 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 shrink-0">
+            <Shield className="w-5 h-5 text-red-600" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t('logs.title')}</h1>
@@ -106,11 +147,43 @@ export const SystemLogs: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            {t('common.online')} (Operational)
-          </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Live stream toggle */}
+          <button
+            type="button"
+            onClick={() => setIsLiveStreaming(!isLiveStreaming)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
+              isLiveStreaming
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                : 'bg-slate-100 text-slate-500 border-slate-200'
+            }`}
+            title={isLiveStreaming ? 'Tạm dừng nhận log trực tiếp' : 'Bật nhận log trực tiếp'}
+          >
+            <Radio className={`w-3.5 h-3.5 ${isLiveStreaming ? 'animate-pulse text-emerald-600' : 'text-slate-400'}`} />
+            <span>{isLiveStreaming ? 'Live Stream: Bật' : 'Live Stream: Tắt'}</span>
+          </button>
+
+          {/* Download Logs */}
+          <button
+            type="button"
+            onClick={handleDownloadLogs}
+            className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            title="Tải tệp nhật ký hệ thống"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-500" />
+            <span>Tải Log</span>
+          </button>
+
+          {/* Clear Logs */}
+          <button
+            type="button"
+            onClick={handleClearLogs}
+            className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+            title="Xóa danh sách nhật ký hiển thị"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Xóa</span>
+          </button>
         </div>
       </div>
 
@@ -127,7 +200,7 @@ export const SystemLogs: React.FC = () => {
               onClick={() => setFilterLevel(level)}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 filterLevel === level
-                  ? 'bg-slate-900 text-white shadow-xs'
+                  ? 'bg-red-600 text-white shadow-xs'
                   : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
@@ -144,7 +217,7 @@ export const SystemLogs: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder={t('logs.searchLogs')}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all font-mono"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-red-500 transition-all font-mono"
           />
         </div>
       </div>
