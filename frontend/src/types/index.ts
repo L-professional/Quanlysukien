@@ -79,6 +79,7 @@ export interface EventCategory {
 export interface Event {
   id: number;
   title: string;
+  slug?: string;
   description?: string;
   category_id: number;
   location: string;
@@ -88,12 +89,22 @@ export interface Event {
   end_time: string;
   start_date?: string;
   end_date?: string;
-  status: 'DRAFT' | 'PUBLISHED' | 'ONGOING' | 'COMPLETED' | 'CANCELLED';
+  status: 'DRAFT' | 'PUBLISHED' | 'UPCOMING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED' | string;
+  capacity?: number;
+  registered_count?: number;
+  registeredCount?: number;
+  event_type?: string;
+  cover_image?: string;
+  homepage_visible?: boolean;
+  featured?: boolean;
+  homepage_order?: number;
+  ticketType?: string;
   wifiName?: string;
   wifiPassword?: string;
   is_registered?: boolean;
   is_checked_in?: boolean;
   has_reviewed?: boolean;
+  [key: string]: any;
 }
 
 export interface EventScheduleItem {

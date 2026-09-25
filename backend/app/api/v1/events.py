@@ -118,14 +118,37 @@ INITIAL_SEED_SCHEDULE = [
 
 @router.get("", response_model=List[EventResponse])
 async def list_events(
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    event_type: Optional[str] = None,
+    is_featured: Optional[bool] = None,
+    limit: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
     List all events with dates, address, and Google Maps embed links.
+    Supports filtering by status, search keyword, event_type, is_featured, limit.
     Returns user-specific flags: is_registered, is_checked_in, has_reviewed.
     """
     stmt = select(Event).order_by(Event.id.asc())
+
+    if status and status.strip():
+        stmt = stmt.where(Event.status == status.strip())
+    if event_type and event_type.strip():
+        stmt = stmt.where(Event.event_type.ilike(f"%{event_type.strip()}%"))
+    if search and search.strip():
+        kw = f"%{search.strip()}%"
+        stmt = stmt.where(
+            (Event.title.ilike(kw)) |
+            (Event.location.ilike(kw)) |
+            (Event.description.ilike(kw))
+        )
+    if is_featured is not None:
+        stmt = stmt.where(Event.featured == is_featured)
+    if limit and limit > 0:
+        stmt = stmt.limit(limit)
+
     res = await db.execute(stmt)
     events = res.scalars().all()
 
@@ -157,8 +180,10 @@ async def list_events(
             EventResponse(
                 id=e.id,
                 title=e.title,
+                slug=e.slug,
                 description=e.description,
                 category_id=e.category_id,
+                event_type=e.event_type or "Hội thảo",
                 location=e.location,
                 location_address=e.location_address,
                 google_maps_url=e.google_maps_url,
@@ -167,6 +192,12 @@ async def list_events(
                 start_date=e.start_date,
                 end_date=e.end_date,
                 status=e.status,
+                capacity=e.capacity if e.capacity is not None else 500,
+                registered_count=e.registered_count if e.registered_count is not None else 0,
+                cover_image=e.cover_image,
+                homepage_visible=e.homepage_visible if e.homepage_visible is not None else False,
+                featured=e.featured if e.featured is not None else False,
+                homepage_order=e.homepage_order if e.homepage_order is not None else 0,
                 created_at=e.created_at,
                 updated_at=e.updated_at,
                 is_registered=e.id in user_reg_events,
@@ -220,8 +251,10 @@ async def get_event(
     return EventResponse(
         id=event.id,
         title=event.title,
+        slug=event.slug,
         description=event.description,
         category_id=event.category_id,
+        event_type=event.event_type or "Hội thảo",
         location=event.location,
         location_address=event.location_address,
         google_maps_url=event.google_maps_url,
@@ -230,6 +263,12 @@ async def get_event(
         start_date=event.start_date,
         end_date=event.end_date,
         status=event.status,
+        capacity=event.capacity if event.capacity is not None else 500,
+        registered_count=event.registered_count if event.registered_count is not None else 0,
+        cover_image=event.cover_image,
+        homepage_visible=event.homepage_visible if event.homepage_visible is not None else False,
+        featured=event.featured if event.featured is not None else False,
+        homepage_order=event.homepage_order if event.homepage_order is not None else 0,
         created_at=event.created_at,
         updated_at=event.updated_at,
         is_registered=is_registered,
