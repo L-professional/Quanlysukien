@@ -12,9 +12,13 @@ import {
   AlertCircle,
   Radio,
   Tv,
+  Check,
+  X,
+  UploadCloud,
 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useEventSync } from '../services/eventSync';
 import { toast } from 'sonner';
 
 export const SpeakerDashboard: React.FC = () => {
@@ -23,6 +27,17 @@ export const SpeakerDashboard: React.FC = () => {
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'live' | 'upcoming' | 'ended'>('ALL');
+  const [sessionAcceptance, setSessionAcceptance] = useState<Record<number, 'ACCEPTED' | 'DECLINED' | 'PENDING'>>({});
+
+  const handleAcceptSession = (id: number) => {
+    setSessionAcceptance((prev) => ({ ...prev, [id]: 'ACCEPTED' }));
+    toast.success('Đã xác nhận chấp thuận chủ trì phiên diễn thuyết!');
+  };
+
+  const handleDeclineSession = (id: number) => {
+    setSessionAcceptance((prev) => ({ ...prev, [id]: 'DECLINED' }));
+    toast.info('Đã gửi thông báo từ chối phiên diễn thuyết đến Ban Tổ Chức.');
+  };
 
   const fetchSessions = async () => {
     setLoading(true);
@@ -41,6 +56,9 @@ export const SpeakerDashboard: React.FC = () => {
     fetchSessions();
   }, []);
 
+  // Sync speaker sessions whenever any event or schedule changes
+  useEventSync(fetchSessions);
+
   const filteredSessions = sessions.filter((s) => {
     if (filterStatus === 'ALL') return true;
     return s.status === filterStatus;
@@ -55,16 +73,16 @@ export const SpeakerDashboard: React.FC = () => {
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300 max-w-7xl mx-auto">
       {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 border border-slate-800 shadow-xl">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-red-700 via-red-600 to-rose-700 text-white p-6 sm:p-8 border border-red-800 shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold tracking-wide">
-              <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 border border-white/30 text-white text-xs font-bold tracking-wide">
+              <Radio className="w-3.5 h-3.5 animate-pulse text-white" />
               <span>CỔNG THỐNG KÊ & ĐIỀU KHIỂN SÂN KHẤU</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center gap-3">
               <span>Xin chào, {user?.full_name || 'Diễn Giả'}!</span>
-              <span className="text-sm font-semibold px-2.5 py-0.5 rounded-lg bg-indigo-500/30 text-indigo-200 border border-indigo-500/40">
+              <span className="text-sm font-semibold px-2.5 py-0.5 rounded-lg bg-white/20 text-white border border-white/30">
                 Speaker
               </span>
             </h1>
@@ -77,7 +95,7 @@ export const SpeakerDashboard: React.FC = () => {
             <button
               onClick={fetchSessions}
               disabled={loading}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+              className="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/30 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-sm"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               <span>Làm Mới Dữ Liệu</span>
@@ -85,9 +103,9 @@ export const SpeakerDashboard: React.FC = () => {
             {sessions.length > 0 && (
               <button
                 onClick={() => navigate(`/speaker/session/${sessions[0].id}`)}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-xs font-black flex items-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer active:scale-95"
+                className="px-5 py-2.5 rounded-xl bg-white hover:bg-rose-50 text-red-700 font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-black/10 transition-all cursor-pointer active:scale-95"
               >
-                <Tv className="w-4 h-4" />
+                <Tv className="w-4 h-4 text-red-600" />
                 <span>Vào Studio Sân Khấu Ngay</span>
               </button>
             )}
@@ -95,8 +113,8 @@ export const SpeakerDashboard: React.FC = () => {
         </div>
 
         {/* Ambient background decoration */}
-        <div className="absolute -right-16 -top-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -left-16 -bottom-16 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -right-16 -top-16 w-64 h-64 bg-red-300/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -left-16 -bottom-16 w-64 h-64 bg-rose-300/15 rounded-full blur-3xl pointer-events-none" />
       </div>
 
       {/* 4 Metric Cards */}
@@ -105,7 +123,7 @@ export const SpeakerDashboard: React.FC = () => {
         <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-xs hover:shadow-md transition-shadow">
           <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mb-2">
             <span>Phiên Được Phân Công</span>
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
+            <div className="w-9 h-9 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
               <Mic className="w-4 h-4" />
             </div>
           </div>
@@ -191,7 +209,7 @@ export const SpeakerDashboard: React.FC = () => {
       {/* Sessions Grid */}
       {loading ? (
         <div className="p-12 text-center text-slate-400">
-          <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
+          <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-red-600" />
           <p className="text-xs font-medium">Đang tải danh sách phiên của diễn giả...</p>
         </div>
       ) : filteredSessions.length === 0 ? (
@@ -238,7 +256,7 @@ export const SpeakerDashboard: React.FC = () => {
 
                   {/* Title & Description */}
                   <div>
-                    <h3 className="text-base font-bold text-slate-900 group-hover:text-indigo-600 transition-colors leading-snug">
+                    <h3 className="text-base font-bold text-slate-900 group-hover:text-red-600 transition-colors leading-snug">
                       {session.title}
                     </h3>
                     {session.description && (
@@ -251,7 +269,7 @@ export const SpeakerDashboard: React.FC = () => {
                   {/* Location & Time Info */}
                   <div className="grid grid-cols-2 gap-2 text-xs font-medium text-slate-600 pt-1">
                     <div className="flex items-center gap-1.5 truncate">
-                      <Clock className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                      <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       <span>{session.start_time} - {session.end_time}</span>
                     </div>
                     <div className="flex items-center gap-1.5 truncate">
@@ -264,7 +282,7 @@ export const SpeakerDashboard: React.FC = () => {
                   <div className="p-3 bg-slate-50 rounded-xl space-y-2 border border-slate-100">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-600 font-semibold flex items-center gap-1">
-                        <Users className="w-3.5 h-3.5 text-indigo-600" />
+                        <Users className="w-3.5 h-3.5 text-red-600" />
                         <span>Khán giả check-in:</span>
                       </span>
                       <span className="font-extrabold text-slate-900">
@@ -273,7 +291,7 @@ export const SpeakerDashboard: React.FC = () => {
                     </div>
                     <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
                       <div
-                        className="h-full bg-indigo-600 rounded-full transition-all duration-500"
+                        className="h-full bg-red-600 rounded-full transition-all duration-500"
                         style={{ width: `${Math.min(100, attendeePct)}%` }}
                       />
                     </div>
@@ -291,17 +309,54 @@ export const SpeakerDashboard: React.FC = () => {
                 </div>
 
                 {/* Bottom Action Footer */}
-                <div className="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-3">
-                  <span className="text-xs font-medium text-slate-500">
-                    ID Phiên: #{session.id}
-                  </span>
+                <div className="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    {sessionAcceptance[session.id] === 'ACCEPTED' ? (
+                      <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Đã nhận lời
+                      </span>
+                    ) : sessionAcceptance[session.id] === 'DECLINED' ? (
+                      <span className="text-[11px] font-bold text-rose-700 bg-rose-100 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                        <X className="w-3 h-3" /> Đã từ chối
+                      </span>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleAcceptSession(session.id)}
+                          className="px-2.5 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Chấp nhận phiên diễn thuyết"
+                        >
+                          <Check className="w-3 h-3" /> Nhận lời
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeclineSession(session.id)}
+                          className="px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:text-rose-700 hover:bg-rose-50 border border-slate-200 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Từ chối phiên diễn thuyết"
+                        >
+                          <X className="w-3 h-3" /> Từ chối
+                        </button>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/speaker/session/${session.id}`)}
+                      className="px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:text-red-600 hover:bg-red-50 border border-slate-200 rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
+                      title="Tải lên slide thuyết trình (.pdf, .pptx)"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5 text-red-600" />
+                      <span>Upload Slide</span>
+                    </button>
+                  </div>
 
                   <button
                     type="button"
                     onClick={() => navigate(`/speaker/session/${session.id}`)}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-xs font-bold flex items-center gap-2 shadow-sm shadow-indigo-600/20 transition-all cursor-pointer active:scale-95 ml-auto"
+                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-red-600/20 transition-all cursor-pointer active:scale-95 ml-auto"
                   >
-                    <span>🚀 Vào Studio Control Center</span>
+                    <span>🚀 Vào Studio</span>
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </button>
                 </div>

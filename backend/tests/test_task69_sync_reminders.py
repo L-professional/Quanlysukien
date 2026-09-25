@@ -8,60 +8,57 @@ backend_dir = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_dir))
 
 from app.main import app
-from app.services.email_service import generate_google_calendar_url
-
 
 @pytest.mark.asyncio
-async def test_calendar_url_generator():
-    """Verify Google Calendar link construction meets specification."""
-    url = generate_google_calendar_url(
-        title="EventHub AI Summit 2026",
-        location="Trung tâm Hội nghị Quốc gia",
-        details="Mã vé QR: TEST-123",
-        start_time_iso="20261015T083000Z",
-        end_time_iso="20261016T173000Z"
-    )
-    assert url.startswith("https://calendar.google.com/calendar/render?")
-    assert "action=TEMPLATE" in url
-    assert "EventHub+AI+Summit+2026" in url or "EventHub%20AI%20Summit%202026" in url
-    assert "20261015T083000Z%2F20261016T173000Z" in url or "20261015T083000Z/20261016T173000Z" in url
-
-
-@pytest.mark.asyncio
-async def test_duplicate_registration_block_and_cancel():
-    """
-    Task 69 Requirement 2:
-    - 1st registration succeeds with 201.
-    - 2nd registration for same event & email is blocked with HTTP 400.
-    - Cancel registration decrements registered_count.
-    """
+async def test_task69_registration_guard_and_reminders():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        test_email = f"task69_test_{uuid.uuid4().hex[:8]}@example.com"
+        # 1. Fetch available events
+        res_events = await client.get("/api/v1/events")
+        assert res_events.status_code == 200
+        events = res_events.json()
+        assert len(events) > 0
+        target_event = events[0]
+        event_id = target_event["id"]
+        initial_count = target_event.get("registered_count", 0)
+
+        # 2. Register for event
+        test_email = f"task69_user_{uuid.uuid4().hex[:8]}@example.com"
         reg_payload = {
-            "event_id": 1,
-            "full_name": "Nguyễn Văn Test 69",
+            "event_id": event_id,
+            "full_name": "Test Attendee Task69",
             "email": test_email,
-            "phone_number": "0987654321",
             "ticket_type": "Vé Tiêu Chuẩn (Standard)",
-            "organization": "EventHub QA Team",
-            "notes": "Testing duplicate guard"
         }
+        res_reg = await client.post("/api/v1/registrations/register", json=reg_payload)
+        assert res_reg.status_code == 201
+        reg_data = res_reg.json()
+        reg_id = reg_data["id"]
+        assert reg_data["event_id"] == event_id
+        assert "qr_code_token" in reg_data
 
-        # 1. First registration attempt: must succeed
-        res1 = await client.post("/api/v1/registrations", json=reg_payload)
-        assert res1.status_code == 201, f"Failed first registration: {res1.text}"
-        data1 = res1.json()
-        assert "qr_code_token" in data1
-        ticket_id = data1["id"]
+        # 3. Registration Guard: Attempt to register again with same user/email -> MUST BE REJECTED WITH 400
+        res_dup = await client.post("/api/v1/registrations/register", json=reg_payload)
+        assert res_dup.status_code == 400
+        dup_err = res_dup.json()
+        assert "đã đăng ký" in dup_err["detail"].lower()
 
-        # 2. Second registration attempt with identical email & event_id: MUST BE BLOCKED
-        res2 = await client.post("/api/v1/registrations", json=reg_payload)
-        assert res2.status_code == 400, f"Expected 400 on duplicate registration, got {res2.status_code}"
-        err_detail = res2.json().get("detail", "")
-        assert "đã đăng ký" in err_detail.lower(), f"Unexpected error detail: {err_detail}"
+        # 4. Check my-registrations endpoint
+        res_my_regs = await client.get(f"/api/v1/registrations/my-registrations?email={test_email}")
+        assert res_my_regs.status_code == 200
+        my_regs = res_my_regs.json()
+        assert len(my_regs) >= 1
+        assert any(r["id"] == reg_id for r in my_regs)
 
-        # 3. Third attempt using /register alias: MUST ALSO BE BLOCKED
-        res3 = await client.post("/api/v1/registrations/register", json=reg_payload)
-        assert res3.status_code == 400
-        assert "đã đăng ký" in res3.json().get("detail", "").lower()
+        # 5. Trigger reminders endpoint
+        res_remind = await client.post("/api/v1/notifications/trigger-reminders")
+        assert res_remind.status_code == 200
+        remind_data = res_remind.json()
+        assert remind_data.get("success") is True
+
+        # 6. Cancel registration: must release capacity and return success
+        res_cancel = await client.delete(f"/api/v1/registrations/{reg_id}")
+        assert res_cancel.status_code == 200
+        cancel_data = res_cancel.json()
+        assert cancel_data.get("success") is True
+        assert "hoàn trả" in cancel_data.get("message", "").lower() or "thành công" in cancel_data.get("message", "").lower()

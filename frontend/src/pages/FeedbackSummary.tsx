@@ -655,7 +655,7 @@ export const FeedbackSummary: React.FC = () => {
             <div>
               <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
                 {t('feedback.title', 'AI Feedback & Analytics Engine')}
-                <span className="text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/80 tracking-wider">
+                <span className="text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200/80 tracking-wider">
                   Real-Time
                 </span>
               </h1>
@@ -674,7 +674,7 @@ export const FeedbackSummary: React.FC = () => {
               onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold border border-slate-200 shadow-xs transition-colors cursor-pointer"
             >
-              <Download className="w-3.5 h-3.5 text-indigo-600" />
+              <Download className="w-3.5 h-3.5 text-red-600" />
               <span>Xuất Báo Cáo Executive</span>
               <ChevronDown className="w-3 h-3 text-slate-400" />
             </button>
@@ -683,7 +683,7 @@ export const FeedbackSummary: React.FC = () => {
               <div className="absolute right-0 mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-30 animate-in fade-in zoom-in-95 duration-150">
                 <button
                   onClick={handleExportWord}
-                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition-colors cursor-pointer"
+                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-red-50 hover:text-red-700 flex items-center gap-2.5 transition-colors cursor-pointer"
                 >
                   <FileText className="w-4 h-4 text-blue-600" />
                   <div>
@@ -693,7 +693,7 @@ export const FeedbackSummary: React.FC = () => {
                 </button>
                 <button
                   onClick={handleExportPDF}
-                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition-colors cursor-pointer"
+                  className="w-full text-left px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-red-50 hover:text-red-700 flex items-center gap-2.5 transition-colors cursor-pointer"
                 >
                   <Printer className="w-4 h-4 text-rose-600" />
                   <div>
@@ -709,7 +709,7 @@ export const FeedbackSummary: React.FC = () => {
           <button
             onClick={handleAnalyzeRealTime}
             disabled={aiLoading}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:to-pink-700 text-white text-xs font-bold shadow-md shadow-indigo-500/25 transition-all cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md shadow-red-600/20 transition-all cursor-pointer transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70"
           >
             <Zap className={`w-3.5 h-3.5 ${aiLoading ? 'animate-spin' : 'fill-white'}`} />
             <span>{aiLoading ? 'Đang Phân Tích...' : '⚡ Phân Tích Real-Time'}</span>
@@ -719,7 +719,7 @@ export const FeedbackSummary: React.FC = () => {
           <button
             onClick={() => handleApplyActionPlan()}
             disabled={applyingPlan || (aiData?.action_plan && appliedActionIds.size === aiData.action_plan.length)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md shadow-red-600/20 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
           >
             <Check className="w-3.5 h-3.5 stroke-[3]" />
             <span>
@@ -736,7 +736,7 @@ export const FeedbackSummary: React.FC = () => {
             className="p-2 rounded-xl bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 shadow-xs transition-colors cursor-pointer"
             title="Làm mới dữ liệu nhận xét"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-red-600' : ''}`} />
           </button>
         </div>
       </div>
@@ -787,12 +787,12 @@ export const FeedbackSummary: React.FC = () => {
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
               Phân Bổ Cảm Xúc
             </span>
-            <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              <TrendingUp className="w-4 h-4 text-indigo-600" />
+            <div className="w-8 h-8 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600">
+              <TrendingUp className="w-4 h-4 text-red-600" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-indigo-600 tracking-tight">
+            <span className="text-3xl font-black text-red-600 tracking-tight">
               {aiData?.sentiment_breakdown?.positive_percent ?? 85}%
             </span>
             <span className="text-xs font-semibold text-slate-500">Tích cực</span>
@@ -808,7 +808,7 @@ export const FeedbackSummary: React.FC = () => {
               ⚠️ {aiData?.sentiment_breakdown?.negative_percent ?? 5}%
             </span>
           </div>
-          <div className="h-1 w-full bg-indigo-500 absolute bottom-0 left-0 right-0" />
+          <div className="h-1 w-full bg-red-500 absolute bottom-0 left-0 right-0" />
         </div>
 
         {/* Card 3: Check-in & Bottleneck Status */}
@@ -899,28 +899,24 @@ export const FeedbackSummary: React.FC = () => {
       {activeTab === 'analytics' && (
         <div className="space-y-6">
           {/* Executive Summary Card */}
-          <div className="bg-gradient-to-br from-indigo-950 via-slate-950 to-indigo-900 rounded-3xl p-6 lg:p-8 text-white shadow-xl shadow-indigo-950/20 relative overflow-hidden border border-indigo-800/50">
-            {/* Background Glow */}
-            <div className="absolute -top-24 -right-24 w-96 h-96 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
-
+          <div className="bg-white rounded-3xl p-6 lg:p-8 text-slate-900 shadow-sm border border-slate-200 border-l-4 border-l-red-600 relative overflow-hidden">
             <div className="relative z-10">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-indigo-800/60 mb-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100 mb-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
-                    <Bot className="w-5 h-5 text-indigo-300" />
+                  <div className="w-10 h-10 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600">
+                    <Bot className="w-5 h-5 text-red-600" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-black text-white tracking-wide">
+                      <h3 className="text-lg font-black text-slate-900 tracking-wide">
                         AI Executive Summary
                       </h3>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         Live RAG Pipeline
                       </span>
                     </div>
-                    <p className="text-xs text-indigo-200/80 mt-0.5">
+                    <p className="text-xs text-slate-500 mt-0.5">
                       Báo cáo điều hành tổng hợp dành cho Ban Tổ Chức & Quản lý Sự kiện
                     </p>
                   </div>
@@ -929,13 +925,13 @@ export const FeedbackSummary: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={copyExecutiveSummary}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-indigo-100 text-xs font-semibold backdrop-blur-sm border border-white/10 transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-200 transition-colors cursor-pointer"
                   >
                     <Copy className="w-3.5 h-3.5" />
                     Sao chép tóm tắt
                   </button>
                   {analyzedAt && (
-                    <span className="text-[11px] text-indigo-300/80 font-mono">
+                    <span className="text-[11px] text-slate-500 font-mono">
                       Cập nhật: {formatVietnameseDateTime(analyzedAt)}
                     </span>
                   )}
@@ -943,8 +939,8 @@ export const FeedbackSummary: React.FC = () => {
               </div>
 
               {/* Executive Summary Content */}
-              <div className="p-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md mb-6">
-                <p className="text-sm sm:text-base leading-relaxed text-indigo-100/95 font-medium">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 mb-6">
+                <p className="text-sm sm:text-base leading-relaxed text-slate-800 font-medium">
                   {aiData?.executive_summary ||
                     'Đang tải tóm tắt điều hành từ AI Feedback & Analytics Engine...'}
                 </p>
@@ -953,15 +949,15 @@ export const FeedbackSummary: React.FC = () => {
               {/* Sentiment Breakdown Bar */}
               {aiData?.sentiment_breakdown && (
                 <div>
-                  <div className="flex items-center justify-between text-xs font-semibold text-indigo-200 mb-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-2">
                     <span className="flex items-center gap-1.5">
-                      <TrendingUp className="w-3.5 h-3.5 text-indigo-300" />
+                      <TrendingUp className="w-3.5 h-3.5 text-red-600" />
                       Phân Bổ Cảm Xúc Khách Tham Dự (Sentiment Analysis)
                     </span>
-                    <span>{aiData.sentiment_breakdown.total_analyzed} phản hồi đã phân tích</span>
+                    <span className="text-slate-500">{aiData.sentiment_breakdown.total_analyzed} phản hồi đã phân tích</span>
                   </div>
 
-                  <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden flex gap-0.5 p-0.5">
+                  <div className="h-3 w-full bg-slate-200 rounded-full overflow-hidden flex gap-0.5 p-0.5">
                     <div
                       className="bg-emerald-500 rounded-l-full transition-all duration-500"
                       style={{ width: `${aiData.sentiment_breakdown.positive_percent}%` }}
@@ -1002,8 +998,8 @@ export const FeedbackSummary: React.FC = () => {
           <div className="bg-white rounded-3xl p-6 lg:p-7 border border-slate-200 shadow-xs space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-                  <Quote className="w-5 h-5 text-indigo-600" />
+                <div className="w-10 h-10 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600">
+                  <Quote className="w-5 h-5 text-red-600" />
                 </div>
                 <div>
                   <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
@@ -1014,7 +1010,7 @@ export const FeedbackSummary: React.FC = () => {
                   </p>
                 </div>
               </div>
-              <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-xl self-start sm:self-center">
+              <span className="text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-3 py-1 rounded-xl self-start sm:self-center">
                 Trích Xuất AI RAG
               </span>
             </div>
@@ -1032,7 +1028,7 @@ export const FeedbackSummary: React.FC = () => {
                   'Trải nghiệm ẩm thực: Chưa phân luồng dán nhãn món ăn thuần chay / ít đường tại tiệc trà.',
                 ]).map((cause, idx) => (
                   <li key={idx} className="flex items-start gap-2.5">
-                    <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="w-5 h-5 rounded-full bg-red-100 text-red-700 font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
                       {idx + 1}
                     </span>
                     <span className="leading-relaxed">{cause}</span>
@@ -1082,7 +1078,7 @@ export const FeedbackSummary: React.FC = () => {
                               ? 'bg-rose-100 text-rose-700'
                               : q.severity === 'MODERATE'
                               ? 'bg-amber-100 text-amber-800'
-                              : 'bg-indigo-100 text-indigo-700'
+                              : 'bg-red-100 text-red-700'
                           }`}
                         >
                           {q.severity === 'CRITICAL'
@@ -1118,7 +1114,7 @@ export const FeedbackSummary: React.FC = () => {
                             aspect: q.aspect,
                           })
                         }
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold transition-colors cursor-pointer shrink-0"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold transition-colors cursor-pointer shrink-0"
                       >
                         <Mail className="w-3 h-3" />
                         <span>Soạn Thư Xin Lỗi</span>
@@ -1135,7 +1131,7 @@ export const FeedbackSummary: React.FC = () => {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-indigo-600" />
+                  <Layers className="w-5 h-5 text-red-600" />
                   Phân Tích Cảm Xúc Theo Khía Cạnh (Aspect-Based Sentiment)
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -1293,7 +1289,7 @@ export const FeedbackSummary: React.FC = () => {
                       ? 'bg-rose-50/40 border-rose-200'
                       : bt.severity === 'MODERATE' || bt.severity === 'HIGH'
                       ? 'bg-amber-50/40 border-amber-200'
-                      : 'bg-indigo-50/40 border-indigo-200'
+                      : 'bg-red-50/40 border-red-200'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2.5">
@@ -1303,7 +1299,7 @@ export const FeedbackSummary: React.FC = () => {
                           ? 'bg-rose-100 text-rose-700 border border-rose-200'
                           : bt.severity === 'MODERATE' || bt.severity === 'HIGH'
                           ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                          : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                          : 'bg-red-100 text-indigo-800 border border-red-200'
                       }`}
                     >
                       {bt.severity === 'CRITICAL'
@@ -1348,7 +1344,7 @@ export const FeedbackSummary: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100 mb-6">
               <div>
                 <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-indigo-600" />
+                  <Sparkles className="w-5 h-5 text-red-600" />
                   Kế Hoạch Khắc Phục Tự Động Theo Thời Gian Thực (AI Action Plan)
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -1387,7 +1383,7 @@ export const FeedbackSummary: React.FC = () => {
                           className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black shrink-0 mt-0.5 ${
                             isApplied
                               ? 'bg-emerald-600 text-white'
-                              : 'bg-indigo-100 text-indigo-700'
+                              : 'bg-red-100 text-red-700'
                           }`}
                         >
                           {isApplied ? <Check className="w-4 h-4 stroke-[3]" /> : idx + 1}
@@ -1402,7 +1398,7 @@ export const FeedbackSummary: React.FC = () => {
                                   : action.priority === 'HIGH'
                                   ? 'bg-amber-100 text-amber-800'
                                   : action.priority === 'MEDIUM'
-                                  ? 'bg-indigo-100 text-indigo-800'
+                                  ? 'bg-red-100 text-indigo-800'
                                   : 'bg-slate-100 text-slate-700'
                               }`}
                             >
@@ -1451,7 +1447,7 @@ export const FeedbackSummary: React.FC = () => {
                             </>
                           ) : (
                             <>
-                              <ArrowRight className="w-3.5 h-3.5 text-indigo-600" />
+                              <ArrowRight className="w-3.5 h-3.5 text-red-600" />
                               <span>Áp Dụng Ngay</span>
                             </>
                           )}
@@ -1473,7 +1469,7 @@ export const FeedbackSummary: React.FC = () => {
                   <h3 className="text-base font-black text-white">
                     Đối Chiếu Chỉ Số Với Sự Kiện Quá Khứ (RAG Historical Benchmarking)
                   </h3>
-                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 flex items-center gap-1">
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-red-500/20 text-indigo-300 border border-indigo-400/30 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
                     pgvector Semantic Search
                   </span>
@@ -1568,7 +1564,7 @@ export const FeedbackSummary: React.FC = () => {
                 placeholder="Tìm theo người gửi, nhận xét, phiên..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:bg-white transition-all"
               />
             </div>
 
@@ -1762,7 +1758,7 @@ export const FeedbackSummary: React.FC = () => {
             {/* Modal Header */}
             <div className="px-6 py-4.5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between border-b border-indigo-800/50">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
+                <div className="w-9 h-9 rounded-2xl bg-red-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
                   <Mail className="w-4 h-4 text-indigo-300" />
                 </div>
                 <div>
@@ -1791,7 +1787,7 @@ export const FeedbackSummary: React.FC = () => {
               {/* Left Column: Input Form (5 cols) */}
               <div className="lg:col-span-5 space-y-4">
                 <div className="text-xs font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
-                  <Bot className="w-3.5 h-3.5 text-indigo-600" />
+                  <Bot className="w-3.5 h-3.5 text-red-600" />
                   Thông Tin Khách Hàng & Vấn Đề
                 </div>
 
@@ -1803,7 +1799,7 @@ export const FeedbackSummary: React.FC = () => {
                     type="text"
                     value={apologyAttendeeName}
                     onChange={(e) => setApologyAttendeeName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-medium"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-500 font-medium"
                   />
                 </div>
 
@@ -1815,7 +1811,7 @@ export const FeedbackSummary: React.FC = () => {
                     type="email"
                     value={apologyAttendeeEmail}
                     onChange={(e) => setApologyAttendeeEmail(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-medium"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-500 font-medium"
                   />
                 </div>
 
@@ -1827,7 +1823,7 @@ export const FeedbackSummary: React.FC = () => {
                     <select
                       value={apologyRating}
                       onChange={(e) => setApologyRating(Number(e.target.value))}
-                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-bold"
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-500 font-bold"
                     >
                       <option value={1}>1 Sao ⭐ (Rất tệ)</option>
                       <option value={2}>2 Sao ⭐⭐ (Kém)</option>
@@ -1841,7 +1837,7 @@ export const FeedbackSummary: React.FC = () => {
                     <select
                       value={apologyAspect}
                       onChange={(e) => setApologyAspect(e.target.value)}
-                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-bold"
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-500 font-bold"
                     >
                       <option value="Hậu cần & Trải nghiệm">Hậu cần & Trải nghiệm</option>
                       <option value="Hạ tầng & Kỹ thuật">Hạ tầng & Kỹ thuật</option>
@@ -1858,7 +1854,7 @@ export const FeedbackSummary: React.FC = () => {
                     rows={2}
                     value={apologyComment}
                     onChange={(e) => setApologyComment(e.target.value)}
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-medium"
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-red-500 font-medium"
                   />
                 </div>
 
@@ -1910,7 +1906,7 @@ export const FeedbackSummary: React.FC = () => {
                         onClick={() => setEmailPreviewTab('html')}
                         className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                           emailPreviewTab === 'html'
-                            ? 'bg-indigo-600 text-white shadow-2xs'
+                            ? 'bg-red-600 text-white shadow-2xs'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
@@ -1920,7 +1916,7 @@ export const FeedbackSummary: React.FC = () => {
                         onClick={() => setEmailPreviewTab('text')}
                         className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
                           emailPreviewTab === 'text'
-                            ? 'bg-indigo-600 text-white shadow-2xs'
+                            ? 'bg-red-600 text-white shadow-2xs'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >

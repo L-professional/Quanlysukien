@@ -302,3 +302,23 @@ async def generate_pr_endpoint(payload: PRGenerateRequest):
 @router.post("/generate", response_model=PRGenerateResponse)
 async def generate_legacy_endpoint(payload: PRGenerateRequest):
     return await execute_pr_generation(payload)
+
+
+@router.post("/generate-description")
+async def generate_ai_description_endpoint(payload: dict):
+    from app.api.v1.events import (
+        GenerateSessionDescriptionRequest,
+        generate_session_description,
+    )
+    req = GenerateSessionDescriptionRequest(
+        title=payload.get("title") or payload.get("event_name") or "",
+        track=payload.get("track") or payload.get("category") or payload.get("event_type") or "AI & Tech",
+        category=payload.get("category") or payload.get("event_type"),
+        event_type=payload.get("event_type"),
+        location=payload.get("location") or payload.get("event_location"),
+        speaker_name=payload.get("speaker_name") or "",
+        speaker_role=payload.get("speaker_role") or "",
+        style=payload.get("style") or "auto",
+    )
+    return await generate_session_description(req)
+

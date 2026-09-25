@@ -260,7 +260,7 @@ export const FloatingChatbot: React.FC = () => {
             setIsOpen(true);
             setIsMinimized(false);
           }}
-          className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative"
+          className="w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30 flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative"
           aria-label="Open AI Concierge Chatbot"
         >
           <Sparkles className="w-7 h-7 text-white" />
@@ -270,14 +270,14 @@ export const FloatingChatbot: React.FC = () => {
 
       {/* Chat Popup Window */}
       {isOpen && !isMinimized && (
-        <div className="w-[92vw] sm:w-[420px] h-[590px] max-h-[85vh] bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-3xl shadow-2xl shadow-indigo-950/80 flex flex-col overflow-hidden animate-fade-in transition-all">
+        <div className="w-[92vw] sm:w-[420px] h-[590px] max-h-[85vh] bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-3xl shadow-2xl shadow-slate-950/80 flex flex-col overflow-hidden animate-fade-in transition-all">
           {/* Header */}
-          <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 border-b border-slate-800/80 flex items-center justify-between">
+          <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-red-950 to-slate-900 border-b border-slate-800/80 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 p-0.5 shadow-md">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-400 p-0.5 shadow-md">
                   <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                    <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse-subtle" />
+                    <Sparkles className="w-5 h-5 text-red-400 animate-pulse-subtle" />
                   </div>
                 </div>
                 <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
@@ -285,7 +285,7 @@ export const FloatingChatbot: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-extrabold text-white tracking-tight">EventHub AI Assistant</h3>
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded">
+                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-red-500/20 text-red-300 border border-red-500/30 rounded">
                     RAG + Gemini 1.5
                   </span>
                 </div>
@@ -319,13 +319,13 @@ export const FloatingChatbot: React.FC = () => {
           </div>
 
           {/* Active WiFi Context Pill Header */}
-          <div className="px-4 py-1.5 bg-indigo-950/80 border-b border-indigo-900/60 flex items-center justify-between text-[11px]">
-            <div className="flex items-center gap-1.5 text-indigo-300 font-semibold">
-              <Wifi className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-              <span>WiFi: <code className="text-white bg-indigo-900 px-1 rounded font-mono">{wifiName}</code></span>
+          <div className="px-4 py-1.5 bg-red-950/80 border-b border-red-900/60 flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-1.5 text-red-200 font-semibold">
+              <Wifi className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              <span>WiFi: <code className="text-white bg-red-900 px-1 rounded font-mono">{wifiName}</code></span>
             </div>
-            <div className="text-indigo-300 font-semibold">
-              <span>Pass: <code className="text-white bg-indigo-900 px-1 rounded font-mono">{wifiPass}</code></span>
+            <div className="text-red-200 font-semibold">
+              <span>Pass: <code className="text-white bg-red-900 px-1 rounded font-mono">{wifiPass}</code></span>
             </div>
           </div>
 
@@ -342,8 +342,8 @@ export const FloatingChatbot: React.FC = () => {
                 <div
                   className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                     msg.sender === 'user'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-800 border border-slate-700 text-indigo-400'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-slate-800 border border-slate-700 text-red-400'
                   }`}
                 >
                   {msg.sender === 'user' ? (
@@ -357,7 +357,7 @@ export const FloatingChatbot: React.FC = () => {
                 <div
                   className={`max-w-[82%] rounded-2xl p-3.5 space-y-2 leading-relaxed ${
                     msg.sender === 'user'
-                      ? 'bg-indigo-600 text-white rounded-tr-none shadow-md'
+                      ? 'bg-red-600 text-white rounded-tr-none shadow-md'
                       : 'bg-slate-800/90 border border-slate-700/80 text-slate-100 rounded-tl-none shadow-sm'
                   }`}
                 >
@@ -378,11 +378,11 @@ export const FloatingChatbot: React.FC = () => {
                   {/* Sources / Knowledge Base Citation */}
                   {msg.sender === 'ai' && !msg.isFallback && (
                     <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 text-[10px] text-indigo-300 font-medium truncate">
-                        <BookOpen className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                      <div className="flex items-center gap-1.5 text-[10px] text-red-300 font-medium truncate">
+                        <BookOpen className="w-3.5 h-3.5 text-red-400 shrink-0" />
                         <span className="truncate">Source: {msg.sources?.[0] || 'Event Knowledge Base'}</span>
                       </div>
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-indigo-950 border border-indigo-800/70 text-indigo-300 shrink-0">
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-950 border border-red-800/70 text-red-300 shrink-0">
                         Hybrid AI
                       </span>
                     </div>
@@ -390,7 +390,7 @@ export const FloatingChatbot: React.FC = () => {
 
                   <span
                     className={`block text-[9px] ${
-                      msg.sender === 'user' ? 'text-indigo-200 text-right' : 'text-slate-500'
+                      msg.sender === 'user' ? 'text-red-200 text-right' : 'text-slate-500'
                     }`}
                   >
                     {msg.timestamp}
@@ -402,14 +402,14 @@ export const FloatingChatbot: React.FC = () => {
             {/* Typing / Analyzing Indicator */}
             {loading && (
               <div className="flex items-start gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-indigo-400 shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-red-400 shrink-0">
                   <Bot className="w-4 h-4" />
                 </div>
                 <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl rounded-tl-none p-3 text-xs text-slate-400 flex items-center gap-2">
                   <div className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></span>
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-bounce"></span>
+                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
                   </div>
                   <span className="text-[11px] text-slate-300 font-medium">Hybrid RAG &amp; Gemini AI đang suy luận...</span>
                 </div>
@@ -461,7 +461,7 @@ export const FloatingChatbot: React.FC = () => {
                 }}
                 placeholder="Hỏi về WiFi tổng, WiFi phòng họp, lịch trình..."
                 disabled={loading}
-                className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500 transition-colors"
               />
               <button
                 type="button"
@@ -473,7 +473,7 @@ export const FloatingChatbot: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading || !inputQuery.trim()}
-                className="p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
+                className="p-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white rounded-xl shadow-md shadow-red-600/30 transition-all cursor-pointer"
                 title="Gửi câu hỏi"
               >
                 <Send className="w-4 h-4" />
@@ -493,7 +493,7 @@ export const FloatingChatbot: React.FC = () => {
       {isOpen && isMinimized && (
         <button
           onClick={() => setIsMinimized(false)}
-          className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative"
+          className="w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30 flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative"
         >
           <Sparkles className="w-7 h-7 text-white" />
           <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-400 border-2 border-white"></span>

@@ -21,6 +21,9 @@ import {
   Layers,
   Check,
   FlipHorizontal,
+  Undo2,
+  Phone,
+  Filter,
 } from 'lucide-react';
 import jsQR from 'jsqr';
 import { apiService } from '../services/api';
@@ -49,6 +52,8 @@ export const QRScanner: React.FC = () => {
   const [cameraLoading, setCameraLoading] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [usingFrontCamera, setUsingFrontCamera] = useState<boolean>(false);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
   // Auto-scan status & cooldown feedback
@@ -62,11 +67,35 @@ export const QRScanner: React.FC = () => {
   // Result & History
   const [result, setResult] = useState<CheckInResult | null>(null);
   const [recentScans, setRecentScans] = useState<CheckInResult[]>([]);
+  const [historyFilter, setHistoryFilter] = useState<'ALL' | 'SUCCESS' | 'ERROR'>('ALL');
 
   // Manual issue modal
   const [showManualIssue, setShowManualIssue] = useState(false);
-  const [issueForm, setIssueForm] = useState({ full_name: '', email: '', ticket_type: 'Vé Vãng Lai' });
+  const [issueForm, setIssueForm] = useState({ full_name: '', email: '', phone: '', ticket_type: 'Vé Vãng Lai' });
   const [issueLoading, setIssueLoading] = useState(false);
+
+  // Enumerate cameras on mount
+  useEffect(() => {
+    if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+      navigator.mediaDevices
+        .enumerateDevices()
+        .then((devices) => {
+          const vInputs = devices.filter((d) => d.kind === 'videoinput');
+          setVideoDevices(vInputs);
+          if (vInputs.length > 0 && !selectedDeviceId) {
+            setSelectedDeviceId(vInputs[0].deviceId);
+          }
+        })
+        .catch((e) => console.warn('Cannot enumerate cameras:', e));
+    }
+  }, []);
+
+  const handleUndoLatestCheckIn = () => {
+    if (recentScans.length === 0) return;
+    const removed = recentScans[0];
+    setRecentScans((prev) => prev.slice(1));
+    toast.info(`Đã hoàn tác lượt check-in của "${removed.participantName || removed.token}"!`);
+  };
 
   // Refs for continuous video frame processing
   // Permanent DOM video ref ensures it's never null when mounting streams
@@ -448,7 +477,7 @@ export const QRScanner: React.FC = () => {
         ticket_type: issueForm.ticket_type,
       });
       toast.success(res.message || 'Cấp vé thành công!');
-      setIssueForm({ full_name: '', email: '', ticket_type: 'Vé Vãng Lai' });
+      setIssueForm({ full_name: '', email: '', phone: '', ticket_type: 'Vé Vãng Lai' });
       setShowManualIssue(false);
     } catch {
       toast.error('Không thể cấp vé. Vui lòng thử lại.');
@@ -463,8 +492,8 @@ export const QRScanner: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-xs">
-              <QrCode className="w-5 h-5 text-indigo-600" />
+            <div className="w-10 h-10 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 shadow-xs">
+              <QrCode className="w-5 h-5 text-red-600" />
             </div>
             {t('checkin.title', { defaultValue: 'Soát Vé Check-in QR Code' })}
           </h1>
@@ -498,7 +527,7 @@ export const QRScanner: React.FC = () => {
           {canIssueManual && (
             <button
               onClick={() => setShowManualIssue(true)}
-              className="px-4 py-2.5 min-h-[44px] rounded-xl border text-xs font-bold flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-600 shadow-xs transition-colors cursor-pointer"
+              className="px-4 py-2.5 min-h-[44px] rounded-xl border text-xs font-bold flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white border-red-600 shadow-xs transition-colors cursor-pointer"
             >
               <UserPlus className="w-4 h-4" />
               {t('checkin.manualIssue', { defaultValue: 'Cấp Vé Tại Chỗ' })}
@@ -508,13 +537,13 @@ export const QRScanner: React.FC = () => {
       </div>
 
       {/* Event Selection Banner (Task 59 Requirement 2) */}
-      <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-red-600 to-rose-700 text-white p-4 sm:p-5 rounded-2xl shadow-sm border border-red-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center text-white shrink-0">
             <Layers className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] font-bold tracking-wider text-indigo-300 uppercase">
+            <span className="text-[11px] font-bold tracking-wider text-red-100 uppercase">
               Sự Kiện Đang Soát Vé (Gate Context)
             </span>
             <h2 className="text-base font-extrabold text-white leading-tight">
@@ -524,7 +553,7 @@ export const QRScanner: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <label htmlFor="event-selector" className="text-xs font-semibold text-slate-300 shrink-0">
+          <label htmlFor="event-selector" className="text-xs font-semibold text-white/90 shrink-0">
             Chọn Sự Kiện Soát Vé:
           </label>
           <select
@@ -537,7 +566,7 @@ export const QRScanner: React.FC = () => {
               if (ev) setActiveEvent(ev);
               toast.info(`Đã chuyển cổng soát vé sang: ${ev?.title || id}`);
             }}
-            className="px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            className="px-3.5 py-2 rounded-xl bg-red-800/80 border border-red-400/40 text-white text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-white cursor-pointer"
           >
             {events.map((ev) => (
               <option key={ev.id} value={ev.id}>
@@ -554,7 +583,7 @@ export const QRScanner: React.FC = () => {
           <div className="w-[95vw] sm:max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-[85vh] flex flex-col overflow-hidden">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
               <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-indigo-600" />
+                <UserPlus className="w-5 h-5 text-red-600" />
                 {t('checkin.manualIssue', { defaultValue: 'Cấp Vé Tại Chỗ' })}
               </h3>
               <button
@@ -577,7 +606,7 @@ export const QRScanner: React.FC = () => {
                     value={issueForm.full_name}
                     onChange={(e) => setIssueForm({ ...issueForm, full_name: e.target.value })}
                     placeholder={t('auth.fullNamePlaceholder', { defaultValue: 'Nguyễn Văn A...' })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-red-500 transition-all"
                   />
                 </div>
                 <div>
@@ -589,7 +618,20 @@ export const QRScanner: React.FC = () => {
                     value={issueForm.email}
                     onChange={(e) => setIssueForm({ ...issueForm, email: e.target.value })}
                     placeholder={t('auth.emailPlaceholder', { defaultValue: 'email@example.com...' })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-red-500 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Phone className="w-3 h-3 text-red-600" />
+                    Số Điện Thoại (Tùy chọn)
+                  </label>
+                  <input
+                    type="tel"
+                    value={issueForm.phone}
+                    onChange={(e) => setIssueForm({ ...issueForm, phone: e.target.value })}
+                    placeholder="0912345678 hoặc +84..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-red-500 transition-all"
                   />
                 </div>
                 <div>
@@ -599,7 +641,7 @@ export const QRScanner: React.FC = () => {
                   <select
                     value={issueForm.ticket_type}
                     onChange={(e) => setIssueForm({ ...issueForm, ticket_type: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-indigo-500 transition-all"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-red-500 transition-all"
                   >
                     <option value="Vé Vãng Lai">Vé Vãng Lai (Walk-in)</option>
                     <option value="Vé Tiêu Chuẩn">Vé Tiêu Chuẩn (Standard)</option>
@@ -620,7 +662,7 @@ export const QRScanner: React.FC = () => {
                 <button
                   type="submit"
                   disabled={issueLoading || !issueForm.full_name.trim() || !issueForm.email.trim()}
-                  className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+                  className="flex-1 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
                 >
                   {issueLoading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -676,7 +718,7 @@ export const QRScanner: React.FC = () => {
                   className={`px-4 py-2 min-h-[44px] rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer shadow-xs ${
                     cameraActive
                       ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
-                      : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                      : 'bg-red-600 hover:bg-red-700 text-white'
                   }`}
                 >
                   {cameraLoading ? (
@@ -770,7 +812,7 @@ export const QRScanner: React.FC = () => {
               ) : (
                 <div className="text-center p-8 space-y-3 z-10 animate-in fade-in duration-150">
                   <div className="w-16 h-16 rounded-2xl bg-slate-900 border border-slate-800 mx-auto flex items-center justify-center text-slate-400 shadow-sm">
-                    <QrCode className="w-8 h-8 text-indigo-400" />
+                    <QrCode className="w-8 h-8 text-red-400" />
                   </div>
                   <div>
                     <p className="text-sm font-bold text-slate-200">
@@ -794,7 +836,7 @@ export const QRScanner: React.FC = () => {
                   <button
                     onClick={() => startCamera(false)}
                     disabled={cameraLoading}
-                    className="mt-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-2 mx-auto"
+                    className="mt-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-md cursor-pointer transition-all flex items-center gap-2 mx-auto"
                   >
                     {cameraLoading ? (
                       <RefreshCw className="w-4 h-4 animate-spin" />
@@ -843,7 +885,7 @@ export const QRScanner: React.FC = () => {
           <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
             <form onSubmit={handleManualSubmit} className="space-y-3">
               <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                <Keyboard className="w-3.5 h-3.5 text-indigo-600" />
+                <Keyboard className="w-3.5 h-3.5 text-red-600" />
                 {t('checkin.manualInput', { defaultValue: 'Nhập Mã Thủ Công' })}
               </label>
               <div className="flex flex-col sm:flex-row gap-2.5">
@@ -854,12 +896,12 @@ export const QRScanner: React.FC = () => {
                   placeholder={t('checkin.manualPlaceholder', {
                     defaultValue: 'Nhập mã token vé (VD: QR-EVENTHUB-xxxx)...',
                   })}
-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 min-h-[44px] text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all font-mono"
+                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 min-h-[44px] text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-red-500 transition-all font-mono"
                 />
                 <button
                   type="submit"
                   disabled={loading || !manualToken.trim()}
-                  className="px-5 py-2.5 min-h-[44px] bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-2 transition-colors shrink-0"
+                  className="px-5 py-2.5 min-h-[44px] bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-2 transition-colors shrink-0"
                 >
                   {loading ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -937,7 +979,7 @@ export const QRScanner: React.FC = () => {
                       {result.participantName && (
                         <div className="flex items-center justify-between text-slate-700">
                           <span className="flex items-center gap-1.5 text-slate-500 font-medium">
-                            <UserCheck className="w-3.5 h-3.5 text-indigo-600" />
+                            <UserCheck className="w-3.5 h-3.5 text-red-600" />
                             Người tham dự:
                           </span>
                           <strong className="text-slate-900 font-bold truncate max-w-[180px]">
@@ -949,17 +991,17 @@ export const QRScanner: React.FC = () => {
                       {result.ticketType && (
                         <div className="flex items-center justify-between text-slate-700">
                           <span className="flex items-center gap-1.5 text-slate-500 font-medium">
-                            <Ticket className="w-3.5 h-3.5 text-indigo-600" />
+                            <Ticket className="w-3.5 h-3.5 text-red-600" />
                             Loại vé:
                           </span>
-                          <span className="text-indigo-700 font-bold">{result.ticketType}</span>
+                          <span className="text-red-700 font-bold">{result.ticketType}</span>
                         </div>
                       )}
 
                       {result.eventTitle && (
                         <div className="flex items-center justify-between text-slate-700">
                           <span className="flex items-center gap-1.5 text-slate-500 font-medium">
-                            <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                            <Layers className="w-3.5 h-3.5 text-red-600" />
                             Sự kiện / Phiên:
                           </span>
                           <span className="font-semibold text-slate-800 truncate max-w-[180px]">
@@ -971,7 +1013,7 @@ export const QRScanner: React.FC = () => {
                       {result.checkInTime && (
                         <div className="flex items-center justify-between text-slate-700">
                           <span className="flex items-center gap-1.5 text-slate-500 font-medium">
-                            <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                            <Clock className="w-3.5 h-3.5 text-red-600" />
                             Thời gian:
                           </span>
                           <span className="font-semibold text-slate-800 font-mono">
@@ -1000,31 +1042,69 @@ export const QRScanner: React.FC = () => {
 
           {/* Recent Scans History */}
           <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h4 className="text-xs font-bold uppercase text-slate-700 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                <Clock className="w-3.5 h-3.5 text-red-600" />
                 {t('checkin.recentScans', { defaultValue: 'Lịch Sử Quét Gần Đây' })}
                 <span className="px-1.5 py-0.2 bg-slate-100 rounded-md text-slate-500 text-[10px] font-mono">
                   {recentScans.length}
                 </span>
               </h4>
 
-              {recentScans.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setRecentScans([])}
-                  className="text-[11px] font-bold text-slate-400 hover:text-rose-600 flex items-center gap-1 transition-colors cursor-pointer"
-                  title="Xóa lịch sử quét"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  Xóa
-                </button>
-              )}
+              <div className="flex items-center gap-1.5">
+                {recentScans.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleUndoLatestCheckIn}
+                    className="px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-1 transition-colors cursor-pointer border border-slate-200"
+                    title="Hoàn tác lượt check-in gần nhất"
+                  >
+                    <Undo2 className="w-3 h-3 text-red-600" />
+                    <span>Hoàn tác</span>
+                  </button>
+                )}
+                {recentScans.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setRecentScans([])}
+                    className="text-[11px] font-bold text-slate-400 hover:text-rose-600 p-1 flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Xóa lịch sử quét"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Filter Pills for Scan History */}
+            {recentScans.length > 0 && (
+              <div className="flex items-center gap-1.5 pt-1">
+                {(['ALL', 'SUCCESS', 'ERROR'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setHistoryFilter(mode)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                      historyFilter === mode
+                        ? 'bg-red-600 text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {mode === 'ALL' ? 'Tất cả' : mode === 'SUCCESS' ? '✓ Thành công' : '✕ Bị từ chối'}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {recentScans.length > 0 ? (
               <div className="space-y-2 max-h-72 overflow-y-auto pr-1 divide-y divide-slate-100">
-                {recentScans.map((scan, idx) => (
+                {recentScans
+                  .filter((s) => {
+                    if (historyFilter === 'SUCCESS') return s.status === 'SUCCESS';
+                    if (historyFilter === 'ERROR') return s.status !== 'SUCCESS';
+                    return true;
+                  })
+                  .map((scan, idx) => (
                   <div
                     key={`${scan.token}-${idx}`}
                     className="pt-2 first:pt-0 pb-1 flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-1 duration-150"

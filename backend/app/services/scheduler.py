@@ -7,6 +7,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.core.database import AsyncSessionLocal
 from app.models.reminder import UserReminder
+from app.models.notification import Notification
 from app.models.user import User
 from app.models.event import Event, EventSchedule
 from app.services.email_service import send_session_reminder_email
@@ -81,8 +82,8 @@ async def check_and_send_scheduled_reminders():
 
                 diff_seconds = (target_start - now_utc).total_seconds()
 
-                # 1. 24h reminder: between 0 and 24 hours
-                if not reminder.notified_24h and 0 < diff_seconds <= 24 * 3600:
+                # 1. 24h reminder: between 2 hours and 24 hours (24 * 3600 seconds)
+                if not reminder.notified_24h and 2 * 3600 < diff_seconds <= 24 * 3600:
                     await send_session_reminder_email(
                         to_email=user_email,
                         recipient_name=user_name,
@@ -92,11 +93,23 @@ async def check_and_send_scheduled_reminders():
                         room_location=room_loc,
                         reminder_type="24h",
                     )
+                    # Create In-App Notification
+                    notif_24h = Notification(
+                        user_id=reminder.user_id,
+                        target_role="PARTICIPANT",
+                        title=f"Nhắc lịch sự kiện (còn 24h): {event_title}",
+                        message=f"Sự kiện '{event_title}' sẽ bắt đầu trong 24 giờ tới tại {room_loc}. Vui lòng sắp xếp lịch trình tham dự đúng giờ!",
+                        type="REMINDER_24H",
+                        link="/events",
+                        is_read=False,
+                        created_at=datetime.now(timezone.utc),
+                    )
+                    db.add(notif_24h)
                     reminder.notified_24h = True
                     sent_count += 1
 
-                # 2. 1h urgent reminder: between 0 and 1 hour (3600 seconds)
-                if not reminder.notified_1h and 0 < diff_seconds <= 3600:
+                # 2. 2h urgent reminder: between 0 and 2 hours (2 * 3600 seconds)
+                if not reminder.notified_1h and 0 < diff_seconds <= 2 * 3600:
                     await send_session_reminder_email(
                         to_email=user_email,
                         recipient_name=user_name,
@@ -106,6 +119,18 @@ async def check_and_send_scheduled_reminders():
                         room_location=room_loc,
                         reminder_type="1h",
                     )
+                    # Create In-App Urgent Notification
+                    notif_2h = Notification(
+                        user_id=reminder.user_id,
+                        target_role="PARTICIPANT",
+                        title=f"Nhắc nhở khẩn cấp (còn 2 giờ): {event_title}",
+                        message=f"Sự kiện '{event_title}' sẽ diễn ra trong 2 giờ nữa tại {room_loc}. Nhấn vào đây để mở nhanh Mã QR Check-in tại cổng!",
+                        type="REMINDER_2H",
+                        link="/check-in",
+                        is_read=False,
+                        created_at=datetime.now(timezone.utc),
+                    )
+                    db.add(notif_2h)
                     reminder.notified_1h = True
                     sent_count += 1
 

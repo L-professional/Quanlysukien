@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Sparkles,
@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiService } from '../services/api';
+import { useEventSync } from '../services/eventSync';
 
 interface InquiryItem {
   id: string;
@@ -171,6 +172,7 @@ export const AIConcierge: React.FC = () => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isAutoApproveActive, setIsAutoApproveActive] = useState<boolean>(false);
+  const [autoApproveThreshold, setAutoApproveThreshold] = useState<number>(95);
 
   // Task 37 States
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -179,61 +181,65 @@ export const AIConcierge: React.FC = () => {
   const [isRagPopoverOpen, setIsRagPopoverOpen] = useState<boolean>(false);
   const [isCopiedSnippet, setIsCopiedSnippet] = useState<boolean>(false);
 
-  // Task 43: Fetch inquiries from Backend API and prioritize VIP
-  useEffect(() => {
-    const fetchLiveInquiries = async () => {
-      try {
-        const data = await apiService.getInquiries();
-        if (data && data.length > 0) {
-          const mapped: InquiryItem[] = data.map((item, idx) => {
-            const isVip = Boolean(
-              (item as any).is_vip ||
-              (item.question && item.question.toLowerCase().includes('vip')) ||
-              idx === 0 ||
-              idx === 2
-            );
-            const firstReply = item.replies && item.replies.length > 0 ? item.replies[0].content : '';
-            return {
-              id: `inq-${item.id}`,
-              name: (item as any).participant_name || `Đại biểu #${item.participant_id || idx + 1}`,
-              initials: ((item as any).participant_name || 'DB')
-                .split(' ')
-                .map((w: string) => w[0])
-                .join('')
-                .slice(0, 2)
-                .toUpperCase(),
-              email: (item as any).participant_email || `attendee${item.participant_id || idx + 1}@eventhub.ai`,
-              phone: (item as any).participant_phone || '+84 912 345 678',
-              isVip: isVip,
-              question: item.question,
-              timestamp: new Date(item.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              status: (item.status === 'APPROVED' ? 'APPROVED' : item.status === 'REJECTED' ? 'REJECTED' : 'PENDING'),
-              draftResponse: firstReply || SAMPLE_INQUIRIES[idx % SAMPLE_INQUIRIES.length].draftResponse,
-              checkInTime: isVip ? 'Check-in tại VIP Lounge' : 'Check-in tại Cổng Sảnh A',
-              qrCodeToken: (item as any).qr_code_token || `QR-EVT-P${item.participant_id}`,
-              ragSource: (item as any).rag_source || SAMPLE_INQUIRIES[idx % SAMPLE_INQUIRIES.length].ragSource,
-              ragSimilarity: (item as any).rag_similarity || (isVip ? 96.5 : 91.8),
-              ragDocTitle: (item as any).rag_doc_title || SAMPLE_INQUIRIES[idx % SAMPLE_INQUIRIES.length].ragDocTitle,
-              ragChunkId: (item as any).rag_chunk_id || SAMPLE_INQUIRIES[idx % SAMPLE_INQUIRIES.length].ragChunkId,
-              ragDistance: (item as any).rag_distance || SAMPLE_INQUIRIES[idx % SAMPLE_INQUIRIES.length].ragDistance,
-              ragSnippet: (item as any).rag_snippet || firstReply || SAMPLE_INQUIRIES[idx % SAMPLE_INQUIRIES.length].ragSnippet,
-            };
-          });
+  // Task 43 & 69: Fetch inquiries from Backend API, prioritize VIP, and auto-sync on event changes
+  const fetchLiveInquiries = useCallback(async () => {
+    try {
+      const data = await apiService.getInquiries();
+      if (data && data.length > 0) {
+        const mapped: InquiryItem[] = data.map((item, idx) => {
+          const isVip = Boolean(
+            (item as any).is_vip ||
+            (item.question && item.question.toLowerCase().includes('vip')) ||
+            idx === 0 ||
+            idx === 2
+          );
+          const firstReply = item.replies && item.replies.length > 0 ? item.replies[0].content : '';
+          return {
+            id: `inq-${item.id}`,
+            name: (item as any).participant_name || `Đại biểu #${item.participant_id || idx + 1}`,
+            initials: ((item as any).participant_name || 'DB')
+              .split(' ')
+              .map((w: string) => w[0])
+              .join('')
+              .slice(0, 2)
+              .toUpperCase(),
+            email: (item as any).participant_email || `attendee${item.participant_id || idx + 1}@eventhub.ai`,
+            phone: (item as any).participant_phone || '+84 912 345 678',
+            isVip: isVip,
+            question: item.question,
+            timestamp: new Date(item.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            status: (item.status === 'APPROVED' ? 'APPROVED' : item.status === 'REJECTED' ? 'REJECTED' : 'PENDING'),
+            draftResponse: firstReply || SAMPLE_INQUIRIES[idx % SAMPLE_INQUIRIES.length].draftResponse,
+            checkInTime: isVip ? 'Check-in tại VIP Lounge' : 'Check-in tại Cổng Sảnh A',
+            qrCodeToken: (item as any).qr_code_token || `QR-EVT-P${item.participant_id}`,
+            ragSource: (item as any).rag_source || SAMPLE_INQUIRIES[idx % SAMPLE_INQUIRIES.length].ragSource,
+            ragSimilarity: (item as any).rag_similarity || (isVip ? 96.5 : 91.8),
+            ragDocTitle: (item as any).rag_doc_title || SAMPLE_INQUIRIES[idx % SAMPLE_INQUIRIES.length].ragDocTitle,
+            ragChunkId: (item as any).rag_chunk_id || SAMPLE_INQUIRIES[idx % SAMPLE_INQUIRIES.length].ragChunkId,
+            ragDistance: (item as any).rag_distance || SAMPLE_INQUIRIES[idx % SAMPLE_INQUIRIES.length].ragDistance,
+            ragSnippet: (item as any).rag_snippet || firstReply || SAMPLE_INQUIRIES[idx % SAMPLE_INQUIRIES.length].ragSnippet,
+          };
+        });
 
-          // Sort VIP items to the top
-          mapped.sort((a, b) => (b.isVip ? 1 : 0) - (a.isVip ? 1 : 0));
-          setInquiries(mapped);
-          if (mapped.length > 0) {
-            setSelectedId(mapped[0].id);
-            setEditableDraft(mapped[0].draftResponse);
-          }
+        // Sort VIP items to the top
+        mapped.sort((a, b) => (b.isVip ? 1 : 0) - (a.isVip ? 1 : 0));
+        setInquiries(mapped);
+        if (mapped.length > 0) {
+          setSelectedId(mapped[0].id);
+          setEditableDraft(mapped[0].draftResponse);
         }
-      } catch (err) {
-        console.warn('Using enhanced VIP inquiries mock:', err);
       }
-    };
-    fetchLiveInquiries();
+    } catch (err) {
+      console.warn('Using enhanced VIP inquiries mock:', err);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchLiveInquiries();
+  }, [fetchLiveInquiries]);
+
+  // Task 69: Real-time event synchronization
+  useEventSync(fetchLiveInquiries);
 
   const selectedInquiry = inquiries.find((item) => item.id === selectedId) || inquiries[0];
 
@@ -397,11 +403,11 @@ export const AIConcierge: React.FC = () => {
     }
   };
 
-  // Task 43: Auto-Approve RAG > 95% Mode
+  // Task 43: Auto-Approve RAG Mode with Dynamic Threshold (>90%, >95%, etc.)
   const handleAutoApproveToggle = async () => {
     setIsAutoApproveActive((prev) => !prev);
     try {
-      const res = await apiService.autoApproveHighConfidence(95.0, 1);
+      const res = await apiService.autoApproveHighConfidence(autoApproveThreshold, 1);
       if (res && res.approved_count > 0) {
         toast.success(`⚡ Auto-Approve: ${res.message}`);
       }
@@ -410,24 +416,24 @@ export const AIConcierge: React.FC = () => {
     }
 
     const highConfidenceItems = inquiries.filter(
-      (item) => item.status === 'PENDING' && (item.ragSimilarity ?? 0) >= 95
+      (item) => item.status === 'PENDING' && (item.ragSimilarity ?? 0) >= autoApproveThreshold
     );
 
     if (highConfidenceItems.length > 0) {
       setInquiries((prev) =>
         prev.map((item) =>
-          item.status === 'PENDING' && (item.ragSimilarity ?? 0) >= 95
+          item.status === 'PENDING' && (item.ragSimilarity ?? 0) >= autoApproveThreshold
             ? { ...item, status: 'APPROVED' }
             : item
         )
       );
       toast.success(
-        `⚡ Đã tự động duyệt ${highConfidenceItems.length} câu hỏi có độ tin cậy RAG > 95% qua kênh ${getChannelLabel(
+        `⚡ Đã tự động duyệt ${highConfidenceItems.length} câu hỏi có độ tin cậy RAG > ${autoApproveThreshold}% qua kênh ${getChannelLabel(
           dispatchChannel
         )}!`
       );
     } else {
-      toast.info('Không có câu hỏi chờ duyệt nào đạt độ tin cậy RAG > 95%.');
+      toast.info(`Không có câu hỏi chờ duyệt nào đạt độ tin cậy RAG > ${autoApproveThreshold}%.`);
     }
   };
 
@@ -562,8 +568,8 @@ export const AIConcierge: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-            <Bot className="w-5 h-5 text-indigo-600" />
+          <div className="w-10 h-10 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600 shrink-0">
+            <Bot className="w-5 h-5 text-red-600" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t('concierge.title')}</h1>
@@ -573,21 +579,35 @@ export const AIConcierge: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Task 43: Auto-Approve RAG > 95% Action Button */}
-          <button
-            type="button"
-            onClick={handleAutoApproveToggle}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-98 ${
-              isAutoApproveActive
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-xs'
-                : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white border-amber-600'
-            }`}
-            title="Tự động phê duyệt các phản hồi đạt độ chính xác RAG pgvector > 95%"
-          >
-            <Zap className="w-3.5 h-3.5 fill-current text-amber-200" />
-            <span>⚡ Auto-Approve RAG &gt; 95%</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Task 43: Auto-Approve RAG Action Button & Threshold Dropdown */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleAutoApproveToggle}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-98 ${
+                isAutoApproveActive
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700 shadow-xs'
+                  : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white border-amber-600'
+              }`}
+              title={`Tự động phê duyệt các phản hồi đạt độ chính xác RAG pgvector > ${autoApproveThreshold}%`}
+            >
+              <Zap className="w-3.5 h-3.5 fill-current text-amber-200" />
+              <span>⚡ Auto-Approve RAG &gt; {autoApproveThreshold}%</span>
+            </button>
+
+            <select
+              value={autoApproveThreshold}
+              onChange={(e) => setAutoApproveThreshold(Number(e.target.value))}
+              className="text-xs font-bold bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-slate-700 outline-none cursor-pointer hover:border-red-500 shadow-xs"
+              title="Chỉnh ngưỡng RAG để tự động duyệt"
+            >
+              <option value={90}>Ngưỡng &gt; 90%</option>
+              <option value={92}>Ngưỡng &gt; 92%</option>
+              <option value={95}>Ngưỡng &gt; 95%</option>
+              <option value={98}>Ngưỡng &gt; 98%</option>
+            </select>
+          </div>
 
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
             <span className="text-xs font-bold text-slate-600">{t('concierge.pendingReview')}:</span>
@@ -632,7 +652,7 @@ export const AIConcierge: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder={t('concierge.searchInquiries')}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500 transition-all"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-red-500 transition-all"
               />
             </div>
 
@@ -645,7 +665,7 @@ export const AIConcierge: React.FC = () => {
                   className="flex items-center gap-1.5 text-slate-600 hover:text-slate-900 font-semibold cursor-pointer"
                 >
                   {selectedIds.size === inquiries.length && inquiries.length > 0 ? (
-                    <CheckSquare className="w-4 h-4 text-indigo-600" />
+                    <CheckSquare className="w-4 h-4 text-red-600" />
                   ) : (
                     <Square className="w-4 h-4 text-slate-400" />
                   )}
@@ -681,7 +701,7 @@ export const AIConcierge: React.FC = () => {
                     onClick={() => handleSelect(item)}
                     className={`w-full text-left p-3 rounded-xl transition-all cursor-pointer block border relative ${
                       isActive
-                        ? 'bg-indigo-50/70 border-l-4 border-indigo-600 border-indigo-200 text-slate-900 shadow-xs'
+                        ? 'bg-red-50/70 border-l-4 border-red-600 border-red-200 text-slate-900 shadow-xs'
                         : item.isVip
                         ? 'bg-amber-50/25 border-amber-200/80 hover:border-amber-300 text-slate-800'
                         : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
@@ -692,10 +712,10 @@ export const AIConcierge: React.FC = () => {
                         <button
                           type="button"
                           onClick={(e) => handleToggleSelect(item.id, e)}
-                          className="text-slate-400 hover:text-indigo-600 cursor-pointer p-0.5"
+                          className="text-slate-400 hover:text-red-600 cursor-pointer p-0.5"
                         >
                           {isChecked ? (
-                            <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
+                            <CheckSquare className="w-3.5 h-3.5 text-red-600" />
                           ) : (
                             <Square className="w-3.5 h-3.5 text-slate-300" />
                           )}
@@ -704,7 +724,7 @@ export const AIConcierge: React.FC = () => {
                           className={`w-6 h-6 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
                             item.isVip
                               ? 'bg-amber-600 text-white shadow-xs ring-1 ring-amber-300'
-                              : 'bg-indigo-600 text-white'
+                              : 'bg-red-600 text-white'
                           }`}
                         >
                           {item.initials}
@@ -769,7 +789,7 @@ export const AIConcierge: React.FC = () => {
             {/* Card 1: Participant Info */}
             <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white font-black text-sm flex items-center justify-center shadow-xs shrink-0">
+                <div className="w-11 h-11 rounded-2xl bg-red-600 text-white font-black text-sm flex items-center justify-center shadow-xs shrink-0">
                   {selectedInquiry.initials}
                 </div>
                 <div className="min-w-0">
@@ -802,7 +822,7 @@ export const AIConcierge: React.FC = () => {
             <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                  <Bot className="w-3.5 h-3.5 text-indigo-600" />
+                  <Bot className="w-3.5 h-3.5 text-red-600" />
                   Câu Hỏi Cần Phản Hồi
                 </span>
                 <span className="text-[10px] text-slate-400 font-mono">Ticket #{selectedInquiry.id}</span>
@@ -817,7 +837,7 @@ export const AIConcierge: React.FC = () => {
           <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5 text-indigo-600" />
+                <Database className="w-3.5 h-3.5 text-red-600" />
                 Trích Dẫn Kiến Thức RAG (pgvector similarity)
               </span>
               <span className="text-[10px] font-mono text-slate-400">text-embedding-004 (768d)</span>
@@ -827,10 +847,10 @@ export const AIConcierge: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsRagPopoverOpen(true)}
-              className="w-full text-left flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-gradient-to-r from-indigo-50/80 via-blue-50/50 to-indigo-50/30 border border-indigo-200 hover:border-indigo-400 cursor-pointer shadow-2xs hover:shadow-xs transition-all group"
+              className="w-full text-left flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-gradient-to-r from-indigo-50/80 via-blue-50/50 to-indigo-50/30 border border-red-200 hover:border-indigo-400 cursor-pointer shadow-2xs hover:shadow-xs transition-all group"
             >
               <div className="flex items-start gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                <div className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
                   <BookOpen className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 space-y-0.5">
@@ -847,7 +867,7 @@ export const AIConcierge: React.FC = () => {
                     >
                       {selectedInquiry.ragSimilarity}% Similarity
                     </span>
-                    <span className="text-[10px] text-indigo-700 font-medium bg-indigo-100/70 px-2 py-0.5 rounded-md">
+                    <span className="text-[10px] text-red-700 font-medium bg-red-100/70 px-2 py-0.5 rounded-md">
                       {selectedInquiry.ragChunkId}
                     </span>
                   </div>
@@ -857,7 +877,7 @@ export const AIConcierge: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-bold shrink-0 self-end sm:self-center group-hover:translate-x-0.5 transition-transform">
+              <div className="flex items-center gap-1.5 text-xs text-red-600 font-bold shrink-0 self-end sm:self-center group-hover:translate-x-0.5 transition-transform">
                 <span>Xem trích dẫn đầy đủ</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </div>
@@ -869,8 +889,8 @@ export const AIConcierge: React.FC = () => {
             {/* Box Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-600 shrink-0">
-                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                <div className="w-8 h-8 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center text-red-600 shrink-0">
+                  <Sparkles className="w-4 h-4 text-red-600" />
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">{t('concierge.suggestedResponse')}</h3>
@@ -889,7 +909,7 @@ export const AIConcierge: React.FC = () => {
             {/* Smart Prompt Assistant Toolbar */}
             <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-50 border border-slate-200/90 rounded-xl">
               <span className="text-[10px] font-extrabold text-slate-500 uppercase flex items-center gap-1 px-1">
-                <Sparkles className="w-3 h-3 text-indigo-600" /> Trợ Lý Prompt:
+                <Sparkles className="w-3 h-3 text-red-600" /> Trợ Lý Prompt:
               </span>
 
               {/* [🌐 Dịch Ngôn Ngữ] */}
@@ -901,7 +921,7 @@ export const AIConcierge: React.FC = () => {
                 title="Dịch câu trả lời sang tiếng Anh hoặc tiếng Việt song ngữ"
               >
                 {isPromptLoading === 'TRANSLATE' ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-red-600" />
                 ) : (
                   <Globe className="w-3.5 h-3.5 text-blue-600" />
                 )}
@@ -917,7 +937,7 @@ export const AIConcierge: React.FC = () => {
                 title="Viết lại câu trả lời theo phong cách nhiệt tình, trực quan với icon và lời chúc"
               >
                 {isPromptLoading === 'REWRITE_ENGAGING' ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-red-600" />
                 ) : (
                   <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 )}
@@ -933,7 +953,7 @@ export const AIConcierge: React.FC = () => {
                 title="Chèn vị trí sảnh hội nghị và mật khẩu WiFi khách VIP"
               >
                 {isPromptLoading === 'INSERT_INFO' ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-red-600" />
                 ) : (
                   <MapPin className="w-3.5 h-3.5 text-rose-500" />
                 )}
@@ -949,7 +969,7 @@ export const AIConcierge: React.FC = () => {
                 title="Tự động tra cứu và đính kèm mã QR Check-in & Thông tin vé của khách"
               >
                 {isPromptLoading === 'ATTACH_QR' ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-red-600" />
                 ) : (
                   <QrCode className="w-3.5 h-3.5 text-emerald-600" />
                 )}
@@ -982,7 +1002,7 @@ export const AIConcierge: React.FC = () => {
                   onClick={() => setDispatchChannel('EMAIL')}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                     dispatchChannel === 'EMAIL'
-                      ? 'bg-white text-indigo-600 shadow-2xs'
+                      ? 'bg-white text-red-600 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                   title="Gửi phản hồi qua Email"
@@ -995,7 +1015,7 @@ export const AIConcierge: React.FC = () => {
                   onClick={() => setDispatchChannel('IN_APP')}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                     dispatchChannel === 'IN_APP'
-                      ? 'bg-white text-indigo-600 shadow-2xs'
+                      ? 'bg-white text-red-600 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                   title="Gửi thông báo In-App trên ứng dụng"
@@ -1008,7 +1028,7 @@ export const AIConcierge: React.FC = () => {
                   onClick={() => setDispatchChannel('SMS')}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                     dispatchChannel === 'SMS'
-                      ? 'bg-white text-indigo-600 shadow-2xs'
+                      ? 'bg-white text-red-600 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                   title="Gửi tin nhắn SMS trực tiếp"
@@ -1035,7 +1055,7 @@ export const AIConcierge: React.FC = () => {
 
                 <button
                   onClick={() => setIsEditing(!isEditing)}
-                  className="bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 min-h-[40px]"
+                  className="bg-red-50 hover:bg-red-100 text-red-600 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 min-h-[40px]"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
                   {isEditing ? t('common.save') : t('concierge.editResponse')}
@@ -1070,13 +1090,13 @@ export const AIConcierge: React.FC = () => {
             {/* Popover Header */}
             <div className="p-5 flex items-center justify-between border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                <div className="w-9 h-9 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600">
                   <Database className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                     <span>RAG Source Inspector</span>
-                    <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">
                       pgvector &lt;=&gt; cosine
                     </span>
                   </h3>
@@ -1119,12 +1139,12 @@ export const AIConcierge: React.FC = () => {
               </div>
 
               {/* Document Meta */}
-              <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 flex items-center justify-between">
+              <div className="p-3 bg-red-50/60 rounded-xl border border-red-100 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] text-indigo-600 font-bold uppercase">Tiêu Đề Trích Đoạn</p>
+                  <p className="text-[10px] text-red-600 font-bold uppercase">Tiêu Đề Trích Đoạn</p>
                   <p className="font-bold text-slate-900 mt-0.5">{selectedInquiry.ragDocTitle}</p>
                 </div>
-                <span className="font-mono text-[11px] bg-white text-indigo-700 font-bold px-2 py-1 rounded-lg border border-indigo-200">
+                <span className="font-mono text-[11px] bg-white text-red-700 font-bold px-2 py-1 rounded-lg border border-red-200">
                   {selectedInquiry.ragChunkId}
                 </span>
               </div>
@@ -1133,13 +1153,13 @@ export const AIConcierge: React.FC = () => {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                    <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                    <Layers className="w-3.5 h-3.5 text-red-600" />
                     Văn Bản Đã Truy Xuất (Retrieved Chunk)
                   </label>
                   <button
                     type="button"
                     onClick={handleCopySnippet}
-                    className="text-[11px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] text-red-600 hover:text-red-800 font-bold flex items-center gap-1 cursor-pointer"
                   >
                     {isCopiedSnippet ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                     <span>{isCopiedSnippet ? 'Đã sao chép' : 'Sao chép'}</span>
@@ -1164,7 +1184,7 @@ export const AIConcierge: React.FC = () => {
               <button
                 type="button"
                 onClick={handleUseSnippetAsDraft}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer min-h-[40px]"
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow-xs cursor-pointer min-h-[40px]"
               >
                 <Sparkles className="w-3.5 h-3.5" />
                 <span>Dùng đoạn này làm câu trả lời</span>

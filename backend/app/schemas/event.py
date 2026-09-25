@@ -52,6 +52,9 @@ class EventResponse(EventBase):
     is_registered: bool = False
     is_checked_in: bool = False
     has_reviewed: bool = False
+    user_registration_id: Optional[int] = None
+    user_ticket_token: Optional[str] = None
+    is_reminded: bool = False
 
     class Config:
         from_attributes = True

@@ -78,9 +78,9 @@ const MOCK_DOCS: KnowledgeBaseItem[] = [
 
 export const KnowledgeBase: React.FC = () => {
   const { t } = useTranslation();
-  const { selectedRole } = useAuth();
-  // Dynamic RBAC Permission Guard (Task 64: Chỉ Quản lý và Admin có quyền đồng bộ RAG)
-  const canSyncRAG = selectedRole === 'ORGANIZER' || selectedRole === 'ADMIN';
+  const { hasRole } = useAuth();
+  // Dynamic RBAC Permission Guard: Admin & Event Manager have full sync/upload access
+  const canSyncRAG = hasRole(['ADMIN', 'EVENT_MANAGER', 'SUPER_ADMIN' as any, 'ORGANIZER' as any]);
 
   const [items, setItems] = useState<KnowledgeBaseItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -89,6 +89,8 @@ export const KnowledgeBase: React.FC = () => {
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
   const [newCategory, setNewCategory] = useState('FAQ');
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [reindexLoading, setReindexLoading] = useState<number | null>(null);
   const [isSyncingAll, setIsSyncingAll] = useState<boolean>(false);
@@ -214,12 +216,16 @@ export const KnowledgeBase: React.FC = () => {
     }
   };
 
-  const filteredItems = items.filter(
-    (i) =>
+  const filteredItems = items.filter((i) => {
+    const matchesCat =
+      selectedCategory === 'ALL' ||
+      i.category.toLowerCase() === selectedCategory.toLowerCase();
+    const matchesSearch =
       i.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       i.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      i.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+      i.category.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesCat && matchesSearch;
+  });
 
   const statusBadge = (status: KnowledgeBaseItem['status']) => {
     switch (status) {
@@ -240,8 +246,8 @@ export const KnowledgeBase: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-              <Brain className="w-5 h-5 text-indigo-600" />
+            <div className="w-9 h-9 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center text-red-600">
+              <Brain className="w-5 h-5 text-red-600" />
             </div>
             {t('knowledge.title')}
           </h1>
@@ -255,14 +261,14 @@ export const KnowledgeBase: React.FC = () => {
               type="button"
               onClick={handleSyncAllRAG}
               disabled={isSyncingAll}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 shadow-2xs transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-600/20 transition-all cursor-pointer"
             >
-              <Zap className={`w-4 h-4 ${isSyncingAll ? 'animate-spin text-purple-600' : 'fill-current text-purple-600'}`} />
+              <Zap className={`w-4 h-4 ${isSyncingAll ? 'animate-spin text-white' : 'fill-current text-white'}`} />
               <span>{isSyncingAll ? 'Đang đồng bộ...' : 'Đồng bộ RAG (pgvector)'}</span>
             </button>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-600/20 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               {t('knowledge.uploadDoc')}
@@ -280,12 +286,12 @@ export const KnowledgeBase: React.FC = () => {
             placeholder={t('knowledge.searchDocs')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 shadow-xs transition-all"
+            className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-red-500 shadow-xs transition-all"
           />
         </div>
         {canSyncRAG && (
           <div
-            className="relative flex items-center justify-center px-5 py-2.5 bg-white border-2 border-dashed border-slate-300 rounded-xl hover:border-indigo-500 hover:bg-indigo-50/50 transition-all cursor-pointer shadow-xs"
+            className="relative flex items-center justify-center px-5 py-2.5 bg-white border-2 border-dashed border-slate-300 rounded-xl hover:border-red-500 hover:bg-red-50/50 transition-all cursor-pointer shadow-xs"
             onDrop={handleFileDrop}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -317,17 +323,35 @@ export const KnowledgeBase: React.FC = () => {
           />
           {isDragging ? (
             <div className="text-center">
-              <Upload className="w-5 h-5 mx-auto text-indigo-600 mb-1" />
-              <p className="text-xs text-indigo-600 font-bold">{t('knowledge.uploadDoc')}</p>
+              <Upload className="w-5 h-5 mx-auto text-red-600 mb-1" />
+              <p className="text-xs text-red-600 font-bold">{t('knowledge.uploadDoc')}</p>
             </div>
           ) : (
             <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-              <Upload className="w-4 h-4 text-indigo-600" />
+              <Upload className="w-4 h-4 text-red-600" />
               <span>{t('knowledge.uploadDoc')} (.pdf, .txt, .md)</span>
             </div>
           )}
         </div>
         )}
+      </div>
+
+      {/* Category Filter Pills (Task 77 Sub-Feature) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        {['ALL', ...CATEGORIES].map((cat) => (
+          <button
+            key={cat}
+            type="button"
+            onClick={() => setSelectedCategory(cat)}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              selectedCategory === cat
+                ? 'bg-red-600 text-white shadow-xs'
+                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 shadow-2xs'
+            }`}
+          >
+            {cat === 'ALL' ? 'Tất cả danh mục' : cat}
+          </button>
+        ))}
       </div>
 
       {/* Document Table */}
@@ -373,8 +397,8 @@ export const KnowledgeBase: React.FC = () => {
                   >
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
-                          <FileText className="w-4 h-4 text-indigo-600" />
+                        <div className="w-8 h-8 rounded-lg bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
+                          <FileText className="w-4 h-4 text-red-600" />
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-900 line-clamp-1">
@@ -420,7 +444,7 @@ export const KnowledgeBase: React.FC = () => {
                             <button
                               onClick={() => handleReindex(item.id)}
                               disabled={reindexLoading === item.id}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                               title="Re-index"
                             >
                               {reindexLoading === item.id ? (
@@ -457,7 +481,7 @@ export const KnowledgeBase: React.FC = () => {
             {/* Fixed Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
               <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-indigo-600" />
+                <Plus className="w-4 h-4 text-red-600" />
                 {t('knowledge.uploadDoc')}
               </h3>
               <button
@@ -479,7 +503,7 @@ export const KnowledgeBase: React.FC = () => {
                     placeholder="Ví dụ: FAQ Check-in"
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-red-500"
                     required
                   />
                 </div>
@@ -488,7 +512,7 @@ export const KnowledgeBase: React.FC = () => {
                   <select
                     value={newCategory}
                     onChange={(e) => setNewCategory(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-indigo-500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-red-500"
                   >
                     {CATEGORIES.map((cat) => (
                       <option key={cat} value={cat}>
@@ -504,7 +528,7 @@ export const KnowledgeBase: React.FC = () => {
                     placeholder="..."
                     value={newContent}
                     onChange={(e) => setNewContent(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-indigo-500"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:bg-white focus:border-red-500"
                     required
                   />
                 </div>
@@ -521,7 +545,7 @@ export const KnowledgeBase: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 min-h-[44px] py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center justify-center"
+                  className="flex-1 min-h-[44px] py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer flex items-center justify-center"
                 >
                   {t('common.save')}
                 </button>

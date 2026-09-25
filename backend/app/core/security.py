@@ -76,7 +76,12 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     try:
-        user = await db.get(User, int(user_id))
+        if str(user_id).isdigit():
+            user = await db.get(User, int(user_id))
+        else:
+            u_stmt = select(User).where(User.email == str(user_id))
+            u_res = await db.execute(u_stmt)
+            user = u_res.scalar_one_or_none()
     except Exception:
         user = None
 
@@ -121,7 +126,13 @@ async def get_current_user_optional(
     if not payload or not payload.get("sub"):
         return None
     try:
-        user = await db.get(User, int(payload["sub"]))
+        uid = str(payload["sub"])
+        if uid.isdigit():
+            user = await db.get(User, int(uid))
+        else:
+            u_stmt = select(User).where(User.email == uid)
+            u_res = await db.execute(u_stmt)
+            user = u_res.scalar_one_or_none()
         return user
     except Exception:
         return None

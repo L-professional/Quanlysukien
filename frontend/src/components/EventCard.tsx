@@ -1,7 +1,30 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, MapPin, Users, Edit, Trash2, QrCode, Play, Image as ImageIcon } from 'lucide-react';
+import {
+  Calendar,
+  MapPin,
+  Users,
+  Edit,
+  Trash2,
+  QrCode,
+  Play,
+  Ticket,
+  Star,
+  Image as ImageIcon,
+  Bell,
+  BellRing,
+  ChevronDown,
+  Download,
+  ExternalLink,
+  Loader2,
+  Copy,
+  Globe,
+  MoreVertical,
+} from 'lucide-react';
 import { Event } from '../types';
+import { apiService } from '../services/api';
+import { notifyEventChange } from '../services/eventSync';
+import { toast } from 'sonner';
 
 export type EventItem = Event;
 
@@ -13,7 +36,14 @@ export interface EventCardProps {
   onCheckIn?: (event: EventItem) => void;
   onPublish?: (event: EventItem) => void;
   onDuplicate?: (event: EventItem) => void;
+  onStatusChange?: (event: EventItem, newStatus: string) => void;
   onRegister?: (event: EventItem) => void;
+  onFeedback?: (event: EventItem) => void;
+  onViewTicket?: (event: EventItem) => void;
+  onCancelRegistration?: (event: EventItem) => void;
+  onToggleReminder?: (event: EventItem, action: 'SCHEDULE' | 'CANCEL') => Promise<void> | void;
+  /** Whether current user can manage (edit/delete) events — only admin/manager should set this true */
+  canManage?: boolean;
   className?: string;
 }
 
@@ -99,6 +129,85 @@ export function formatEventDateTime(
   return `${dateStr}${startTimeDisplay}`;
 }
 
+/** Build Google Calendar URL for personal device sync */
+export function buildGoogleCalendarUrl(event: Event): string {
+  const title = encodeURIComponent(cleanEventTitle(event.title) || 'Sự kiện EventHub AI');
+  const details = encodeURIComponent(
+    `${event.description || 'Tham gia sự kiện cùng EventHub AI'}\n\nXem chi tiết tại: ${window.location.origin}/events`
+  );
+  const location = encodeURIComponent(event.location_address || event.location || 'Hà Nội, Việt Nam');
+
+  const parseToUtcString = (val?: any): string => {
+    if (!val) {
+      const d = new Date(Date.now() + 86400000);
+      return d.toISOString().replace(/-|:|\.\d\d\d/g, '');
+    }
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().replace(/-|:|\.\d\d\d/g, '');
+    }
+    const future = new Date(Date.now() + 86400000);
+    return future.toISOString().replace(/-|:|\.\d\d\d/g, '');
+  };
+
+  const startUtc = parseToUtcString(event.start_time || event.start_date);
+  const endUtc = parseToUtcString(event.end_time || event.end_date);
+
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startUtc}/${endUtc}&details=${details}&location=${location}`;
+}
+
+/** Download standard .ics file for Apple Calendar, Outlook, Mobile */
+export function downloadIcsFile(event: Event): void {
+  const cleanTitle = cleanEventTitle(event.title) || 'Su kien EventHub AI';
+  const formatIcsDate = (val?: any): string => {
+    const d = val ? new Date(val) : new Date(Date.now() + 86400000);
+    const validD = isNaN(d.getTime()) ? new Date(Date.now() + 86400000) : d;
+    return validD.toISOString().replace(/-|:|\.\d\d\d/g, '');
+  };
+
+  const startIcs = formatIcsDate(event.start_time || event.start_date);
+  const endIcs = formatIcsDate(event.end_time || event.end_date);
+
+  const icsContent = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//EventHub AI//Event Scheduler//VI',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:evt-${event.id}-${Date.now()}@eventhub.ai`,
+    `DTSTAMP:${formatIcsDate(new Date())}`,
+    `DTSTART:${startIcs}`,
+    `DTEND:${endIcs}`,
+    `SUMMARY:${cleanTitle}`,
+    `DESCRIPTION:${(event.description || '').replace(/\n/g, '\\n')}`,
+    `LOCATION:${event.location_address || event.location || 'Việt Nam'}`,
+    'STATUS:CONFIRMED',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT24H',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:Nhắc nhở sự kiện EventHub AI trước 24 giờ',
+    'END:VALARM',
+    'BEGIN:VALARM',
+    'TRIGGER:-PT2H',
+    'ACTION:DISPLAY',
+    'DESCRIPTION:Nhắc nhở sự kiện EventHub AI trước 2 giờ - Chuẩn bị mã QR check-in',
+    'END:VALARM',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `event_${event.id}_schedule.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
 export const EventCard: React.FC<EventCardProps> = ({
   event,
   onViewDetails,
@@ -106,12 +215,95 @@ export const EventCard: React.FC<EventCardProps> = ({
   onDelete,
   onCheckIn,
   onPublish,
+  onDuplicate,
+  onStatusChange,
+  onRegister,
+  onFeedback,
+  onViewTicket,
+  onCancelRegistration,
+  onToggleReminder,
+  canManage = false,
   className = '',
 }) => {
   const navigate = useNavigate();
 
   const titleClean = cleanEventTitle(event.title) || 'Sự kiện chưa đặt tên';
   const category = event.event_type || 'Hội thảo';
+
+  // Task 70 & 79: Action Menus State (Lưu lịch & Thao tác quản trị)
+  const [isReminded, setIsReminded] = useState(Boolean(event.is_reminded));
+  const [showReminderMenu, setShowReminderMenu] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const reminderMenuRef = useRef<HTMLDivElement>(null);
+
+  const [showAdminMenu, setShowAdminMenu] = useState(false);
+  const adminMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setIsReminded(Boolean(event.is_reminded));
+  }, [event.is_reminded]);
+
+  // Click outside to close menus
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (reminderMenuRef.current && !reminderMenuRef.current.contains(e.target as Node)) {
+        setShowReminderMenu(false);
+      }
+      if (adminMenuRef.current && !adminMenuRef.current.contains(e.target as Node)) {
+        setShowAdminMenu(false);
+      }
+    };
+    if (showReminderMenu || showAdminMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showReminderMenu, showAdminMenu]);
+
+  const handleOpenGoogleCalendar = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = buildGoogleCalendarUrl(event);
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setShowReminderMenu(false);
+    toast.success('Đang mở Google Calendar để thêm sự kiện...');
+  };
+
+  const handleDownloadIcs = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    downloadIcsFile(event);
+    setShowReminderMenu(false);
+    toast.success('Đã tải xuống tệp lịch .ics cho Apple/Outlook!');
+  };
+
+  const handleToggleScheduleReminder = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsScheduling(true);
+    try {
+      if (!isReminded) {
+        if (onToggleReminder) {
+          await onToggleReminder(event, 'SCHEDULE');
+        } else {
+          await apiService.scheduleEventReminder(event.id);
+          notifyEventChange('REMINDER', event.id);
+          toast.success(`Đã đặt lịch nhắc tự động cho "${titleClean}"!`);
+        }
+        setIsReminded(true);
+      } else {
+        if (onToggleReminder) {
+          await onToggleReminder(event, 'CANCEL');
+        } else {
+          await apiService.cancelEventReminder(event.id);
+          notifyEventChange('REMINDER', event.id);
+          toast.info(`Đã hủy lịch nhắc sự kiện "${titleClean}".`);
+        }
+        setIsReminded(false);
+      }
+      setShowReminderMenu(false);
+    } catch {
+      toast.error('Có lỗi xảy ra khi cập nhật lịch nhắc. Vui lòng thử lại!');
+    } finally {
+      setIsScheduling(false);
+    }
+  };
   const defaultBanner = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80';
   const bannerImage = event.cover_image || defaultBanner;
 
@@ -260,52 +452,274 @@ export const EventCard: React.FC<EventCardProps> = ({
         </div>
       </div>
 
-      {/* Card Footer Actions */}
-      <div className="p-4 pt-0">
-        <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-          {/* Action 1: View / Edit */}
-          <button
-            type="button"
-            onClick={() => (onEdit ? onEdit(event) : onViewDetails?.(event))}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-            title="Xem chi tiết hoặc Chỉnh sửa sự kiện"
-          >
-            <Edit size={14} className="text-slate-600 group-hover:text-[#DC2626]" />
-            <span>Chỉnh sửa</span>
-          </button>
-
-          {/* Action 2: Fast QR Check-in */}
-          <button
-            type="button"
-            onClick={handleQrCheckIn}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md cursor-pointer"
-            title="Chuyển nhanh sang màn hình Soát vé QR"
-          >
-            <QrCode size={14} />
-            <span>Soát vé QR</span>
-          </button>
-
-          {/* Quick Publish for Drafts (optional) */}
-          {event.status === 'DRAFT' && onPublish && (
+      {/* Card Footer Actions (Task 79: Bố Cục 2 Tầng Tinh Gọn) */}
+      <div className="p-4 pt-0 space-y-2.5">
+        {/* ── TẦNG 1: PRIMARY ACTION (ƯU TIÊN CAO NHẤT, RỘNG TOÀN CHIỀU NGANG) ── */}
+        <div>
+          {event.is_registered ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewTicket ? onViewTicket(event) : onViewDetails?.(event);
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-sm shadow-sm transition-all cursor-pointer active:scale-98"
+                title="Mở popup xem mã vé QR và thông tin soát vé"
+              >
+                <QrCode size={16} />
+                <span>Xem mã vé QR</span>
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCancelRegistration?.(event);
+                }}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-semibold transition-all border border-rose-200 cursor-pointer active:scale-98"
+                title="Hủy đăng ký vé tham dự sự kiện này"
+              >
+                <Trash2 size={14} className="text-rose-600" />
+                <span>Hủy đăng ký vé</span>
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
-              onClick={() => onPublish(event)}
-              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors cursor-pointer"
-              title="Xuất bản sự kiện"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRegister ? onRegister(event) : onViewDetails?.(event);
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm shadow-sm transition-all cursor-pointer active:scale-98"
+              title="Đăng ký giữ chỗ, chọn loại vé và nhận mã QR xác nhận"
             >
-              <Play size={15} />
+              <Ticket size={16} />
+              <span>🎟️ Đăng ký tham dự</span>
             </button>
           )}
+        </div>
 
-          {/* Action 3: Delete Event */}
-          <button
-            type="button"
-            onClick={() => onDelete?.(event)}
-            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
-            title="Xóa sự kiện"
-          >
-            <Trash2 size={16} />
-          </button>
+        {/* ── TẦNG 2: SECONDARY & ADMIN ACTIONS (FLEXBOX JUSTIFY-BETWEEN) ── */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+          {/* Nhóm Trái (Public User Actions: Lưu lịch & Đánh giá) */}
+          <div className="flex items-center gap-1.5">
+            {/* Nút [ 🗓️ Lưu lịch ▾ ] Dropdown */}
+            <div className="relative" ref={reminderMenuRef}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowReminderMenu(!showReminderMenu);
+                  setShowAdminMenu(false);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-colors cursor-pointer ${
+                  isReminded
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 font-medium'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium'
+                }`}
+                title="Lưu vào Google Calendar, Apple / Outlook hoặc bật thông báo"
+              >
+                {isReminded ? (
+                  <BellRing size={14} className="text-emerald-600 animate-pulse" />
+                ) : (
+                  <Calendar size={14} className="text-slate-600" />
+                )}
+                <span>{isReminded ? 'Đã lưu lịch' : 'Lưu lịch'}</span>
+                <ChevronDown
+                  size={13}
+                  className={`transition-transform duration-200 ${showReminderMenu ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {/* Popup Dropdown Lưu lịch */}
+              {showReminderMenu && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute left-0 bottom-full mb-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 p-2 space-y-1 animate-in fade-in zoom-in-95 duration-150"
+                >
+                  <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Thêm vào lịch cá nhân
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleOpenGoogleCalendar}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors text-left cursor-pointer"
+                  >
+                    <Calendar size={14} className="text-red-600 shrink-0" />
+                    <span className="flex-1">Google Calendar</span>
+                    <ExternalLink size={12} className="text-slate-400 shrink-0" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadIcs}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors text-left cursor-pointer"
+                  >
+                    <Download size={14} className="text-blue-600 shrink-0" />
+                    <span className="flex-1">Tải file .ics (Apple / Outlook)</span>
+                  </button>
+                  <div className="border-t border-slate-100 my-1"></div>
+                  <button
+                    type="button"
+                    disabled={isScheduling}
+                    onClick={handleToggleScheduleReminder}
+                    className={`w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                      isReminded
+                        ? 'bg-rose-50 hover:bg-rose-100 text-rose-700'
+                        : 'bg-red-600 hover:bg-red-700 text-white shadow-xs'
+                    }`}
+                  >
+                    {isScheduling ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : isReminded ? (
+                      <>
+                        <Trash2 size={13} />
+                        <span>Hủy nhắc lịch tự động</span>
+                      </>
+                    ) : (
+                      <>
+                        <BellRing size={13} />
+                        <span>Kích hoạt nhắc 3 mốc (SMS/Email)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Nút [ ⭐ Đánh giá ] (Chỉ hiển thị khi sự kiện đã diễn ra hoặc tài khoản đã tham dự) */}
+            {(event.status === 'COMPLETED' || event.status === 'completed' || event.is_registered) && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFeedback?.(event);
+                }}
+                className="flex items-center gap-1.5 border border-amber-300 text-amber-600 hover:bg-amber-50 px-3 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer active:scale-95"
+                title="Gửi nhận xét và đánh giá sao cho sự kiện"
+              >
+                <Star size={14} className="fill-amber-500 text-amber-500" />
+                <span className="hidden sm:inline">Đánh giá</span>
+              </button>
+            )}
+          </div>
+
+          {/* Nhóm Phải (Admin / Manager Actions: Soát vé & Dropdown Thao Tác) */}
+          <div className="flex items-center gap-1.5">
+            {/* Nút [ ▦ Soát vé QR ] */}
+            <button
+              type="button"
+              onClick={handleQrCheckIn}
+              className="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 rounded-lg text-sm font-medium transition-colors cursor-pointer active:scale-95"
+              title="Chuyển nhanh sang màn hình Quét mã QR Soát vé"
+            >
+              <QrCode size={14} className="text-red-600" />
+              <span className="hidden sm:inline">Soát vé QR</span>
+            </button>
+
+            {/* Dropdown Menu [ ⋮ Thao Tác ▾ ] */}
+            <div className="relative" ref={adminMenuRef}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowAdminMenu(!showAdminMenu);
+                  setShowReminderMenu(false);
+                }}
+                className="flex items-center gap-1 px-2.5 py-2 text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors cursor-pointer active:scale-95"
+                title="Thao tác nâng cao"
+              >
+                <MoreVertical size={15} />
+                <ChevronDown
+                  size={12}
+                  className={`transition-transform duration-200 ${showAdminMenu ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {/* Popup Menu Thao Tác */}
+              {showAdminMenu && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute right-0 bottom-full mb-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 p-1.5 space-y-0.5 animate-in fade-in zoom-in-95 duration-150"
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowAdminMenu(false);
+                      navigate(`/landing?event_id=${event.id}`);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 hover:text-red-600 rounded-xl transition-colors text-left cursor-pointer"
+                  >
+                    <Globe size={14} className="text-slate-500" />
+                    <span>Xem Landing Page</span>
+                  </button>
+
+                  {canManage && event.status === 'DRAFT' && onPublish && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAdminMenu(false);
+                        onPublish(event);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 rounded-xl transition-colors text-left cursor-pointer"
+                    >
+                      <Play size={14} className="text-emerald-600" />
+                      <span>Xuất bản ngay</span>
+                    </button>
+                  )}
+
+                  {canManage && onDuplicate && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAdminMenu(false);
+                        onDuplicate(event);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 hover:text-red-600 rounded-xl transition-colors text-left cursor-pointer"
+                    >
+                      <Copy size={14} className="text-slate-500" />
+                      <span>Nhân bản sự kiện</span>
+                    </button>
+                  )}
+
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAdminMenu(false);
+                        onEdit ? onEdit(event) : onViewDetails?.(event);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100 hover:text-red-600 rounded-xl transition-colors text-left cursor-pointer"
+                    >
+                      <Edit size={14} className="text-slate-500" />
+                      <span>Chỉnh sửa sự kiện</span>
+                    </button>
+                  )}
+
+                  {canManage && (
+                    <>
+                      <div className="border-t border-slate-100 my-1"></div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowAdminMenu(false);
+                          onDelete?.(event);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-xl transition-colors text-left cursor-pointer"
+                      >
+                        <Trash2 size={14} className="text-rose-600" />
+                        <span>Xóa sự kiện</span>
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

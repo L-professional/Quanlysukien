@@ -409,25 +409,25 @@ export const Settings: React.FC = () => {
   };
 
   return (
-    <div className="w-full bg-[#0B0F19] text-slate-100 p-2 sm:p-4 lg:p-6 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-300">
+    <div className="w-full text-slate-900 p-2 sm:p-4 lg:p-6 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-300">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-6">
         <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">
+          <div className="flex items-center gap-2 text-xs font-bold text-red-600 uppercase tracking-wider mb-1">
             <Sparkles className="w-3.5 h-3.5" />
             <span>{t('settings.badge', 'Cấu Hình Tài Khoản')}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             {t('settings.title', 'Cài Đặt Hệ Thống')}
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-slate-500 mt-1">
             {t('settings.subtitle', 'Quản lý thông tin hồ sơ cá nhân, tùy chọn hiển thị và an toàn bảo mật tài khoản')}
           </p>
         </div>
 
         {/* User Summary Pill */}
-        <div className="flex items-center gap-3 bg-[#161B22] border border-slate-800/80 rounded-2xl p-2.5 shadow-md">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white font-black text-sm flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+        <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-2xl p-2.5 shadow-xs">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-600 text-white font-black text-sm flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
             {avatarUrl ? (
               <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
             ) : user?.full_name ? (
@@ -437,10 +437,10 @@ export const Settings: React.FC = () => {
             )}
           </div>
           <div className="min-w-0 pr-2">
-            <div className="text-xs font-extrabold text-white truncate">
+            <div className="text-xs font-extrabold text-slate-900 truncate">
               {user?.full_name || 'Tài khoản EventHub'}
             </div>
-            <div className="text-[11px] text-slate-400 truncate">
+            <div className="text-[11px] text-slate-500 truncate">
               {user?.email}
             </div>
           </div>
@@ -448,13 +448,13 @@ export const Settings: React.FC = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 p-1.5 bg-[#161B22] border border-slate-800 rounded-2xl overflow-x-auto no-scrollbar shadow-lg">
+      <div className="flex items-center gap-2 p-1.5 bg-white border border-slate-200 rounded-2xl overflow-x-auto no-scrollbar shadow-xs">
         <button
           onClick={() => setActiveTab('profile')}
           className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'profile'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
           <User className="w-4 h-4" />
@@ -465,8 +465,8 @@ export const Settings: React.FC = () => {
           onClick={() => setActiveTab('preferences')}
           className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'preferences'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
           <Globe className="w-4 h-4" />
@@ -477,8 +477,8 @@ export const Settings: React.FC = () => {
           onClick={() => setActiveTab('security')}
           className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
             activeTab === 'security'
-              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
           <Shield className="w-4 h-4" />
@@ -487,8 +487,8 @@ export const Settings: React.FC = () => {
             <span
               className={`ml-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
                 activeTab === 'security'
-                  ? 'bg-indigo-700/80 text-white border border-indigo-400/40'
-                  : 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/80'
+                  ? 'bg-red-700/80 text-white border border-red-400/40'
+                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
               }`}
             >
               2FA ON
@@ -503,14 +503,14 @@ export const Settings: React.FC = () => {
       {activeTab === 'profile' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Avatar Upload Column */}
-          <div className="bg-[#161B22] rounded-3xl border border-slate-800/80 p-6 shadow-xl flex flex-col items-center text-center space-y-4">
-            <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xs flex flex-col items-center text-center space-y-4">
+            <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider">
               {t('settings.avatarTitle', 'Ảnh Đại Diện')}
             </h3>
 
             <div className="relative group">
-              <div className="w-32 h-32 rounded-3xl bg-gradient-to-tr from-indigo-500 to-purple-600 p-1 shadow-lg shadow-indigo-500/20">
-                <div className="w-full h-full rounded-[22px] bg-slate-900 overflow-hidden flex items-center justify-center text-white font-black text-3xl">
+              <div className="w-32 h-32 rounded-3xl bg-gradient-to-tr from-red-500 to-rose-600 p-1 shadow-lg shadow-red-500/20">
+                <div className="w-full h-full rounded-[22px] bg-slate-100 overflow-hidden flex items-center justify-center text-slate-800 font-black text-3xl">
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="Avatar Preview" className="w-full h-full object-cover" />
                   ) : (
@@ -540,17 +540,17 @@ export const Settings: React.FC = () => {
             />
 
             <div className="space-y-1 text-center">
-              <p className="text-xs font-bold text-slate-200">
+              <p className="text-xs font-bold text-slate-700">
                 Định dạng JPG, PNG, WebP
               </p>
-              <p className="text-[11px] text-slate-400">Dung lượng tối đa: 3.0 MB</p>
+              <p className="text-[11px] text-slate-500">Dung lượng tối đa: 3.0 MB</p>
             </div>
 
             <div className="flex flex-wrap gap-2 justify-center w-full pt-2">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-2 text-xs font-bold rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-2 text-xs font-bold rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <Upload className="w-3.5 h-3.5" />
                 <span>Tải ảnh lên</span>
@@ -560,7 +560,7 @@ export const Settings: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setAvatarUrl('')}
-                  className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-2 text-xs font-bold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Xóa ảnh</span>
@@ -569,8 +569,8 @@ export const Settings: React.FC = () => {
             </div>
 
             {/* Quick avatar presets */}
-            <div className="w-full pt-4 border-t border-slate-800/80">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+            <div className="w-full pt-4 border-t border-slate-200">
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
                 Hoặc chọn Avatar mẫu
               </div>
               <div className="flex justify-center gap-2">
@@ -584,7 +584,7 @@ export const Settings: React.FC = () => {
                     key={idx}
                     type="button"
                     onClick={() => setAvatarUrl(preset)}
-                    className="w-9 h-9 rounded-xl overflow-hidden border-2 border-slate-700 hover:border-indigo-500 transition-all cursor-pointer shrink-0"
+                    className="w-9 h-9 rounded-xl overflow-hidden border-2 border-slate-200 hover:border-red-500 transition-all cursor-pointer shrink-0"
                   >
                     <img src={preset} alt={`Preset ${idx + 1}`} className="w-full h-full object-cover" />
                   </button>
@@ -594,16 +594,16 @@ export const Settings: React.FC = () => {
           </div>
 
           {/* Profile Form Details Column */}
-          <div className="lg:col-span-2 bg-[#161B22] rounded-3xl border border-slate-800/80 p-6 sm:p-8 shadow-xl">
-            <h3 className="text-base font-extrabold text-white mb-6 flex items-center gap-2">
-              <User className="w-5 h-5 text-indigo-400" />
+          <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs">
+            <h3 className="text-base font-extrabold text-slate-900 mb-6 flex items-center gap-2">
+              <User className="w-5 h-5 text-red-600" />
               <span>{t('settings.profileDetails', 'Thông Tin Hồ Sơ Cá Nhân')}</span>
             </h3>
 
             <form onSubmit={handleSaveProfile} className="space-y-5">
               {/* Display Name */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-200">
+                <label className="block text-xs font-bold text-slate-700">
                   {t('settings.displayName', 'Tên Hiển Thị (Display Name)')} <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
@@ -613,7 +613,7 @@ export const Settings: React.FC = () => {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="VD: Nguyễn Văn Quản Trị"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-800 bg-[#0B0F19] text-white placeholder:text-slate-500 text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all pl-10"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-white transition-all pl-10"
                   />
                   <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 </div>
@@ -621,7 +621,7 @@ export const Settings: React.FC = () => {
 
               {/* Job Title / Role display */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-200">
+                <label className="block text-xs font-bold text-slate-700">
                   {t('settings.jobTitle', 'Chức Danh / Vị Trí (Job Title)')}
                 </label>
                 <div className="relative">
@@ -630,7 +630,7 @@ export const Settings: React.FC = () => {
                     value={jobTitle}
                     onChange={(e) => setJobTitle(e.target.value)}
                     placeholder="VD: Giám Đốc Sự Kiện / Chuyên Viên Vận Hành"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-800 bg-[#0B0F19] text-white placeholder:text-slate-500 text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all pl-10"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-white transition-all pl-10"
                   />
                   <Briefcase className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 </div>
@@ -638,9 +638,9 @@ export const Settings: React.FC = () => {
 
               {/* Phone Number with Regex Check */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-200 flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-700 flex items-center justify-between">
                   <span>{t('settings.phone', 'Số Điện Thoại Liên Hệ')}</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Định dạng: 09xxxxxxxx hoặc +84xxxxxxxxx</span>
+                  <span className="text-[10px] text-slate-500 font-normal">Định dạng: 09xxxxxxxx hoặc +84xxxxxxxxx</span>
                 </label>
                 <div className="relative">
                   <input
@@ -651,8 +651,8 @@ export const Settings: React.FC = () => {
                     className={`w-full px-4 py-2.5 rounded-xl border ${
                       phoneError
                         ? 'border-rose-500 focus:ring-rose-500'
-                        : 'border-slate-800 focus:ring-indigo-500 focus:border-indigo-500'
-                    } bg-[#0B0F19] text-white placeholder:text-slate-500 text-sm font-medium focus:outline-hidden focus:ring-2 transition-all pl-10`}
+                        : 'border-slate-200 focus:ring-red-500 focus:border-red-500'
+                    } bg-slate-50 text-slate-900 placeholder:text-slate-400 text-sm font-medium focus:outline-hidden focus:ring-2 focus:bg-white transition-all pl-10`}
                   />
                   <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 </div>
@@ -666,9 +666,9 @@ export const Settings: React.FC = () => {
 
               {/* Contact Email (Read-only ID with badge) */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-200 flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-700 flex items-center justify-between">
                   <span>{t('settings.email', 'Email Liên Hệ & Đăng Nhập')}</span>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-300 bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded-md">
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
                     <CheckCircle2 className="w-3 h-3" /> Đã xác thực
                   </span>
                 </label>
@@ -678,21 +678,21 @@ export const Settings: React.FC = () => {
                     readOnly
                     value={user?.email || ''}
                     disabled
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-800 bg-[#0B0F19]/60 text-slate-400 text-sm font-medium cursor-not-allowed pl-10"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-500 text-sm font-medium cursor-not-allowed pl-10"
                   />
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 </div>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-500">
                   Email là định danh tài khoản chính trên EventHub AI. Vui lòng liên hệ Quản trị viên nếu cần đổi email.
                 </p>
               </div>
 
               {/* Submit Button */}
-              <div className="pt-4 border-t border-slate-800/80 flex justify-end">
+              <div className="pt-4 border-t border-slate-200 flex justify-end">
                 <button
                   type="submit"
                   disabled={isSavingProfile || !!phoneError}
-                  className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md shadow-red-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSavingProfile ? (
                     <RefreshCw className="w-4 h-4 animate-spin" />
@@ -711,16 +711,16 @@ export const Settings: React.FC = () => {
           TAB 2: TÙY CHỌN & GIAO DIỆN (PREFERENCES)
           ───────────────────────────────────────────────────────────── */}
       {activeTab === 'preferences' && (
-        <div className="bg-[#161B22] rounded-3xl border border-slate-800/80 p-6 sm:p-8 shadow-xl space-y-8 max-w-3xl">
+        <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-8 max-w-3xl">
           {/* Section 1: Language */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <Globe className="w-5 h-5 text-indigo-400" />
-              <h3 className="text-base font-extrabold text-white">
+              <Globe className="w-5 h-5 text-red-600" />
+              <h3 className="text-base font-extrabold text-slate-900">
                 {t('settings.languageTitle', 'Ngôn Ngữ Hiển Thị')}
               </h3>
             </div>
-            <p className="text-xs text-slate-400 mb-4">
+            <p className="text-xs text-slate-500 mb-4">
               Lựa chọn ngôn ngữ bạn mong muốn sử dụng trên toàn bộ ứng dụng và các thông báo sự kiện
             </p>
 
@@ -730,23 +730,23 @@ export const Settings: React.FC = () => {
                 onClick={() => handleLanguageChange('vi')}
                 className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
                   currentLang === 'vi'
-                    ? 'border-indigo-500 bg-indigo-950/40 text-white shadow-md shadow-indigo-900/20'
-                    : 'border-slate-800 bg-[#0B0F19] text-slate-300 hover:border-slate-700 hover:bg-[#0B0F19]/80'
+                    ? 'border-red-600 bg-red-50/50 text-slate-900 shadow-xs'
+                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">🇻🇳</span>
                   <div>
-                    <div className="text-sm font-bold text-white">
+                    <div className="text-sm font-bold text-slate-900">
                       Tiếng Việt (VI)
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-slate-500">
                       Ngôn ngữ mặc định
                     </div>
                   </div>
                 </div>
                 {currentLang === 'vi' && (
-                  <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center shadow-xs">
                     <Check className="w-3.5 h-3.5" />
                   </div>
                 )}
@@ -757,23 +757,23 @@ export const Settings: React.FC = () => {
                 onClick={() => handleLanguageChange('en')}
                 className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
                   currentLang === 'en'
-                    ? 'border-indigo-500 bg-indigo-950/40 text-white shadow-md shadow-indigo-900/20'
-                    : 'border-slate-800 bg-[#0B0F19] text-slate-300 hover:border-slate-700 hover:bg-[#0B0F19]/80'
+                    ? 'border-red-600 bg-red-50/50 text-slate-900 shadow-xs'
+                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white'
                 }`}
               >
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">🇺🇸</span>
                   <div>
-                    <div className="text-sm font-bold text-white">
+                    <div className="text-sm font-bold text-slate-900">
                       English (EN)
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-slate-500">
                       International format
                     </div>
                   </div>
                 </div>
                 {currentLang === 'en' && (
-                  <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center shadow-xs">
                     <Check className="w-3.5 h-3.5" />
                   </div>
                 )}
@@ -782,14 +782,14 @@ export const Settings: React.FC = () => {
           </div>
 
           {/* Section 2: Theme Mode */}
-          <div className="pt-6 border-t border-slate-800/80">
+          <div className="pt-6 border-t border-slate-200">
             <div className="flex items-center gap-2 mb-2">
-              <Sun className="w-5 h-5 text-amber-400" />
-              <h3 className="text-base font-extrabold text-white">
+              <Sun className="w-5 h-5 text-amber-500" />
+              <h3 className="text-base font-extrabold text-slate-900">
                 {t('settings.themeTitle', 'Chế Độ Giao Diện (Theme)')}
               </h3>
             </div>
-            <p className="text-xs text-slate-400 mb-4">
+            <p className="text-xs text-slate-500 mb-4">
               Tùy chỉnh tông màu hiển thị phù hợp với điều kiện ánh sáng và sở thích của bạn
             </p>
 
@@ -799,25 +799,25 @@ export const Settings: React.FC = () => {
                 onClick={() => handleThemeChange('light')}
                 className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
                   currentTheme === 'light'
-                    ? 'border-indigo-500 bg-indigo-950/40 text-white shadow-md shadow-indigo-900/20'
-                    : 'border-slate-800 bg-[#0B0F19] text-slate-300 hover:border-slate-700 hover:bg-[#0B0F19]/80'
+                    ? 'border-red-600 bg-red-50/50 text-slate-900 shadow-xs'
+                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center">
                     <Sun className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-white">
+                    <div className="text-sm font-bold text-slate-900">
                       Giao Diện Sáng (Light Mode)
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-slate-500">
                       Phù hợp môi trường ban ngày
                     </div>
                   </div>
                 </div>
                 {currentTheme === 'light' && (
-                  <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center shadow-xs">
                     <Check className="w-3.5 h-3.5" />
                   </div>
                 )}
@@ -828,25 +828,25 @@ export const Settings: React.FC = () => {
                 onClick={() => handleThemeChange('dark')}
                 className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between ${
                   currentTheme === 'dark'
-                    ? 'border-indigo-500 bg-indigo-950/40 text-white shadow-md shadow-indigo-900/20'
-                    : 'border-slate-800 bg-[#0B0F19] text-slate-300 hover:border-slate-700 hover:bg-[#0B0F19]/80'
+                    ? 'border-red-600 bg-red-50/50 text-slate-900 shadow-xs'
+                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-white'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 border border-red-200 flex items-center justify-center">
                     <Moon className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="text-sm font-bold text-white">
+                    <div className="text-sm font-bold text-slate-900">
                       Giao Diện Tối (Dark Mode)
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-slate-500">
                       Dịu mắt, bảo vệ pin OLED
                     </div>
                   </div>
                 </div>
                 {currentTheme === 'dark' && (
-                  <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                  <div className="w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center shadow-xs">
                     <Check className="w-3.5 h-3.5" />
                   </div>
                 )}
@@ -855,12 +855,12 @@ export const Settings: React.FC = () => {
           </div>
 
           {/* Save Button */}
-          <div className="pt-4 border-t border-slate-800/80 flex justify-end">
+          <div className="pt-4 border-t border-slate-200 flex justify-end">
             <button
               type="button"
               onClick={handleSavePreferences}
               disabled={isSavingPreferences}
-              className="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md shadow-red-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {isSavingPreferences ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />
@@ -881,21 +881,21 @@ export const Settings: React.FC = () => {
           {/* Top Row: Password Change & 2FA Status */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Box 1: Change Password Form */}
-            <div className="bg-[#161B22] rounded-3xl border border-slate-800/80 p-6 sm:p-8 shadow-xl space-y-5">
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-5">
               <div className="flex items-center gap-2 mb-1">
-                <KeyRound className="w-5 h-5 text-indigo-400" />
-                <h3 className="text-base font-extrabold text-white">
+                <KeyRound className="w-5 h-5 text-red-600" />
+                <h3 className="text-base font-extrabold text-slate-900">
                   {t('settings.changePassword', 'Đổi Mật Khẩu')}
                 </h3>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Nên sử dụng mật khẩu mạnh có ít nhất 8 ký tự, bao gồm chữ hoa, số và ký tự đặc biệt.
               </p>
 
               <form onSubmit={handleChangePassword} className="space-y-4">
                 {/* Current Password */}
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-200">
+                  <label className="block text-xs font-bold text-slate-700">
                     Mật khẩu hiện tại <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
@@ -905,13 +905,13 @@ export const Settings: React.FC = () => {
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-800 bg-[#0B0F19] text-white placeholder:text-slate-500 text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all pr-10 pl-10"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-white transition-all pr-10 pl-10"
                     />
                     <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                     <button
                       type="button"
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-200 cursor-pointer"
+                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700 cursor-pointer"
                     >
                       {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -920,7 +920,7 @@ export const Settings: React.FC = () => {
 
                 {/* New Password */}
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-200">
+                  <label className="block text-xs font-bold text-slate-700">
                     Mật khẩu mới <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
@@ -930,13 +930,13 @@ export const Settings: React.FC = () => {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-800 bg-[#0B0F19] text-white placeholder:text-slate-500 text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all pr-10 pl-10"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-white transition-all pr-10 pl-10"
                     />
                     <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                     <button
                       type="button"
                       onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-200 cursor-pointer"
+                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700 cursor-pointer"
                     >
                       {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -946,10 +946,10 @@ export const Settings: React.FC = () => {
                   {newPassword && (
                     <div className="pt-2 space-y-1">
                       <div className="flex items-center justify-between text-[11px]">
-                        <span className="text-slate-400">Độ mạnh mật khẩu:</span>
-                        <span className="font-bold text-slate-200">{pwdStrength.label}</span>
+                        <span className="text-slate-500">Độ mạnh mật khẩu:</span>
+                        <span className="font-bold text-slate-700">{pwdStrength.label}</span>
                       </div>
-                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden flex gap-1">
+                      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden flex gap-1">
                         {[1, 2, 3, 4, 5].map((lvl) => (
                           <div
                             key={lvl}
@@ -965,7 +965,7 @@ export const Settings: React.FC = () => {
 
                 {/* Confirm New Password */}
                 <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-200">
+                  <label className="block text-xs font-bold text-slate-700">
                     Xác nhận mật khẩu mới <span className="text-rose-500">*</span>
                   </label>
                   <div className="relative">
@@ -975,13 +975,13 @@ export const Settings: React.FC = () => {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full px-4 py-2.5 rounded-xl border border-slate-800 bg-[#0B0F19] text-white placeholder:text-slate-500 text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all pr-10 pl-10"
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 text-sm font-medium focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-white transition-all pr-10 pl-10"
                     />
                     <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-200 cursor-pointer"
+                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700 cursor-pointer"
                     >
                       {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
@@ -998,7 +998,7 @@ export const Settings: React.FC = () => {
                   <button
                     type="submit"
                     disabled={isChangingPassword || !newPassword || newPassword !== confirmPassword}
-                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-sm shadow-md shadow-red-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     {isChangingPassword ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
                     <span>Cập nhật mật khẩu</span>
@@ -1008,47 +1008,47 @@ export const Settings: React.FC = () => {
             </div>
 
             {/* Box 2: Two-Factor Authentication (2FA) */}
-            <div className="bg-[#161B22] rounded-3xl border border-slate-800/80 p-6 sm:p-8 shadow-xl flex flex-col justify-between space-y-6">
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs flex flex-col justify-between space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-indigo-400" />
-                    <h3 className="text-base font-extrabold text-white">
+                    <Shield className="w-5 h-5 text-red-600" />
+                    <h3 className="text-base font-extrabold text-slate-900">
                       Xác Thực 2 Yếu Tố (2FA)
                     </h3>
                   </div>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-black tracking-wide uppercase ${
                       is2FAEnabled
-                        ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/80'
-                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200'
                     }`}
                   >
                     {is2FAEnabled ? '🟢 Đang Bật' : '⚪ Đang Tắt'}
                   </span>
                 </div>
 
-                <p className="text-xs text-slate-400 leading-relaxed">
+                <p className="text-xs text-slate-500 leading-relaxed">
                   Bảo vệ tài khoản tối đa với mã xác thực 6 chữ số theo thời gian (TOTP) từ các ứng dụng như Google Authenticator, Microsoft Authenticator hoặc Authy mỗi khi đăng nhập.
                 </p>
 
-                <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-900/60 flex items-start gap-3">
-                  <QrCode className="w-6 h-6 text-indigo-400 shrink-0 mt-0.5" />
-                  <div className="text-xs text-slate-200 space-y-1">
-                    <span className="font-bold text-white">Phương thức: Google Authenticator / TOTP</span>
-                    <p className="text-slate-400">
+                <div className="p-4 rounded-2xl bg-red-50/50 border border-red-200 flex items-start gap-3">
+                  <QrCode className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
+                  <div className="text-xs text-slate-800 space-y-1">
+                    <span className="font-bold text-slate-900">Phương thức: Google Authenticator / TOTP</span>
+                    <p className="text-slate-600">
                       Mã được làm mới mỗi 30 giây trực tiếp trên điện thoại của bạn, không cần kết nối mạng.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-800/80 flex items-center justify-between">
+              <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
                 <div>
-                  <span className="text-xs font-bold text-white block">
+                  <span className="text-xs font-bold text-slate-900 block">
                     {is2FAEnabled ? 'Trạng thái bảo mật cao' : 'Khuyến nghị kích hoạt'}
                   </span>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-slate-500">
                     {is2FAEnabled ? 'Tài khoản được bảo vệ 2 lớp' : 'Chưa thiết lập bảo vệ 2 lớp'}
                   </span>
                 </div>
@@ -1057,7 +1057,7 @@ export const Settings: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleDisable2FA}
-                    className="px-4 py-2 rounded-xl bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border border-rose-900/40 text-xs font-bold transition-colors cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition-colors cursor-pointer"
                   >
                     Tắt xác thực 2FA
                   </button>
@@ -1065,7 +1065,7 @@ export const Settings: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleOpen2FAModal}
-                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                    className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold shadow-md shadow-red-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
                   >
                     <QrCode className="w-4 h-4" />
                     <span>Bật 2FA ngay</span>
@@ -1076,16 +1076,16 @@ export const Settings: React.FC = () => {
           </div>
 
           {/* Active Sessions Box */}
-          <div className="bg-[#161B22] rounded-3xl border border-slate-800/80 p-6 sm:p-8 shadow-xl space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xs space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <Laptop className="w-5 h-5 text-indigo-400" />
-                  <h3 className="text-base font-extrabold text-white">
+                  <Laptop className="w-5 h-5 text-red-600" />
+                  <h3 className="text-base font-extrabold text-slate-900">
                     Quản Lý Thiết Bị Đang Đăng Nhập (Active Sessions)
                   </h3>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 mt-1">
                   Danh sách các thiết bị và trình duyệt hiện đang có phiên đăng nhập hợp lệ với tài khoản này.
                 </p>
               </div>
@@ -1095,7 +1095,7 @@ export const Settings: React.FC = () => {
                   type="button"
                   onClick={loadSessions}
                   disabled={isLoadingSessions}
-                  className="p-2 rounded-xl border border-slate-800 hover:bg-slate-800 text-slate-300 bg-[#0B0F19] text-xs font-bold transition-colors cursor-pointer"
+                  className="p-2 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-600 bg-white text-xs font-bold transition-colors cursor-pointer"
                   title="Làm mới danh sách"
                 >
                   <RefreshCw className={`w-4 h-4 ${isLoadingSessions ? 'animate-spin' : ''}`} />
@@ -1114,9 +1114,9 @@ export const Settings: React.FC = () => {
             </div>
 
             {/* Sessions List */}
-            <div className="divide-y divide-slate-800/80">
+            <div className="divide-y divide-slate-200">
               {sessions.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs">
+                <div className="py-8 text-center text-slate-500 text-xs">
                   Chưa có thông tin phiên đăng nhập
                 </div>
               ) : (
@@ -1125,14 +1125,14 @@ export const Settings: React.FC = () => {
                   return (
                     <div
                       key={sess.id}
-                      className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-800/40 px-2 rounded-xl transition-colors"
+                      className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 px-2 rounded-xl transition-colors"
                     >
                       <div className="flex items-center gap-3.5">
                         <div
                           className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${
                             sess.is_current
-                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
-                              : 'bg-slate-800 text-slate-400 border border-slate-700/60'
+                              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+                              : 'bg-slate-100 text-slate-500 border border-slate-200'
                           }`}
                         >
                           {isMobile ? <Smartphone className="w-5 h-5" /> : <Laptop className="w-5 h-5" />}
@@ -1140,18 +1140,18 @@ export const Settings: React.FC = () => {
 
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-white">
+                            <span className="text-sm font-bold text-slate-900">
                               {sess.device_name}
                             </span>
                             {sess.is_current && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-950/80 text-emerald-300 border border-emerald-800/80">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                 Thiết bị hiện tại
                               </span>
                             )}
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400 mt-1">
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-1">
                             <span className="flex items-center gap-1">
                               <MapPin className="w-3 h-3" />
                               {sess.location || 'Việt Nam'} • {sess.ip_address || '127.0.0.1'}
@@ -1165,7 +1165,7 @@ export const Settings: React.FC = () => {
                       </div>
 
                       <div className="text-right shrink-0">
-                        <span className="text-xs text-slate-400">
+                        <span className="text-xs text-slate-500">
                           {sess.browser || 'Trình duyệt Web'}
                         </span>
                       </div>
@@ -1182,54 +1182,54 @@ export const Settings: React.FC = () => {
           MODAL: 2FA ACTIVATION & TOTP QR CODE
           ───────────────────────────────────────────────────────────── */}
       {show2FAModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-[#161B22] rounded-3xl border border-slate-800 w-full max-w-md p-6 sm:p-8 shadow-2xl space-y-6 relative text-slate-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl border border-slate-200 w-full max-w-md p-6 sm:p-8 shadow-2xl space-y-6 relative text-slate-900">
             {/* Close Button */}
             <button
               type="button"
               onClick={() => setShow2FAModal(false)}
-              className="absolute right-5 top-5 p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              className="absolute right-5 top-5 p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
 
             <div className="text-center space-y-1.5">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-950 text-indigo-400 flex items-center justify-center mx-auto mb-2 border border-indigo-800/50">
+              <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-2 border border-red-200">
                 <QrCode className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-black text-white">
+              <h3 className="text-lg font-black text-slate-900">
                 Kích Hoạt Xác Thực 2 Yếu Tố
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Sử dụng ứng dụng Google Authenticator hoặc Authy để quét mã QR bên dưới
               </p>
             </div>
 
             {/* QR Code Container */}
-            <div className="flex flex-col items-center justify-center p-4 bg-[#0B0F19] rounded-2xl border border-slate-800">
+            <div className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-2xl border border-slate-200">
               {isGenerating2FA ? (
-                <div className="py-12 flex flex-col items-center gap-2 text-xs text-slate-400">
-                  <RefreshCw className="w-6 h-6 animate-spin text-indigo-400" />
+                <div className="py-12 flex flex-col items-center gap-2 text-xs text-slate-500">
+                  <RefreshCw className="w-6 h-6 animate-spin text-red-600" />
                   <span>Đang khởi tạo mã bảo mật...</span>
                 </div>
               ) : totpQrCode ? (
                 <div className="space-y-3 flex flex-col items-center">
-                  <div className="p-2 bg-white rounded-xl shadow-xs">
+                  <div className="p-2 bg-white rounded-xl shadow-xs border border-slate-200">
                     <img src={totpQrCode} alt="TOTP QR Code" className="w-44 h-44 object-contain" />
                   </div>
                   <div className="text-center space-y-1">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       Khóa nhập thủ công (Manual Key)
                     </span>
-                    <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-slate-200">
+                    <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-mono font-bold text-slate-800">
                       <span>{totpSecret}</span>
                       <button
                         type="button"
                         onClick={() => copyToClipboard(totpSecret)}
-                        className="p-1 hover:text-indigo-400 transition-colors cursor-pointer"
+                        className="p-1 hover:text-red-600 transition-colors cursor-pointer"
                         title="Sao chép"
                       >
-                        {hasCopiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                        {hasCopiedSecret ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                       </button>
                     </div>
                   </div>
@@ -1240,7 +1240,7 @@ export const Settings: React.FC = () => {
             {/* 6-digit verification code input */}
             <form onSubmit={handleVerify2FA} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-200 text-center">
+                <label className="block text-xs font-bold text-slate-700 text-center">
                   Nhập mã 6 chữ số từ ứng dụng xác thực
                 </label>
                 <input
@@ -1251,7 +1251,7 @@ export const Settings: React.FC = () => {
                   value={totpCode}
                   onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ''))}
                   placeholder="000000"
-                  className="w-full text-center tracking-[0.5em] text-2xl font-black px-4 py-3 rounded-xl border border-slate-700 bg-[#0B0F19] text-indigo-400 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all font-mono"
+                  className="w-full text-center tracking-[0.5em] text-2xl font-black px-4 py-3 rounded-xl border border-slate-300 bg-slate-50 text-red-600 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all font-mono"
                 />
               </div>
 
@@ -1259,14 +1259,14 @@ export const Settings: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShow2FAModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-800 text-slate-300 font-bold text-xs hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
                 <button
                   type="submit"
                   disabled={isVerifying2FA || totpCode.length !== 6}
-                  className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-600/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {isVerifying2FA ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                   <span>Xác nhận & Bật</span>

@@ -4,6 +4,7 @@ import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { FloatingChatbot } from '../AI/FloatingChatbot';
 import { AuthModal } from '../AuthModal';
+import { useAuth } from '../../context/AuthContext';
 
 interface MainLayoutProps {
   activeTab?: string;
@@ -50,6 +51,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { userRole } = useAuth();
 
   const pendingCount = 5;
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -70,7 +72,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
 
   if (isLanding) {
     return (
-      <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-[#D7193F] selection:text-white relative">
+      <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-[#DC2626] selection:text-white relative">
         <AuthModal
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
@@ -85,7 +87,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   }
 
   return (
-    <div className="min-h-screen flex bg-[#F6F8FC] text-[#12213A] font-sans selection:bg-[#D7193F] selection:text-white relative">
+    <div className="min-h-screen flex bg-[#F6F8FC] text-[#12213A] font-sans selection:bg-[#DC2626] selection:text-white relative">
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
@@ -100,6 +102,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
           pendingCount={pendingCount}
           isCollapsed={isCollapsed}
           onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+          userRole={userRole}
         />
       </div>
 
@@ -132,6 +135,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
             isCollapsed={false}
             isMobileDrawer={true}
             onCloseMobileDrawer={() => setIsMobileDrawerOpen(false)}
+            userRole={userRole}
           />
         </div>
       </div>

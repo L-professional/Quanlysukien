@@ -104,6 +104,9 @@ export interface Event {
   is_registered?: boolean;
   is_checked_in?: boolean;
   has_reviewed?: boolean;
+  user_registration_id?: number;
+  user_ticket_token?: string;
+  is_reminded?: boolean;
   [key: string]: any;
 }
 
@@ -171,7 +174,12 @@ export interface Registration {
   participant_name?: string;
   participant_email?: string;
   qr_code_token: string;
+  ticket_code?: string;
+  token?: string;
   qr_code_image?: string;
+  qr_code_url?: string;
+  qr_code_base64?: string;
+  qr_code?: string;
   is_checked_in: boolean;
   checked_in_at?: string;
   ticket_type?: string;
@@ -252,7 +260,11 @@ export type NotificationType =
   | 'INQUIRY_PENDING'
   | 'INQUIRY_APPROVED'
   | 'EVENT_CREATED'
-  | 'SECURITY_ALERT';
+  | 'SECURITY_ALERT'
+  | 'TICKET_CONFIRMATION'
+  | 'REMINDER_24H'
+  | 'REMINDER_2H'
+  | string;
 
 export interface NotificationItem {
   id: number;

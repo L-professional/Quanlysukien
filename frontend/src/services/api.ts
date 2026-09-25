@@ -1621,6 +1621,45 @@ export const apiService = {
     return response.data;
   },
 
+  async generateEventDescription(payload: {
+    title: string;
+    category?: string;
+    event_type?: string;
+    location?: string;
+    track?: string;
+    speaker_name?: string;
+    speaker_role?: string;
+    style?: string;
+  }): Promise<string> {
+    try {
+      const response = await apiClient.post<{ description: string; style_applied?: string }>(
+        '/ai/generate-description',
+        payload
+      );
+      if (response.data && response.data.description) {
+        return response.data.description;
+      }
+    } catch {
+      try {
+        const fallbackRes = await apiClient.post<{ description: string; style_applied?: string }>(
+          '/events/generate-description',
+          payload
+        );
+        if (fallbackRes.data && fallbackRes.data.description) {
+          return fallbackRes.data.description;
+        }
+      } catch (err) {
+        console.warn('Backend generate description fallback triggered:', err);
+      }
+    }
+
+    // Local smart fallback if offline
+    const spk = payload.speaker_name ? `cùng ${payload.speaker_name}` : 'cùng các chuyên gia và lãnh đạo đầu ngành';
+    const loc = payload.location ? `tại ${payload.location}` : 'với quy mô hoành tráng';
+    const cat = payload.event_type || payload.category || 'công nghệ';
+    return `Sự kiện "${payload.title}" diễn ra ${loc} ${spk}, mở ra không gian kết nối chuyên sâu trong lĩnh vực ${cat}. Chương trình quy tụ những bài chia sẻ mang tính đột phá, khai mở góc nhìn đa chiều và mang lại giá trị thực tiễn vượt trội cho toàn thể người tham dự.`;
+  },
+
   async generateSessionDescription(payload: {
     title: string;
     track?: string;
@@ -1628,6 +1667,17 @@ export const apiService = {
     speaker_role?: string;
     style?: string;
   }): Promise<string> {
+    try {
+      const response = await apiClient.post<{ description: string; style_applied?: string }>(
+        '/ai/generate-description',
+        payload
+      );
+      if (response.data && response.data.description) {
+        return response.data.description;
+      }
+    } catch {
+      // Fallback
+    }
     try {
       const response = await apiClient.post<{ description: string; style_applied?: string }>(
         '/events/generate-description',
@@ -1972,7 +2022,10 @@ export const apiService = {
     try {
       const response = await apiClient.post<Registration>('/registrations/register', payload);
       return response.data;
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.response?.status === 400 || error?.response?.status === 409) {
+        throw error;
+      }
       console.warn('Backend self-register unavailable, returning mock registration:', error);
       return {
         id: Math.floor(Math.random() * 1000) + 100,
@@ -1985,6 +2038,27 @@ export const apiService = {
         checked_in_at: undefined,
         ticket_type: payload.ticket_type || 'Vé Tham Dự',
       };
+    }
+  },
+
+  async getMyRegistrations(email?: string): Promise<Registration[]> {
+    try {
+      const url = email ? `/registrations/my-registrations?email=${encodeURIComponent(email)}` : '/registrations/my-registrations';
+      const response = await apiClient.get<Registration[]>(url);
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to fetch my-registrations from backend:', error);
+      return [];
+    }
+  },
+
+  async triggerReminders(): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await apiClient.post<{ success: boolean; message: string }>('/notifications/trigger-reminders');
+      return response.data;
+    } catch (error) {
+      console.warn('Failed to trigger reminders:', error);
+      return { success: false, message: 'Không thể kích hoạt nhắc lịch' };
     }
   },
 
@@ -2296,6 +2370,59 @@ export const apiService = {
     }
   },
 
+  // ── Task 70: Event Reminder & Calendar API ────────────────────────────────
+  async scheduleEventReminder(
+    eventId: number
+  ): Promise<{ status: string; is_reminded: boolean; ticket_token?: string; message: string }> {
+    try {
+      const response = await apiClient.post<{
+        status: string;
+        is_reminded: boolean;
+        ticket_token?: string;
+        message: string;
+      }>(`/events/${eventId}/remind`);
+      return response.data;
+    } catch {
+      // Local fallback for offline/demo mode
+      const cached = localStorage.getItem('eventhub_custom_events');
+      if (cached) {
+        let items: Event[] = JSON.parse(cached);
+        items = items.map((ev) => (ev.id === eventId ? { ...ev, is_reminded: true } : ev));
+        localStorage.setItem('eventhub_custom_events', JSON.stringify(items));
+      }
+      return {
+        status: 'success',
+        is_reminded: true,
+        message: 'Đã đặt lịch nhắc cho sự kiện thành công!',
+      };
+    }
+  },
+
+  async cancelEventReminder(
+    eventId: number
+  ): Promise<{ status: string; is_reminded: boolean; message: string }> {
+    try {
+      const response = await apiClient.delete<{
+        status: string;
+        is_reminded: boolean;
+        message: string;
+      }>(`/events/${eventId}/remind`);
+      return response.data;
+    } catch {
+      const cached = localStorage.getItem('eventhub_custom_events');
+      if (cached) {
+        let items: Event[] = JSON.parse(cached);
+        items = items.map((ev) => (ev.id === eventId ? { ...ev, is_reminded: false } : ev));
+        localStorage.setItem('eventhub_custom_events', JSON.stringify(items));
+      }
+      return {
+        status: 'success',
+        is_reminded: false,
+        message: 'Đã hủy đặt lịch nhắc sự kiện.',
+      };
+    }
+  },
+
   // ── Demo Accounts API ────────────────────────────────────────────────────────
   
   async publishEvent(id: number): Promise<Event> {
@@ -2477,4 +2604,4 @@ export const apiService = {
   },
 };
 
-
+export type { NotificationItem };

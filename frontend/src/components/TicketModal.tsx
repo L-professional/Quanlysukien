@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   CheckCircle2,
@@ -16,7 +16,9 @@ import {
   Building2,
   Phone,
   Clock,
+  QrCode,
 } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { apiService } from '../services/api';
@@ -27,7 +29,11 @@ export interface TicketData {
   participant_name: string;
   participant_email: string;
   qr_code_token: string;
+  ticket_code?: string;
+  token?: string;
   qr_code_image?: string;
+  qr_code_url?: string;
+  qr_code_base64?: string;
   ticket_type?: string;
   event_title?: string;
   schedule_id?: number;
@@ -60,26 +66,85 @@ export const TicketModal: React.FC<TicketModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [ticket?.id, ticket?.qr_code_token, ticket?.ticket_code, ticket?.token]);
 
   if (!isOpen || !ticket) return null;
 
+  const ticketCode =
+    ticket.ticket_code ||
+    ticket.qr_code_token ||
+    ticket.token ||
+    `QR-EVENTHUB-${ticket.id}`;
+
+  const rawServerImage = ticket.qr_code_base64 || ticket.qr_code_image || ticket.qr_code_url;
+  const hasServerImage = Boolean(rawServerImage);
+  const serverImageSrc = rawServerImage
+    ? rawServerImage.startsWith('http') || rawServerImage.startsWith('data:')
+      ? rawServerImage
+      : `data:image/png;base64,${rawServerImage}`
+    : '';
+
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(ticket.qr_code_token);
+    navigator.clipboard.writeText(ticketCode);
     setCopied(true);
-    toast.success(t('events.copyToken') + '!');
+    toast.success((t('events.copyToken') || 'Đã sao chép mã vé') + '!');
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownloadQR = () => {
-    if (ticket.qr_code_image) {
-      const link = document.createElement('a');
-      link.href = `data:image/png;base64,${ticket.qr_code_image}`;
-      link.download = `Ticket_${ticket.qr_code_token}.png`;
-      link.click();
-      toast.success(t('events.downloadTicket') + '!');
-    } else {
-      handleCopyCode();
+    const sanitizedCode = ticketCode.replace(/[^a-zA-Z0-9-_]/g, '_');
+    const fileName = `ve-eventhub-${sanitizedCode}.png`;
+
+    // 1. Export directly from QRCodeCanvas (100% reliable, zero CORS issues, high resolution)
+    const canvas = qrCanvasRef.current || (document.getElementById('ticket-qr-canvas') as HTMLCanvasElement | null);
+    if (canvas) {
+      try {
+        const dataUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = dataUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success((t('events.downloadTicket') || 'Tải ảnh vé QR') + ' thành công!');
+        return;
+      } catch (err) {
+        console.warn('Canvas export failed, falling back to base64 image source', err);
+      }
     }
+
+    // 2. Fallback to base64 server image if canvas was not rendered
+    if (rawServerImage && (rawServerImage.startsWith('data:') || !rawServerImage.startsWith('http'))) {
+      const link = document.createElement('a');
+      link.href = serverImageSrc;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success((t('events.downloadTicket') || 'Tải ảnh vé QR') + ' thành công!');
+      return;
+    }
+
+    // 3. Fallback to URL
+    if (serverImageSrc.startsWith('http')) {
+      const link = document.createElement('a');
+      link.href = serverImageSrc;
+      link.download = fileName;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('Đang tải ảnh mã QR...');
+      return;
+    }
+
+    // 4. Fallback copy
+    handleCopyCode();
   };
 
   const handleConfirmCancel = async () => {
@@ -212,30 +277,64 @@ export const TicketModal: React.FC<TicketModalProps> = ({
 
           {/* QR Code Presentation Box */}
           <div className="bg-white rounded-2xl p-5 text-slate-900 text-center shadow-lg border border-slate-200">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500 mb-2">
-              MÃ QR SOÁT VÉ CHECK-IN
-            </p>
-            {ticket.qr_code_image ? (
-              <div className="flex justify-center my-2">
-                <img
-                  src={`data:image/png;base64,${ticket.qr_code_image}`}
-                  alt="QR Ticket"
-                  className="w-48 h-48 rounded-xl border border-slate-200 shadow-xs"
+            <div className="flex items-center justify-center gap-1.5 mb-2">
+              <QrCode className="w-4 h-4 text-indigo-600" />
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+                MÃ QR SOÁT VÉ CHECK-IN
+              </p>
+            </div>
+
+            {/* High-contrast QR Container */}
+            <div className="flex flex-col items-center justify-center bg-white p-4 rounded-xl shadow-inner border border-slate-200/90 mx-auto max-w-[230px] my-2">
+              {hasServerImage && !imageError ? (
+                <>
+                  <img
+                    src={serverImageSrc}
+                    alt="Mã QR Soát Vé"
+                    onError={() => setImageError(true)}
+                    className="w-[192px] h-[192px] object-contain rounded-lg"
+                  />
+                  {/* Hidden high-res canvas ready for PNG export without CORS */}
+                  <div className="hidden">
+                    <QRCodeCanvas
+                      ref={qrCanvasRef}
+                      id="ticket-qr-canvas"
+                      value={ticketCode}
+                      size={256}
+                      level="H"
+                      includeMargin={true}
+                      bgColor="#FFFFFF"
+                      fgColor="#000000"
+                    />
+                  </div>
+                </>
+              ) : (
+                <QRCodeCanvas
+                  ref={qrCanvasRef}
+                  id="ticket-qr-canvas"
+                  value={ticketCode}
+                  size={192}
+                  level="H"
+                  includeMargin={true}
+                  bgColor="#FFFFFF"
+                  fgColor="#000000"
+                  className="rounded-lg"
                 />
-              </div>
-            ) : (
-              <div className="w-48 h-48 mx-auto bg-slate-100 rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-3 my-2">
-                <Ticket className="w-12 h-12 text-indigo-600 mb-2" />
-                <span className="text-[11px] font-mono font-bold text-slate-700 break-all">
-                  {ticket.qr_code_token}
-                </span>
-              </div>
-            )}
+              )}
+            </div>
+
+            {/* Display Token for Manual Check-in */}
+            <div className="mt-2.5 flex items-center justify-center gap-1.5">
+              <span className="font-mono font-bold text-xs sm:text-sm text-slate-800 tracking-wider bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 select-all">
+                {ticketCode}
+              </span>
+            </div>
+
             <div className="mt-2 text-xs font-semibold text-slate-800">
               Khách tham dự: <span className="font-bold text-indigo-600">{ticket.participant_name}</span>
             </div>
             <p className="text-[10px] text-slate-500 mt-1">
-              Vui lòng giữ mã QR này trên điện thoại để nhân viên quét qua cổng
+              Vui lòng giữ mã QR này trên điện thoại để nhân viên quét qua cổng soát vé
             </p>
           </div>
 
@@ -244,7 +343,7 @@ export const TicketModal: React.FC<TicketModalProps> = ({
             <div className="overflow-hidden">
               <span className="text-[10px] text-slate-500 block uppercase font-bold">Mã vé (Token):</span>
               <code className="text-xs text-indigo-400 font-mono font-bold truncate block">
-                {ticket.qr_code_token}
+                {ticketCode}
               </code>
             </div>
             <button
@@ -264,6 +363,69 @@ export const TicketModal: React.FC<TicketModalProps> = ({
                 </>
               )}
             </button>
+          </div>
+
+          {/* Calendar Integration: Google / Apple / Outlook */}
+          <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+            <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+              Lưu vào lịch cá nhân (Tự động nhắc hẹn):
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const title = encodeURIComponent(ticket.event_title || ticket.schedule_title || 'Sự kiện EventHub AI');
+                  const details = encodeURIComponent(
+                    `Mã vé QR Check-in: ${ticketCode}\nLoại vé: ${ticket.ticket_type || 'Vé Tham Dự'}\nKhách tham dự: ${ticket.participant_name}\n\nVui lòng chuẩn bị mã QR trên điện thoại để quét tại cổng.`
+                  );
+                  const location = encodeURIComponent(ticket.room_location || 'Trung tâm Hội nghị GEM Center, TP.HCM');
+                  const gCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}`;
+                  window.open(gCalUrl, '_blank');
+                  toast.success('Đang mở Google Calendar để thêm sự kiện!');
+                }}
+                className="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer hover:border-indigo-500/50"
+                title="Lưu sự kiện vào Google Calendar"
+              >
+                <span>📅 Google Calendar</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const title = ticket.event_title || ticket.schedule_title || 'Sự kiện EventHub AI';
+                  const desc = `Mã vé QR: ${ticketCode} | Loại vé: ${ticket.ticket_type || 'Vé Tham Dự'}`;
+                  const loc = ticket.room_location || 'Trung tâm Hội nghị GEM Center, TP.HCM';
+                  const icsContent = [
+                    'BEGIN:VCALENDAR',
+                    'VERSION:2.0',
+                    'PRODID:-//EventHub AI//Event Calendar//VI',
+                    'CALSCALE:GREGORIAN',
+                    'BEGIN:VEVENT',
+                    `SUMMARY:${title}`,
+                    `DESCRIPTION:${desc}`,
+                    `LOCATION:${loc}`,
+                    `DTSTART:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+                    `DTEND:${new Date(Date.now() + 3 * 3600 * 1000).toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+                    `STATUS:CONFIRMED`,
+                    'END:VEVENT',
+                    'END:VCALENDAR'
+                  ].join('\r\n');
+                  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+                  const link = document.createElement('a');
+                  link.href = window.URL.createObjectURL(blob);
+                  link.setAttribute('download', `${title.replace(/[^a-zA-Z0-9]/g, '_')}.ics`);
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  toast.success('Đã tải file .ics cho Apple Calendar & Outlook!');
+                }}
+                className="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer hover:border-indigo-500/50"
+                title="Tải file .ics cho Apple Calendar và Outlook"
+              >
+                <span>🍏 Apple Calendar</span>
+              </button>
+            </div>
           </div>
 
           {/* Cancel Ticket Trigger Button */}
