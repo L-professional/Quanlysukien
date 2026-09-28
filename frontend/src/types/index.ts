@@ -246,6 +246,11 @@ export interface LiveFeedItem {
   badge?: string;
 }
 
+export interface ActionLink {
+  label: string;
+  url: string;
+}
+
 // Chatbot Types
 export interface ChatMessage {
   id: string;
@@ -254,6 +259,7 @@ export interface ChatMessage {
   timestamp: string;
   sources?: string[];
   isFallback?: boolean;
+  actionLinks?: ActionLink[];
 }
 
 export interface AttendeeChatResponse {
@@ -261,6 +267,7 @@ export interface AttendeeChatResponse {
   sources: string[];
   is_fallback: boolean;
   ai_category?: string;
+  action_links?: ActionLink[];
 }
 
 export interface KnowledgeItem {

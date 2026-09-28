@@ -135,7 +135,17 @@ async def list_events(
     stmt = select(Event).order_by(Event.id.asc())
 
     if status and status.strip():
-        stmt = stmt.where(Event.status == status.strip())
+        s_upper = status.strip().upper()
+        if s_upper in ("UPCOMING", "PUBLISHED"):
+            stmt = stmt.where(Event.status.in_(["UPCOMING", "PUBLISHED", "upcoming", "published"]))
+        elif s_upper in ("ONGOING", "LIVE"):
+            stmt = stmt.where(Event.status.in_(["ONGOING", "LIVE", "ongoing", "live"]))
+        elif s_upper in ("ENDED", "COMPLETED"):
+            stmt = stmt.where(Event.status.in_(["ENDED", "COMPLETED", "ended", "completed"]))
+        elif s_upper == "DRAFT":
+            stmt = stmt.where(Event.status.in_(["DRAFT", "draft"]))
+        else:
+            stmt = stmt.where(Event.status.ilike(status.strip()))
     if event_type and event_type.strip():
         stmt = stmt.where(Event.event_type.ilike(f"%{event_type.strip()}%"))
     if search and search.strip():

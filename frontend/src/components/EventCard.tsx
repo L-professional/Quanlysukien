@@ -60,6 +60,18 @@ export function cleanEventTitle(title?: string): string {
     .trim();
 }
 
+import {
+  parseEventDate,
+  computeEventStatus,
+  matchesStatusFilter,
+} from '../utils/eventStatus';
+
+export {
+  parseEventDate,
+  computeEventStatus,
+  matchesStatusFilter,
+};
+
 /** Format event date and time to DD/MM/YYYY • HH:mm */
 export function formatEventDateTime(
   startTime?: any,
@@ -320,8 +332,8 @@ export const EventCard: React.FC<EventCardProps> = ({
 
   // Status Badge Helper
   const renderStatusBadge = () => {
-    const status = (event.status || 'DRAFT').toUpperCase();
-    switch (status) {
+    const computed = computeEventStatus(event);
+    switch (computed) {
       case 'ONGOING':
         return (
           <span className="bg-[#DC2626] text-white font-bold text-[11px] px-2.5 py-1 rounded-full shadow-md flex items-center gap-1.5 backdrop-blur-sm">
@@ -339,13 +351,7 @@ export const EventCard: React.FC<EventCardProps> = ({
             Sắp diễn ra
           </span>
         );
-      case 'PUBLISHED':
-        return (
-          <span className="bg-emerald-600 text-white font-bold text-[11px] px-2.5 py-1 rounded-full shadow-md backdrop-blur-sm">
-            Đã xuất bản
-          </span>
-        );
-      case 'COMPLETED':
+      case 'ENDED':
         return (
           <span className="bg-slate-700 text-white font-bold text-[11px] px-2.5 py-1 rounded-full shadow-md backdrop-blur-sm">
             Đã kết thúc

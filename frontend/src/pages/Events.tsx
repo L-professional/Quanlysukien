@@ -53,6 +53,8 @@ import {
   formatEventDateTime,
   buildGoogleCalendarUrl,
   downloadIcsFile,
+  computeEventStatus,
+  matchesStatusFilter,
 } from '../components/EventCard';
 import { TicketModal, TicketData } from '../components/TicketModal';
 import { notifyEventChange, useEventSync } from '../services/eventSync';
@@ -240,23 +242,11 @@ export const Events: React.FC = () => {
   // 2. Dynamic Metric KPI Calculations from real Database data
   const kpiData = useMemo(() => {
     const list = allEvents.length > 0 ? allEvents : events;
-    const upcoming = list.filter((e) =>
-      ['UPCOMING', 'upcoming', 'PUBLISHED', 'published'].includes(e.status)
-    ).length;
-    const ongoing = list.filter((e) =>
-      ['ONGOING', 'ongoing', 'LIVE', 'live'].includes(e.status)
-    ).length;
-    const completed = list.filter((e) =>
-      ['COMPLETED', 'completed', 'ended'].includes(e.status)
-    ).length;
-    const draft = list.filter((e) =>
-      ['DRAFT', 'draft'].includes(e.status)
-    ).length;
-    const total = list.filter((e) =>
-      ['UPCOMING', 'ONGOING', 'COMPLETED', 'DRAFT', 'LIVE', 'PUBLISHED', 'upcoming', 'ongoing', 'completed', 'draft', 'live', 'published'].includes(
-        e.status
-      )
-    ).length;
+    const upcoming = list.filter((e) => matchesStatusFilter(e, 'UPCOMING')).length;
+    const ongoing = list.filter((e) => matchesStatusFilter(e, 'ONGOING')).length;
+    const completed = list.filter((e) => matchesStatusFilter(e, 'COMPLETED')).length;
+    const draft = list.filter((e) => matchesStatusFilter(e, 'DRAFT')).length;
+    const total = list.length;
     return {
       total,
       upcoming,
@@ -268,7 +258,7 @@ export const Events: React.FC = () => {
 
   // Real-time client-side filtered view for instant typing reaction
   const displayEvents = useMemo(() => {
-    let list = events;
+    let list = allEvents.length > 0 ? allEvents : events;
     if (search.trim()) {
       const q = search.toLowerCase().trim();
       list = list.filter((e) => {
@@ -281,27 +271,14 @@ export const Events: React.FC = () => {
       });
     }
     if (statusFilter) {
-      if (statusFilter === 'UPCOMING') {
-        list = list.filter((e) =>
-          ['UPCOMING', 'upcoming', 'PUBLISHED', 'published'].includes(e.status)
-        );
-      } else {
-        list = list.filter((e) => e.status === statusFilter);
-      }
-    } else {
-      // Khi ở chế độ "Tổng sự kiện", đồng bộ khớp chính xác với tất cả sự kiện hợp lệ trong hệ thống
-      list = list.filter((e) =>
-        ['UPCOMING', 'ONGOING', 'COMPLETED', 'DRAFT', 'LIVE', 'PUBLISHED', 'upcoming', 'ongoing', 'completed', 'draft', 'live', 'published'].includes(
-          e.status
-        )
-      );
+      list = list.filter((e) => matchesStatusFilter(e, statusFilter));
     }
     if (typeFilter) {
       const tf = typeFilter.toLowerCase();
       list = list.filter((e) => (e.event_type || '').toLowerCase().includes(tf));
     }
     return list;
-  }, [events, search, statusFilter, typeFilter]);
+  }, [allEvents, events, search, statusFilter, typeFilter]);
 
   // Pagination slice
   const paginatedEvents = useMemo(() => {
@@ -923,13 +900,23 @@ export const Events: React.FC = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const s = (status || 'DRAFT').toUpperCase();
-    const badges: any = {
+  const getStatusBadge = (target: Event | string) => {
+    let s: string;
+    if (typeof target === 'object' && target !== null) {
+      s = computeEventStatus(target);
+    } else {
+      const raw = (target || 'DRAFT').toUpperCase().trim();
+      if (raw === 'PUBLISHED') s = 'UPCOMING';
+      else if (raw === 'COMPLETED') s = 'ENDED';
+      else if (raw === 'LIVE') s = 'ONGOING';
+      else s = raw;
+    }
+
+    const badges: Record<string, { label: string; color: string }> = {
       DRAFT: { label: 'Bản nháp', color: 'bg-slate-100 text-slate-700 border-slate-200' },
-      PUBLISHED: { label: 'Đã xuất bản', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      UPCOMING: { label: 'Sắp diễn ra', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+      UPCOMING: { label: 'Sắp diễn ra', color: 'bg-amber-50 text-amber-700 border-amber-200 font-semibold' },
       ONGOING: { label: 'Đang diễn ra', color: 'bg-red-50 text-[#DC2626] border-red-200 font-bold' },
+      ENDED: { label: 'Đã kết thúc', color: 'bg-slate-100 text-slate-600 border-slate-200' },
       COMPLETED: { label: 'Đã kết thúc', color: 'bg-slate-100 text-slate-600 border-slate-200' },
       CANCELLED: { label: 'Đã hủy', color: 'bg-rose-50 text-rose-700 border-rose-200' },
     };
@@ -983,7 +970,10 @@ export const Events: React.FC = () => {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         {/* KPI 1: Tổng sự kiện */}
         <div
-          onClick={() => setStatusFilter('')}
+          onClick={() => {
+            setStatusFilter('');
+            setPage(1);
+          }}
           className={`p-4 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-md ${
             statusFilter === ''
               ? 'border-[#DC2626] ring-2 ring-[#DC2626]/20 bg-red-50/20'
@@ -1001,7 +991,10 @@ export const Events: React.FC = () => {
 
         {/* KPI 2: Sắp diễn ra */}
         <div
-          onClick={() => setStatusFilter(statusFilter === 'UPCOMING' ? '' : 'UPCOMING')}
+          onClick={() => {
+            setStatusFilter(statusFilter === 'UPCOMING' ? '' : 'UPCOMING');
+            setPage(1);
+          }}
           className={`p-4 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-md ${
             statusFilter === 'UPCOMING'
               ? 'border-[#DC2626] ring-2 ring-[#DC2626]/20 bg-amber-50/20'
@@ -1019,7 +1012,10 @@ export const Events: React.FC = () => {
 
         {/* KPI 3: Đang diễn ra */}
         <div
-          onClick={() => setStatusFilter(statusFilter === 'ONGOING' ? '' : 'ONGOING')}
+          onClick={() => {
+            setStatusFilter(statusFilter === 'ONGOING' ? '' : 'ONGOING');
+            setPage(1);
+          }}
           className={`p-4 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-md ${
             statusFilter === 'ONGOING'
               ? 'border-[#DC2626] ring-2 ring-[#DC2626]/30 bg-red-50/30'
@@ -1040,7 +1036,10 @@ export const Events: React.FC = () => {
 
         {/* KPI 4: Đã kết thúc */}
         <div
-          onClick={() => setStatusFilter(statusFilter === 'COMPLETED' ? '' : 'COMPLETED')}
+          onClick={() => {
+            setStatusFilter(statusFilter === 'COMPLETED' ? '' : 'COMPLETED');
+            setPage(1);
+          }}
           className={`p-4 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-md ${
             statusFilter === 'COMPLETED'
               ? 'border-[#DC2626] ring-2 ring-[#DC2626]/20 bg-slate-50'
@@ -1058,7 +1057,10 @@ export const Events: React.FC = () => {
 
         {/* KPI 5: Bản nháp */}
         <div
-          onClick={() => setStatusFilter(statusFilter === 'DRAFT' ? '' : 'DRAFT')}
+          onClick={() => {
+            setStatusFilter(statusFilter === 'DRAFT' ? '' : 'DRAFT');
+            setPage(1);
+          }}
           className={`p-4 rounded-2xl bg-white border transition-all cursor-pointer shadow-xs hover:shadow-md ${
             statusFilter === 'DRAFT'
               ? 'border-[#DC2626] ring-2 ring-[#DC2626]/20 bg-gray-50'
@@ -1195,7 +1197,13 @@ export const Events: React.FC = () => {
             )}
             {statusFilter && (
               <span className="px-2 py-0.5 bg-red-50 text-[#DC2626] font-semibold rounded-md">
-                Trạng thái: {statusFilter}
+                Trạng thái: {
+                  statusFilter === 'UPCOMING' ? 'Sắp diễn ra' :
+                  statusFilter === 'ONGOING' ? 'Đang diễn ra' :
+                  statusFilter === 'COMPLETED' || statusFilter === 'ENDED' ? 'Đã kết thúc' :
+                  statusFilter === 'DRAFT' ? 'Bản nháp' :
+                  statusFilter === 'PUBLISHED' ? 'Đã xuất bản' : statusFilter
+                }
               </span>
             )}
             {typeFilter && (
@@ -1385,7 +1393,7 @@ export const Events: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">{getStatusBadge(event.status)}</td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">{getStatusBadge(event)}</td>
                       <td className="py-3.5 px-4 text-center">
                         <div className="flex items-center justify-center gap-1.5">
                           <button

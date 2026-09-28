@@ -25,7 +25,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenMobileDrawer,
   onOpenAuthModal,
 }) => {
-  const { user, isAuthenticated, userRole, switchDemoAccount, logout } = useAuth();
+  const { user, isAuthenticated, userRole, logout } = useAuth();
   const navigate = useNavigate();
 
   const currentRoleLabel =
@@ -492,20 +492,21 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                   <div className="grid grid-cols-2 gap-1.5">
                     {[
-                      { role: 'SUPER_ADMIN' as UserRole, label: 'Admin', icon: ShieldCheck },
-                      { role: 'EVENT_MANAGER' as UserRole, label: 'Manager', icon: Briefcase },
-                      { role: 'SPEAKER' as UserRole, label: 'Speaker', icon: Mic },
-                      { role: 'STAFF' as UserRole, label: 'Staff', icon: Ticket },
-                      { role: 'ATTENDEE' as UserRole, label: 'Attendee', icon: User },
+                      { role: 'SUPER_ADMIN' as UserRole, label: 'Admin', email: 'admin@eventhub.ai', icon: ShieldCheck },
+                      { role: 'EVENT_MANAGER' as UserRole, label: 'Manager', email: 'manager@eventhub.ai', icon: Briefcase },
+                      { role: 'SPEAKER' as UserRole, label: 'Speaker', email: 'speaker@eventhub.ai', icon: Mic },
+                      { role: 'STAFF' as UserRole, label: 'Staff', email: 'staff@eventhub.ai', icon: Ticket },
+                      { role: 'ATTENDEE' as UserRole, label: 'Attendee', email: 'attendee@eventhub.ai', icon: User },
                     ].map((r) => {
                       const Icon = r.icon;
-                      const isCurrent = userRole === r.role || (r.role === 'ATTENDEE' && userRole === 'PARTICIPANT');
+                      const isCurrent = userRole === r.role || (r.role === 'ATTENDEE' && userRole === 'PARTICIPANT') || (r.role === 'SUPER_ADMIN' && userRole === 'ADMIN');
                       return (
                         <button
                           key={r.role}
                           onClick={() => {
-                            switchDemoAccount(r.role);
                             setShowDropdown(false);
+                            logout({ silent: true, redirect: false });
+                            navigate(`/login?email=${encodeURIComponent(r.email)}&role=${encodeURIComponent(r.label)}`);
                           }}
                           className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-[10px] font-bold transition-all ${
                             isCurrent

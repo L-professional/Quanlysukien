@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Mail, Lock, User, Eye, EyeOff, ArrowRight,
-  Home, Calendar, Users, Cpu, CheckSquare, Square
+  Home, Calendar, Users, Cpu, CheckSquare, Square, Sparkles
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { GoogleAuthModal } from "../components/GoogleAuthModal";
@@ -80,32 +80,104 @@ const SocialBtn: React.FC<{ onClick: () => void; children: React.ReactNode }> = 
   </button>
 );
 
+const DEMO_CREDENTIALS_MAP: Record<string, { email: string; password: string; role: string }> = {
+  'admin@eventhub.ai': { email: 'admin@eventhub.ai', password: '123456', role: 'Admin' },
+  'manager@eventhub.ai': { email: 'manager@eventhub.ai', password: '123456', role: 'Manager' },
+  'speaker@eventhub.ai': { email: 'speaker@eventhub.ai', password: '123456', role: 'Speaker' },
+  'staff@eventhub.ai': { email: 'staff@eventhub.ai', password: '123456', role: 'Staff' },
+  'attendee@eventhub.ai': { email: 'attendee@eventhub.ai', password: '123456', role: 'Attendee' },
+  'participant@eventhub.ai': { email: 'attendee@eventhub.ai', password: '123456', role: 'Attendee' },
+};
+
 export const Login: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { login, register: registerUser, isAuthenticated } = useAuth();
 
-  const [mode, setMode] = useState<AuthMode>(
-    searchParams.get("mode") === "register" ? "register" : "login"
-  );
+  const urlEmail = searchParams.get("email")?.trim() || "";
+  const urlRole = searchParams.get("role")?.trim() || "";
+  const urlPw = searchParams.get("password") || "";
+
+  const demoMatch = urlEmail ? DEMO_CREDENTIALS_MAP[urlEmail.toLowerCase()] : null;
+  const initialPassword = urlPw || (demoMatch ? demoMatch.password : (urlEmail ? "123456" : ""));
+  const initialRole = urlRole || (demoMatch ? demoMatch.role : (urlEmail ? "Demo" : ""));
+
+  const [mode, setMode] = useState<AuthMode>(() => {
+    if (urlEmail) return "login";
+    return searchParams.get("mode") === "register" ? "register" : "login";
+  });
+
   const [showPw, setShowPw] = useState(false);
   const [showCPw, setShowCPw] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [form, setForm] = useState<FormState>({
-    fullName: "", email: "", password: "", confirmPassword: ""
-  });
+
+  const [form, setForm] = useState<FormState>(() => ({
+    fullName: "",
+    email: urlEmail,
+    password: initialPassword,
+    confirmPassword: "",
+  }));
+
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+  const [demoRoleInfo, setDemoRoleInfo] = useState<{ role: string; email: string } | null>(() => {
+    if (!urlEmail) return null;
+    return {
+      role: initialRole,
+      email: urlEmail,
+    };
+  });
 
+  const lastPrefilledEmailRef = useRef<string>(urlEmail);
 
   useEffect(() => {
-    if (isAuthenticated) navigate("/dashboard", { replace: true });
-  }, [isAuthenticated, navigate]);
+    const email = searchParams.get("email")?.trim();
+    const role = searchParams.get("role")?.trim();
+    const pw = searchParams.get("password");
 
-  useEffect(() => {
-    setMode(searchParams.get("mode") === "register" ? "register" : "login");
+    if (email) {
+      const demo = DEMO_CREDENTIALS_MAP[email.toLowerCase()];
+      const roleName = role || (demo ? demo.role : "Demo");
+      const defaultPassword = pw || (demo ? demo.password : "123456");
+
+      setMode("login");
+      setForm(prev => ({
+        ...prev,
+        email: email,
+        password: defaultPassword,
+      }));
+      setDemoRoleInfo({ role: roleName, email });
+
+      if (lastPrefilledEmailRef.current !== email) {
+        lastPrefilledEmailRef.current = email;
+        toast.info(`Đã điền sẵn thông tin tài khoản ${roleName} Demo. Vui lòng bấm Đăng nhập để tiếp tục.`, {
+          id: `demo-prefill-${email}`,
+        });
+      }
+    } else {
+      if (searchParams.get("mode") === "register") {
+        setMode("register");
+      }
+    }
   }, [searchParams]);
+
+  // Initial toast notification for pre-filled demo accounts
+  useEffect(() => {
+    if (urlEmail && demoRoleInfo) {
+      toast.info(`Đã điền sẵn thông tin tài khoản ${demoRoleInfo.role} Demo. Vui lòng bấm Đăng nhập để tiếp tục.`, {
+        id: `demo-prefill-${urlEmail}`,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Only redirect to dashboard if the user is already authenticated AND NOT currently visiting with a demo auto-fill parameter
+    if (isAuthenticated && !searchParams.get("email")) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, searchParams, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -132,16 +204,22 @@ export const Login: React.FC = () => {
     setIsLoading(true);
     try {
       if (mode === "login") {
-        await login(form.email.trim(), form.password);
-        toast.success("Đăng nhập thành công!");
-        navigate("/dashboard", { replace: true });
+        const success = await login(form.email.trim(), form.password);
+        if (success) {
+          navigate("/dashboard", { replace: true });
+        }
       } else {
-        await registerUser(form.fullName.trim(), form.email.trim(), form.password);
-        toast.success("Đăng ký thành công! Chào mừng đến với EventAI.");
-        navigate("/dashboard", { replace: true });
+        const success = await registerUser(form.fullName.trim(), form.email.trim(), form.password);
+        if (success) {
+          toast.success("Đăng ký thành công! Chào mừng đến với EventAI.");
+          navigate("/dashboard", { replace: true });
+        }
       }
     } catch (err: any) {
-      toast.error(err?.message || (mode === "login" ? "Email hoặc mật khẩu không đúng" : "Đăng ký thất bại"));
+      console.error("Login submission error:", err);
+      // DO NOT clear or reset form fields on error
+      const errorMsg = err?.message || (mode === "login" ? "Email hoặc mật khẩu không chính xác" : "Đăng ký thất bại");
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -153,6 +231,7 @@ export const Login: React.FC = () => {
     setForm({ fullName: "", email: "", password: "", confirmPassword: "" });
     setShowPw(false);
     setShowCPw(false);
+    setDemoRoleInfo(null);
   };
 
   return (
@@ -351,6 +430,24 @@ export const Login: React.FC = () => {
                       </p>
                     </div>
 
+                    {/* Demo Account Auto-filled Badge / Notice */}
+                    {demoRoleInfo && (
+                      <div className="mb-4 p-3 bg-red-50/90 border border-red-200/90 rounded-xl flex items-start gap-2.5 text-[#101827] text-[12px] shadow-xs animate-in fade-in slide-in-from-top-1">
+                        <Sparkles className="w-4 h-4 text-[#D7193F] shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#D7193F] text-white">
+                              {demoRoleInfo.role} Demo
+                            </span>
+                            <span className="text-[11px] font-semibold text-slate-500">Đã điền sẵn tài khoản</span>
+                          </div>
+                          <p className="text-[12px] text-slate-700 leading-snug">
+                            Đã điền sẵn thông tin tài khoản <strong>{demoRoleInfo.role}</strong> Demo. Vui lòng bấm <strong>Đăng nhập</strong> để tiếp tục.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     <form onSubmit={handleSubmit} noValidate>
                       <InputField icon={Mail} name="email" type="email" placeholder="Email hoặc số điện thoại" form={form} errors={errors} onChange={handleChange} />
                       <InputField icon={Lock} name="password" type={showPw ? "text" : "password"} placeholder="Mật khẩu" form={form} errors={errors} onChange={handleChange} rightIcon={showPw ? EyeOff : Eye} onRightIconClick={() => setShowPw(v => !v)} />
@@ -405,7 +502,14 @@ export const Login: React.FC = () => {
                       ].map(d => (
                         <button
                           key={d.label} type="button"
-                          onClick={() => { setForm(p=>({...p, email:d.email, password:"123456"})); toast.success(`Đã điền tài khoản ${d.label}`); }}
+                          onClick={() => {
+                            setForm(p => ({ ...p, email: d.email, password: "123456" }));
+                            setDemoRoleInfo({ role: d.label, email: d.email });
+                            lastPrefilledEmailRef.current = d.email;
+                            toast.info(`Đã điền sẵn thông tin tài khoản ${d.label} Demo. Vui lòng bấm Đăng nhập để tiếp tục.`, {
+                              id: `demo-pill-${d.label}`,
+                            });
+                          }}
                           className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors hover:opacity-80 ${d.color}`}
                         >
                           {d.label}

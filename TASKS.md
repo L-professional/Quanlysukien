@@ -1580,3 +1580,182 @@
     - Frontend build: `npm run build` thành công xuất sắc không có cảnh báo hay lỗi (`built in 24.08s`).
     - Backend Pytest: `pytest backend/tests/test_task88_omnichannel.py` **9/9 tests PASSED 100%**.
 
+- [x] **Task 88: Chuẩn Hóa Quy Trình Chuyển Đổi Tài Khoản Demo (Redirect To Login & Pre-fill Credentials)**
+
+  - **1. Loại Bỏ Cơ Chế Auto-Switch Quyền Tức Thì:**
+    - Component Menu Tài khoản ở Header ([`Header.tsx`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/components/Header.tsx)): Xóa bỏ hoàn toàn việc gọi trực tiếp `switchDemoAccount` gây tráo đổi Session/JWT Token tức thì.
+    - Cập nhật [`AuthContext.tsx`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/context/AuthContext.tsx): Nâng cấp hàm `logout(options?: { silent?: boolean; redirect?: boolean | string })` hỗ trợ chế độ đăng xuất êm không gây reload/nhảy trang trái ý muốn khi chuyển hướng sang trang đăng nhập.
+
+  - **2. Chuyển Hướng Về Trang Đăng Nhập & Truyền Thông Tin Tài Khoản:**
+    - Khi người dùng click vào bất kỳ nút vai trò nào trong mục `CHUYỂN ROLE (DEMO)` (Admin, Manager, Speaker, Staff, Attendee):
+      + Tự động xóa phiên đăng nhập hiện tại (`logout({ silent: true, redirect: false })`).
+      + Chuyển hướng ngay lập tức sang `/login` kèm theo Query Parameters:
+        * Ví dụ: `/login?email=manager@eventhub.ai&role=Manager`
+        * Hoặc Admin: `/login?email=admin@eventhub.ai&role=Admin`
+
+  - **3. Cấu Hình Tự Động Điền (Auto-fill) & Thông Báo Tại Trang Đăng Nhập (`/login`):**
+    - Component [`Login.tsx`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/pages/Login.tsx):
+      + Đọc các tham số `email` và `role` từ URL `searchParams`.
+      + Tự động điền email và mật khẩu (`123456`) vào 2 ô Input của form Đăng nhập.
+      + **Bảo mật tuyệt đối:** Không tự động đăng nhập ngầm; bắt buộc người dùng phải tự tay click nút **[ Đăng nhập ]** để kích hoạt quy trình xác thực.
+      + Hiển thị Badge/Banner nổi bật cùng thông báo Toast: *"Đã điền sẵn thông tin tài khoản [Tên Role] Demo. Vui lòng bấm Đăng nhập để tiếp tục."*
+      + Đồng bộ cả các nút demo pills nhanh dưới chân form đăng nhập với trải nghiệm đồng nhất.
+
+  - **4. Kiểm Tra Biên Dịch & Xác Nhận Luồng:**
+    - Chạy `npm run build`: TypeScript biên dịch thành công (`✓ built in 14.26s`) với **0 lỗi**.
+    - Luồng chuyển đổi vai trò Demo: Header ➔ Logout an toàn ➔ Chuyển hướng `/login?email=...&role=...` ➔ Pre-fill credentials ➔ Hiện Badge & Toast ➔ Chờ người dùng nhấn [Đăng nhập] ➔ Xác thực vào `/dashboard`.
+
+- [x] **Task 89: Khắc Phục Lỗi Mất State Form Đăng Nhập & Xử Lý Đồng Bộ Auto-fill Credentials**
+
+  - **1. Đồng Bộ Triệt Để State Form Với Query Parameters (`/login`):**
+    - Khởi tạo trực tiếp giá trị `email`, `password` (`123456`), và thông tin vai trò `role` ngay trong hàm tạo `useState` của [`Login.tsx`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/pages/Login.tsx), loại bỏ hoàn toàn độ trễ render hoặc trạng thái rỗng ban đầu.
+    - Xây dựng từ điển `DEMO_CREDENTIALS_MAP` chuẩn hóa toàn diện cho các vai trò: Admin, Manager, Speaker, Staff, Attendee.
+    - Đồng bộ `searchParams` thông qua `useEffect` độc lập có `lastPrefilledEmailRef`, ngăn ngừa kích hoạt vòng lặp vô hạn hoặc hiện lại Toast thừa.
+
+  - **2. Khắc Phục Triệt Để Hành Vi Bị Reset Form Về Trang Trắng & Đăng Nhập Không Thành Công:**
+    - **Nguyên nhân gốc rễ:** Trước đây, trong `useEffect` của `Login.tsx` có logic `if (isAuthenticated) { logout(...) }` chạy phụ thuộc vào `isAuthenticated`. Khi người dùng bấm [Đăng nhập], API xác thực thành công khiến `isAuthenticated = true`, dẫn đến `useEffect` lập tức kích hoạt lại và gọi `logout()`, xóa sạch token/user vừa lưu và khiến form bị reset/đá về trạng thái chưa đăng nhập.
+    - **Khắc phục:** Loại bỏ hoàn toàn việc gọi `logout()` bên trong `Login.tsx`. Khi đăng nhập thành công, hệ thống điều hướng trực tiếp bằng `navigate('/dashboard', { replace: true })`.
+    - Đảm bảo `e.preventDefault()` trong `handleSubmit`, bọc toàn bộ luồng gọi `apiService.login` trong khối `try ... catch` an toàn.
+    - Khi có lỗi đăng nhập: Không bao giờ reset trắng các ô input, giữ nguyên dữ liệu đã nhập để người dùng chỉnh sửa.
+
+  - **3. Lưu Trữ Session Đồng Bộ Cookie & LocalStorage:**
+    - Cập nhật [`AuthContext.tsx`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/context/AuthContext.tsx): Khi `login()`, `register()`, hoặc `googleLogin()` thành công, token được lưu đồng thời vào cả `localStorage.setItem('eventhub_token')` lẫn `document.cookie = eventhub_token=...; path=/; max-age=86400; SameSite=Lax`.
+    - Chuẩn hóa hàm fallback offline trong [`api.ts`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/services/api.ts) với `email.trim().toLowerCase()` và chấp nhận cả 2 mật khẩu demo phổ biến (`123456`, `password123`).
+
+  - **4. Kiểm Tra Biên Dịch & Xác Nhận Thực Tế:**
+    - Biên dịch Frontend: `npm run build` (`tsc && vite build`) thành công 100% không có lỗi TypeScript (`✓ built in 19.93s`).
+    - Kiểm thử luồng:
+      1. Bấm Menu góc phải ➔ Chọn chuyển vai trò "Manager".
+      2. Màn hình chuyển sang `/login?email=manager%40eventhub.ai&role=Manager` với Email `manager@eventhub.ai` và Mật khẩu `123456` đã điền sẵn đầy đủ.
+      3. Bấm [Đăng nhập] ➔ Xác thực thành công 100%, lưu Cookie & LocalStorage, chuyển hướng thẳng vào `/dashboard` với quyền Manager, KHÔNG bị reset Form hay đá về trang trắng.
+
+- [x] **Task 90: Khắc Phục Lỗi Lệch Dữ Liệu Giữa Thẻ Thống Kê & Bộ Lọc Danh Sách Sự Kiện (/events)**
+
+  - **1. Chuẩn Hóa Logic Bộ Lọc Trạng Thái Sự Kiện (Status Enum Synchronization):**
+    - Tạo module tiện ích dùng chung [`eventStatus.ts`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/utils/eventStatus.ts) chứa hàm chuẩn hóa `computeEventStatus` và `matchesStatusFilter`.
+    - Đồng bộ mã Enum trạng thái trên toàn bộ các thành phần:
+      + Thẻ thống kê số lượng phía trên (KPI Count Cards): Tổng sự kiện (24), Sắp diễn ra (20), Đang diễn ra (1), Đã kết thúc (3), Bản nháp (0).
+      + Dropdown chọn trạng thái (`UPCOMING`, `ONGOING`, `PUBLISHED`, `COMPLETED`, `DRAFT`) & Tag bộ lọc đang áp dụng (hiển thị tiếng Việt: "Sắp diễn ra", "Đang diễn ra", "Đã kết thúc", "Bản nháp").
+      + Danh sách hiển thị dạng Thẻ Lưới ([`EventCard.tsx`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/components/EventCard.tsx)) và dạng Bảng Dữ Liệu ([`Events.tsx`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/pages/Events.tsx)).
+      + Truy vấn API backend [`events.py`](file:///d:/TL_2026-2027/eventhub-ai/backend/app/api/v1/events.py) và cơ chế Offline fallback trong [`api.ts`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/services/api.ts).
+    - Hỗ trợ xử lý case-insensitive (`.toUpperCase()`) và nhóm trạng thái đồng nghĩa:
+      + `UPCOMING` tương đương với `PUBLISHED` (đối với sự kiện chưa đến ngày diễn ra).
+      + `ONGOING` tương đương với `LIVE`.
+      + `ENDED` tương đương với `COMPLETED`.
+
+  - **2. Đồng Bộ Số Liệu Thống Kê & Danh Sách Sự Kiện (Consistent Counting & Filtering):**
+    - Cả 5 Thẻ thống kê KPI và danh sách lọc `displayEvents` đều sử dụng **duy nhất một hàm điều kiện `matchesStatusFilter(event, filter)`**:
+      + Thẻ **"Sắp diễn ra" (20)**: Khi click, danh sách ngay lập tức hiển thị chính xác **20 sự kiện sắp diễn ra**, loại bỏ hoàn toàn tình trạng trả về mảng rỗng hay màn hình báo "Không tìm thấy sự kiện nào".
+      + Thẻ **"Đang diễn ra" (1)**: Khi click, hiển thị chính xác **1 sự kiện đang diễn ra**.
+      + Thẻ **"Đã kết thúc" (3)**: Khi click, hiển thị chính xác **3 sự kiện đã kết thúc**.
+      + Thẻ **"Tổng sự kiện" (24)**: Khi click, hiển thị toàn bộ **24 sự kiện**.
+    - Bổ sung `setPage(1)` khi click chuyển đổi giữa các Thẻ KPI để đưa người dùng về trang 1 xem kết quả tức thì.
+
+  - **3. Tự Động Tính Toán Trạng Thái Theo Thời Gian Thực (Automatic Real-time Calculation):**
+    - Hàm `computeEventStatus` tự động phân tích và so sánh mốc thời gian hiện tại (`new Date()`):
+      + `now < startDate`: Sự kiện `UPCOMING` ("Sắp diễn ra").
+      + `startDate <= now <= endDate`: Sự kiện `ONGOING` ("Đang diễn ra").
+      + `now > endDate`: Sự kiện `ENDED` ("Đã kết thúc").
+    - Đồng bộ nhãn Badge màu sắc:
+      + `ONGOING`: Màu đỏ nổi bật kèm chấm ping hoạt họa (`animate-ping`).
+      + `UPCOMING`: Màu cam ấm (`bg-amber-500` / `bg-amber-50`).
+      + `ENDED`: Màu xám thanh lịch (`bg-slate-700` / `bg-slate-100`).
+      + `DRAFT`: Màu xám bạc trung tính.
+
+  - **4. Kiểm Thử Biên Dịch & Xác Nhận:**
+    - Biên dịch Frontend: `npm run build` (`tsc && vite build`) thành công 100% không có lỗi TypeScript hay cảnh báo circular dependency (`✓ built in 19.08s`).
+
+
+- [x] **Task 91: Nâng Cấp AI Chatbot Copilot Toàn Năng - Kết Nối PostgreSQL Real-Time, Phân Quyền RBAC Cấp AI & Xử Lý Ngôn Ngữ Tự Nhiên**
+
+  - **1. Tích Hợp Kiến Trúc Hybrid Autonomous Copilot Engine (Text-to-SQL + pgvector RAG):**
+    - Tạo mới dịch vụ lõi `ai_copilot_service.py` triển khai mô hình Autonomous Copilot với đầy đủ bộ công cụ (Autonomous Tools):
+      + `tool_get_event_overview`: Truy xuất chi tiết sự kiện hiện tại (tiêu đề, trạng thái, địa chỉ chuẩn, tọa độ/Google Maps embed URL, thông tin mạng WiFi SSID & mật khẩu).
+      + `tool_list_events`: Thống kê danh mục sự kiện PostgreSQL theo chuẩn Task 90 (tổng số sự kiện, số lượng theo từng trạng thái: Sắp diễn ra, Đang diễn ra, Đã kết thúc).
+      + `tool_get_schedules`: Truy vấn toàn bộ lịch trình, ca diễn thuyết, phòng sảnh (room/hall), thông tin diễn giả và lọc linh hoạt theo từ khóa ngữ nghĩa.
+      + `tool_get_checkin_and_registration_stats`: Đo đếm số lượt đăng ký, số vé đã check-in thực tế và tỷ lệ check-in thời gian thực.
+      + `tool_get_user_personal_tickets`: Tra cứu trạng thái vé, mã vé cá nhân của người dùng hiện tại mà không làm lộ thông tin của người khác.
+      + `tool_get_event_feedback_summary`: Tóm tắt điểm số hài lòng, lượt đánh giá và ý kiến phản hồi sự kiện.
+      + `tool_search_knowledge_rag`: Tích hợp tìm kiếm RAG theo ngữ nghĩa tài liệu qua pgvector.
+    - **Bảo mật tuyệt đối (Security Lock):** Loại bỏ hoàn toàn mọi trường thông tin nhạy cảm của người dùng (`password`, `hashed_password`, `token`, `secret_key`, ...) khỏi toàn bộ kết quả trả về của các công cụ.
+
+  - **2. Thiết Lập Rào Chắn Phân Quyền RBAC Cấp AI Nghiêm Ngặt (Strict AI-Level RBAC Guardrails):**
+    - Phân quyền phản hồi theo vai trò thực tế của người dùng:
+      + `ADMIN` / `MANAGER`: Toàn quyền truy xuất số liệu thống kê quản trị, tỷ lệ check-in, doanh thu, phân bổ vé, danh sách người dùng và tổng quan hệ thống.
+      + `SPEAKER`: Truy xuất danh sách phiên diễn thuyết của mình, vị trí sảnh diễn, phản hồi và câu hỏi từ khán giả dành cho bài thuyết trình.
+      + `STAFF`: Truy xuất thông tin vé, trạng thái check-in, vị trí sảnh, lịch trình sự kiện phục vụ điều phối hội trường.
+      + `ATTENDEE` / `Khách vãng lai`: Chỉ được phép truy cập thông tin công khai sự kiện, lịch trình chi tiết, vị trí sảnh, mật khẩu WiFi, vé cá nhân của chính mình và hướng dẫn check-in.
+    - **Bộ lọc phòng thủ chủ động (Guardrail Interceptor):** Khi tài khoản `ATTENDEE` đặt các câu hỏi liên quan đến số liệu quản trị (tỷ lệ check-in, doanh thu, danh sách người dùng, báo cáo tài chính,...), Copilot từ chối lịch sự và chuyển hướng hành động:
+      > *"Rất tiếc, thông tin này chỉ dành cho Ban Tổ Chức. Bạn có cần tôi hỗ trợ tìm kiếm lịch trình hay vị trí sảnh sự kiện không?"*
+      Kèm theo các phím tắt Smart Action Widgets hữu ích: `[ 📅 Xem Lịch trình Sự kiện ](/events)`, `[ 🎟️ Xem Vé của tôi ](/registrations)`, `[ 🗺️ Xem Sơ đồ & Chỉ đường Google Maps ](...)`.
+
+  - **3. Smart Action Widgets & Nhận Diện Ngữ Cảnh Hội Thoại Nhiều Lượt (Multi-turn Context Memory):**
+    - Nhận diện và biến đổi định dạng Markdown link `[ Nhãn ](đường_dẫn)` thành các **Nút Widget Hành Động Tương Tác** (Action Widget Buttons) trực tiếp trong khung chat:
+      + Điều hướng nội bộ không reload trang thông qua `navigate()` của React Router: `[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events)`, `[ 🎟️ Xem Vé của tôi ](/registrations)`.
+      + Mở liên kết ngoài an toàn trong tab mới: `[ 🗺️ Mở Bản đồ Google Maps ](https://maps.google.com/maps?q=...)`.
+      + Danh sách phím tắt hành động nhanh `action_links` được gắn dưới chân tin nhắn để người dùng bấm ngay lập tức.
+    - Duy trì bộ nhớ ngữ cảnh hội thoại nhiều lượt (`history`), giúp AI ghi nhớ tên sự kiện, phiên họp hay chủ đề đang thảo luận khi người dùng hỏi các câu tiếp nối ngắn gọn (ví dụ: *"Ai là diễn giả của phiên này?", "Diễn ra ở phòng nào?"*).
+
+  - **4. Nâng Cấp Giao Diện FloatingChatbot & Đồng Bộ State Toàn Diện:**
+    - Cập nhật `FloatingChatbot.tsx`:
+      + Tích hợp xác thực `useAuth()` để tự động nhận diện vai trò người dùng hiện tại (`ADMIN`, `MANAGER`, `SPEAKER`, `STAFF`, `ATTENDEE`).
+      + Hiển thị câu chào và gợi ý câu hỏi thông minh riêng biệt theo từng Role (Ví dụ Admin thấy gợi ý hỏi tỷ lệ check-in, Attendee thấy gợi ý hỏi lịch trình, sảnh, WiFi, vé của tôi).
+      + Đồng bộ endpoint `/chat/attendee` gửi kèm `history`, `user_id`, `role` và JWT token thông qua `api.ts` và `public_chat.py`.
+    - Cập nhật `types/index.ts` với interface `ActionLink` và mở rộng `ChatMessage`, `AttendeeChatResponse`.
+
+  - **5. Kiểm Thử Biên Dịch & Xác Nhận:**
+    - **Frontend Build:** `npm run build` (`tsc && vite build`) hoàn thành thành công 100% với 0 lỗi TypeScript (`✓ built in 10.63s`).
+    - **Backend Copilot Test:** Kiểm thử tự động trên CSDL PostgreSQL thực tế xác nhận:
+      + Tài khoản `ATTENDEE` hỏi số liệu quản trị: Kích hoạt Guardrail từ chối chuẩn xác, đi kèm các nút chuyển hướng `/events` và `/registrations`.
+      + Tài khoản `ADMIN` hỏi số liệu quản trị: Trả về chính xác số liệu PostgreSQL real-time (tổng 24 sự kiện, tỷ lệ check-in, số vé đã đăng ký).
+      + Tài khoản `ATTENDEE` hỏi lịch trình và vé cá nhân: Trả về đầy đủ lịch trình và liên kết mở vé cá nhân.
+
+- [x] **Task 92: Khắc Phục Lỗi Chatbot Scope Lock & Tối Ưu PostgreSQL Tool Tra Cứu Sự Kiện Real-time**
+
+  - **1. Loại Bỏ Tình Trạng Khóa Scope Sự Kiện (Remove Event Context Lock):**
+    - Kiểm tra và tái cấu trúc System Prompt cùng bộ công cụ API Tool của Chatbot AI trong `ai_copilot_service.py`.
+    - **Xóa bỏ triệt để Scope Lock:** Loại bỏ điều kiện lọc cứng `WHERE event_id = 1` khi người dùng đặt các câu hỏi tổng quan, tìm kiếm sự kiện khác hoặc hỏi sự kiện đang diễn ra hôm nay.
+    - AI Copilot được trang bị công cụ `tool_search_events` có khả năng truy vấn **toàn bộ bảng `events`** trong CSDL PostgreSQL.
+
+  - **2. Cấu Hình Tìm Kiếm Linh Hoạt (Fuzzy Search & Case-Insensitive ILIKE):**
+    - Tích hợp chuẩn hóa tiếng Việt loại bỏ dấu thanh (`remove_vietnamese_diacritics`) kết hợp `ILIKE` không phân biệt hoa thường.
+    - Cho phép AI phát hiện chính xác sự kiện ngay cả khi người dùng nhập từ khóa vắn tắt (ví dụ: "Diễn đàn ASEAN", "ASEAN", "ICTU", "Cybersecurity", "Thái Nguyên"...).
+    - Tự động gán điểm liên quan (`match_score`) và ưu tiên sự kiện trùng khớp nhất để làm ngữ cảnh chính thay thế cho `event_id` mặc định.
+
+  - **3. Đồng Bộ Múi Giờ & Xử Lý Trạng Thái Thời Gian Thực (Timezone Handling UTC+7):**
+    - Xây dựng hàm chuẩn hóa thời gian `parse_event_time_range_vn`:
+      + Chuyển đổi chính xác thời gian bắt đầu/kết thúc sang múi giờ Việt Nam (`Asia/Ho_Chi_Minh` - UTC+7).
+      + Xác định điều kiện sự kiện đang diễn ra: `st_vn <= now_vn <= et_vn` hoặc `status IN ('ONGOING', 'LIVE')`.
+      + Nhận diện sự kiện "Diễn đàn ASEAN" (ID 146) diễn ra vào rạng sáng ngày 29/09/2026 trong khung giờ **00:37 - 03:37** tại **ICTU Quyết Thắng, Thái Nguyên** là sự kiện **🔴 Đang diễn ra (ONGOING) hôm nay**.
+      + Đồng bộ trạng thái vào `tool_list_events` và `tool_get_event_overview`.
+
+  - **4. Kiểm Tra Biên Dịch & Xác Nhận:**
+    - **Frontend Build:** `npm run build` (`tsc && vite build`) hoàn thành thành công 100% với 0 lỗi TypeScript (`✓ built in 51.36s`).
+    - **Kiểm thử tự động thực tế:**
+      + Câu hỏi 1: *"tôi thấy có sự kiện Diễn đàn ASEAN đang diễn ra hôm nay mà"* ➔ AI truy vấn chính xác bảng `events` trong PostgreSQL và phản hồi đầy đủ thông tin: Trạng thái 🔴 Đang diễn ra (ONGOING), Thời gian 00:37 - 03:37 ngày 29/09/2026, Địa điểm ICTU Quyết Thắng, Thái Nguyên kèm các nút Smart Action Widgets.
+      + Câu hỏi 2: *"có sự kiện nào đang diễn ra hôm nay không"* ➔ AI phát hiện và liệt kê ngay sự kiện "Diễn đàn ASEAN" đang diễn ra hôm nay.
+
+- [x] **Task 93: Tái Cấu Trúc AI Chatbot Copilot - Truy Vấn PostgreSQL Live Real-time, Triệt Hạ Lỗi Hardcoded Context & Guardrail Bắt Buộc Dùng Tool**
+
+  - **1. Triệt Hạ Hoàn Toàn Bẫy Ngữ Cảnh Tĩnh (Remove Hardcoded System Context):**
+    - Kiểm tra và tái cấu trúc `FloatingChatbot.tsx`, `api.ts`, `public_chat.py`:
+      + Xóa bỏ việc tiêm mặc định ID hoặc Tên của sự kiện cố định (`TechFest Global...`, `activeEvent.id || 1`) vào System Prompt và Request Payload.
+      + Khi người dùng ở các trang chung (`/`, `/events`, `/registrations`), Chatbot khởi tạo ở trạng thái **Toàn Cục (Global Scope)** với `event_id = None`. Chỉ khi người dùng đang xem trang chi tiết một sự kiện cụ thể (`/events/:id`), Chatbot mới truyền `contextualEventId`.
+      + Chuẩn hóa câu chào và gợi ý mở đầu theo từng Role người dùng, không gán cứng địa điểm, wifi hay nội dung của bất kỳ sự kiện nào.
+
+  - **2. Đồng Bộ Live Query 100% Không Cache (Zero-Cache Tools):**
+    - Áp dụng `db.expire_all()` trên Async Session của SQLAlchemy trong toàn bộ các công cụ DB Tools (`tool_search_events`, `tool_get_event_overview`, `tool_list_events`, `execute_copilot`) để hủy mọi session cache trong bộ nhớ.
+    - Đảm bảo ngay sau khi Admin Thêm mới (INSERT), Chỉnh sửa (UPDATE), hoặc Xóa (DELETE) bất kỳ sự kiện nào trong PostgreSQL, AI Chatbot phản ánh chính xác tức thì ở lượt chat kế tiếp với độ trễ bằng 0.
+
+  - **3. Anti-Hallucination Guardrail Cấp Cao (Strict Tool Verification):**
+    - Ép buộc AI gọi DB Tools xác thực trong CSDL PostgreSQL trước khi trả lời.
+    - Xây dựng cơ chế trích xuất tên sự kiện truy vấn thông minh (`extract_queried_event_name`) kết hợp tách từ (tokenized set filtering) chống bắt nhầm từ khóa.
+    - Nếu sự kiện được hỏi không tồn tại trong CSDL PostgreSQL (hoặc vừa bị xóa), AI trả lời dứt khoát: sự kiện không tồn tại hoặc đã bị xóa khỏi hệ thống, tuyệt đối không suy đoán hay bịa đặt thông tin ảo, đồng thời đính kèm liên kết điều hướng đến `/events`.
+
+  - **4. Kiểm Thử Biên Dịch & Quy Trình End-to-End Thực Tế 100%:**
+    - **Frontend Build:** `npm run build` (`tsc && vite build`) hoàn thành thành công 100% với 0 lỗi TypeScript.
+    - **End-to-End Automated Test Suite (`test_task93_e2e.py`):**
+      + *Bước 1 & 2 (Create Event):* Admin tạo sự kiện mới `"Hội Thảo Công Nghệ Tương Lai 2026"` trong PostgreSQL ➔ AI Chatbot lập tức tìm thấy và phản hồi chính xác chi tiết thời gian, địa điểm, mô tả.
+      + *Bước 3 (Update Event):* Admin cập nhật địa điểm thành `"Tòa nhà FPT Tower, Cầu Giấy, Hà Nội"` ➔ AI Chatbot lập tức phản hồi địa điểm mới cập nhật với Zero-Cache.
+      + *Bước 4 (Delete Event):* Admin xóa sự kiện khỏi PostgreSQL ➔ AI Chatbot kích hoạt Anti-Hallucination Guardrail, xác nhận sự kiện không còn tồn tại trên hệ thống và gợi ý trang `/events`.
+      + *Bước 5 (ASEAN Ongoing Event):* Người dùng hỏi *"tôi thấy có sự kiện Diễn đàn ASEAN đang diễn ra hôm nay mà"* ➔ AI Chatbot xác nhận chính xác trạng thái `🔴 Đang diễn ra (ONGOING)` hôm nay trong khung giờ `00:37 - 03:37` (UTC+7) tại `ICTU Quyết Thắng, Thái Nguyên`.

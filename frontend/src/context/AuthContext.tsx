@@ -117,7 +117,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   register: (email: string, password: string, fullName: string, phoneNumber?: string) => Promise<boolean>;
   googleLogin: (payload: { credential?: string; email?: string; full_name?: string; avatar_url?: string }) => Promise<boolean>;
-  logout: () => void;
+  logout: (options?: { silent?: boolean; redirect?: boolean | string }) => void;
   switchDemoAccount: (role: UserRole) => void;
   updateUser: (updatedData: Partial<User>) => void;
 }
@@ -215,6 +215,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(response.user);
       localStorage.setItem('eventhub_token', response.access_token);
       localStorage.setItem('eventhub_user', JSON.stringify(response.user));
+      document.cookie = `eventhub_token=${response.access_token}; path=/; max-age=86400; SameSite=Lax`;
       const role = normalizeRole(response.user.role_name);
       const roleDisplay =
         role === 'ADMIN'
@@ -262,6 +263,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(response.user);
       localStorage.setItem('eventhub_token', response.access_token);
       localStorage.setItem('eventhub_user', JSON.stringify(response.user));
+      document.cookie = `eventhub_token=${response.access_token}; path=/; max-age=86400; SameSite=Lax`;
       toast.success(`Đăng ký tài khoản thành công! Chào mừng ${response.user.full_name}`);
       return true;
     } catch (err: unknown) {
@@ -293,6 +295,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(response.user);
       localStorage.setItem('eventhub_token', response.access_token);
       localStorage.setItem('eventhub_user', JSON.stringify(response.user));
+      document.cookie = `eventhub_token=${response.access_token}; path=/; max-age=86400; SameSite=Lax`;
       const role = normalizeRole(response.user.role_name);
       const roleDisplay =
         role === 'ADMIN'
@@ -339,7 +342,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     toast.success(`Đã chuyển vai trò sang: ${roleTitles[key]}!`);
   };
 
-  const logout = () => {
+  const logout = (options?: { silent?: boolean; redirect?: boolean | string }) => {
     setToken(null);
     setUser(null);
     localStorage.removeItem('eventhub_token');
@@ -348,9 +351,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('eventhub_submitted_feedback_sessions');
     localStorage.removeItem('eventhub_my_agenda');
     document.cookie = 'eventhub_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-    toast.info('Đã đăng xuất khỏi hệ thống EventHub AI');
-    if (window.location.pathname !== '/') {
-      window.location.href = '/';
+    if (!options?.silent) {
+      toast.info('Đã đăng xuất khỏi hệ thống EventHub AI');
+    }
+    if (options?.redirect === false) {
+      return;
+    }
+    const target = typeof options?.redirect === 'string' ? options.redirect : '/';
+    if (window.location.pathname !== target) {
+      window.location.href = target;
     }
   };
 
