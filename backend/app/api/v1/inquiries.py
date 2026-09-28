@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select, or_
@@ -11,6 +12,9 @@ from app.models.event import Event
 from app.models.user import User
 from app.models.registration import Registration
 from app.models.ai_log import AILog
+from app.models.knowledge import KnowledgeBase
+from app.models.notification import Notification
+from app.services.email_service import send_invitation_email
 from app.schemas.inquiry import (
     InquiryCreate,
     InquiryResponse,
@@ -29,6 +33,8 @@ from app.schemas.inquiry import (
 )
 from app.services.rag_engine import rag_engine
 from app.services.gemini_service import gemini_service
+
+logger = logging.getLogger("eventhub.inquiries")
 
 router = APIRouter(prefix="/inquiries", tags=["Inquiries (HITL)"])
 
@@ -330,11 +336,13 @@ async def review_inquiry(
     final_reply_response = None
 
     # 3. Process Review Action
+    approved_content = ""
     if payload.action == ReviewActionEnum.ACCEPT:
         inquiry.status = InquiryStatusEnum.APPROVED.value
         inquiry.assigned_staff_id = payload.staff_id
         if target_reply:
             target_reply.sender_id = payload.staff_id
+            approved_content = target_reply.content or ""
             final_reply_response = InquiryReplyResponse.model_validate(target_reply)
         message = "Câu trả lời AI đã được duyệt và chấp thuận."
 
@@ -346,6 +354,7 @@ async def review_inquiry(
             )
         inquiry.status = InquiryStatusEnum.APPROVED.value
         inquiry.assigned_staff_id = payload.staff_id
+        approved_content = payload.edited_content.strip()
 
         if target_reply:
             target_reply.content = payload.edited_content.strip()
@@ -371,13 +380,67 @@ async def review_inquiry(
         inquiry.assigned_staff_id = payload.staff_id
         message = "Câu trả lời AI đã bị từ chối."
 
-    # 4. Mandatory Audit Log Entry
+    # 4. Feedback Loop: Auto-index Question + Approved Answer into pgvector KnowledgeBase
+    if approved_content and inquiry.question and payload.action in [ReviewActionEnum.ACCEPT, ReviewActionEnum.EDIT]:
+        try:
+            golden_title = f"Golden FAQ #{inquiry.id}: {inquiry.question[:80]}"
+            golden_content = f"Câu hỏi: {inquiry.question}\nCâu trả lời chuẩn: {approved_content}"
+            embedding = await gemini_service.generate_embedding(golden_content)
+            kb_item = KnowledgeBase(
+                event_id=inquiry.event_id,
+                title=golden_title,
+                content=golden_content,
+                embedding=embedding
+            )
+            db.add(kb_item)
+        except Exception as kb_err:
+            logger.warning(f"Error auto-indexing golden answer to KnowledgeBase: {kb_err}")
+
+    # 5. Omnichannel Dispatch Engine: Email, In-App Notification, SMS
+    target_channel = (payload.channel or "EMAIL").upper()
+    if approved_content and payload.action in [ReviewActionEnum.ACCEPT, ReviewActionEnum.EDIT]:
+        if target_channel == "IN_APP":
+            try:
+                noti = Notification(
+                    user_id=inquiry.participant_id,
+                    title="Ban Tổ Chức đã phản hồi thắc mắc của bạn",
+                    message=f"Câu hỏi: {inquiry.question[:60]}...\nPhản hồi: {approved_content[:200]}...",
+                    type="CONCIERGE_REPLY"
+                )
+                db.add(noti)
+            except Exception as noti_err:
+                logger.warning(f"Error creating in-app notification: {noti_err}")
+        elif target_channel == "EMAIL":
+            try:
+                participant_user = await db.get(User, inquiry.participant_id)
+                if participant_user and participant_user.email:
+                    custom_body = (
+                        f"<strong>Câu hỏi của Quý khách:</strong><br/>"
+                        f"<blockquote style='border-left: 4px solid #DC2626; padding-left: 12px; margin: 10px 0; color: #475569; font-style: italic;'>"
+                        f"{inquiry.question}"
+                        f"</blockquote><br/>"
+                        f"<strong>Phản hồi từ Ban Tổ Chức:</strong><br/>"
+                        f"<div style='background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; margin-top: 8px; color: #1E293B; line-height: 1.6; white-space: pre-wrap;'>"
+                        f"{approved_content}"
+                        f"</div>"
+                    )
+                    await send_invitation_email(
+                        to_email=participant_user.email,
+                        recipient_name=participant_user.full_name or "Quý Khách",
+                        event_title="EventHub AI Summit 2026",
+                        subject=f"💬 [EventHub AI Concierge] Phản hồi thắc mắc: {inquiry.question[:50]}...",
+                        custom_message=custom_body,
+                    )
+            except Exception as mail_err:
+                logger.warning(f"Error sending email reply: {mail_err}")
+
+    # 6. Mandatory Audit Log Entry
     ai_audit_log = AILog(
         task_type="HITL_REVIEW",
         prompt_tokens=0,
         completion_tokens=len(payload.edited_content.split()) if payload.edited_content else 0,
         latency_ms=0.0,
-        staff_action=payload.action.value
+        staff_action=f"{payload.action.value}_VIA_{target_channel}"
     )
     db.add(ai_audit_log)
 
@@ -387,8 +450,8 @@ async def review_inquiry(
         message=message,
         inquiry_id=inquiry.id,
         status=inquiry.status,
-        staff_action=payload.action.value,
-        dispatch_channel=payload.channel or "EMAIL",
+        staff_action=f"{payload.action.value}_VIA_{target_channel}",
+        dispatch_channel=target_channel,
         final_reply=final_reply_response
     )
 

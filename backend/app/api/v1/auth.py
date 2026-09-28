@@ -18,6 +18,7 @@ from app.core.security import (
     create_access_token,
     get_current_user,
     get_user_role_name,
+    get_permissions_for_role,
 )
 from app.models.user import User
 from app.models.role import Role, RoleEnum
@@ -133,6 +134,7 @@ async def ensure_default_roles(db: AsyncSession):
 async def _build_user_response(user: User, db: AsyncSession) -> UserResponse:
     """Build UserResponse with role_name fetched from related Role table."""
     role_name = await get_user_role_name(user, db)
+    permissions = get_permissions_for_role(role_name)
     data = {
         "id": user.id,
         "email": user.email,
@@ -140,6 +142,7 @@ async def _build_user_response(user: User, db: AsyncSession) -> UserResponse:
         "phone_number": user.phone_number,
         "role_id": user.role_id,
         "role_name": role_name,
+        "permissions": permissions,
         "is_active": user.is_active,
         "avatar_url": getattr(user, "avatar_url", None),
         "provider": getattr(user, "provider", "local"),

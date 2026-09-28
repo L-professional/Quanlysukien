@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(".env", "../.env"),
+        env_file=(".env", "../.env", ".env.local", "../.env.local"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore"
@@ -55,6 +55,32 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "eventhub_ai_secret_key_super_secure_jwt_2026"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
+
+    # SMTP & Email Configuration
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    SMTP_FROM: str = "EventAI System <noreply@eventhub.ai>"
+    SMTP_SECURE: bool = False
+    RESEND_API_KEY: str = ""
+
+    # SMS Gateway Configuration (eSMS.vn / SpeedSMS / Twilio)
+    ESMS_API_KEY: str = ""
+    ESMS_SECRET_KEY: str = ""
+    ESMS_BRANDNAME: str = "EVENTHUB"
+    SPEEDSMS_ACCESS_TOKEN: str = ""
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_PHONE_NUMBER: str = ""
+
+    # Zalo Official Account & ZNS Configuration
+    ZALO_OA_ID: str = ""
+    ZALO_APP_ID: str = ""
+    ZALO_SECRET_KEY: str = ""
+    ZALO_ACCESS_TOKEN: str = ""
+    ZALO_REFRESH_TOKEN: str = ""
+    ZALO_TEMPLATE_ID: str = ""
 
 
 settings = Settings()

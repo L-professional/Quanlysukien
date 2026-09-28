@@ -364,12 +364,24 @@ export const UserManagement: React.FC = () => {
     }
     setIsInviting(true);
     try {
-      await new Promise((r) => setTimeout(r, 800));
+      await apiService.sendInvitation({
+        to: inviteForm.email.trim(),
+        recipient_name: inviteForm.full_name.trim() || undefined,
+        role: inviteForm.role,
+        custom_message: inviteForm.message.trim() || undefined,
+        subject: `🎟️ [EventAI] Thư Mời Tham Gia Hệ Thống với Vai Trò ${inviteForm.role}`,
+      });
       toast.success(`Đã gửi thư mời tham gia hệ thống với vai trò ${inviteForm.role} tới "${inviteForm.email}"!`);
       setIsInviteModalOpen(false);
       setInviteForm({ email: '', full_name: '', role: 'ATTENDEE', message: '' });
-    } catch {
-      toast.error('Gửi thư mời thất bại. Vui lòng thử lại!');
+    } catch (err: any) {
+      console.error('Failed to send invitation email:', err);
+      const detail =
+        err.response?.data?.detail ||
+        err.response?.data?.error ||
+        err.message ||
+        'Gửi thư mời thất bại. Vui lòng kiểm tra cấu hình SMTP!';
+      toast.error(detail);
     } finally {
       setIsInviting(false);
     }

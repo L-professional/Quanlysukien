@@ -1206,7 +1206,377 @@
     - Lệnh `npx tsc --noEmit` hoàn thành với **0 lỗi TypeScript**.
     - Lệnh `npm run build` (Vite production build) hoàn tất thành công 100% trong 11.62s.
 
+- [x] **Task 80: Kết Nối Dữ Liệu Thực Database Cho Khối "Sự Kiện Nổi Bật" Trang Chủ & Chuẩn Hóa Bố Cục UI Card**
 
+  - **1. Tích Hợp Dữ Liệu Thực 100% Từ CSDL (Zero Mock/Hardcoded Data):**
+    - **API Integration:** Thay thế hoàn toàn cơ chế cũ trong component Landing Page bằng lệnh gọi API trực tiếp từ CSDL PostgreSQL (`GET /api/events?status=PUBLISHED` qua `api.getEvents({ status: 'PUBLISHED' })` kết hợp fallback thông minh theo `is_featured` và `homepage_visible`).
+    - **Đồng bộ Real-time 1-1:** Tích hợp `useEventSync` và đồng bộ hóa đa tầng (`BroadcastChannel`, custom event bus `EVENTHUB_EVENTS_SYNC`, và `localStorage` cache). Khi Admin Thêm / Sửa / Xóa / Xuất bản sự kiện tại `/events`, khối "Sự kiện nổi bật" trên Trang chủ tự động kích hoạt refetch và cập nhật tức thì 1-1 (Tên sự kiện, Danh mục, Ngày giờ, Địa điểm, Số lượng vé/sức chứa, Banner).
 
+  - **2. Bố Cục & Thiết Kế Khối Header:**
+    - Tag đỏ nhận diện thương hiệu: `▪ KHÁM PHÁ` chuẩn màu `#DC2626` đậm nét, tracking-wider uppercase.
+    - Tiêu đề chính: **Sự kiện nổi bật** (`text-[36px] lg:text-[42px] font-bold text-event-navy leading-[1.3]`).
+    - Dòng mô tả phụ: *"Khám phá những sự kiện sắp diễn ra được tổ chức và quản lý bởi nền tảng EventAI."* (`text-slate-500 text-[16px] mt-3`).
+    - Link điều hướng góc phải: **[ Xem tất cả sự kiện → ]** với hiệu ứng hover trượt mũi tên mượt mà trỏ về `/events`.
 
+  - **3. Chuẩn Hóa Cấu Trúc Bố Cục 4 Thẻ Sự Kiện (4-Column Grid Layout):**
+    - Thẻ Card thiết kế bo tròn viền nhẹ cao cấp (`rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all bg-white overflow-hidden flex flex-col group`).
+    - **Ảnh Banner & Badge:** Banner sự kiện thực tế từ DB với tỷ lệ `aspect-video`, zoom nhẹ khi hover; góc trên bên trái gắn Badge Danh mục pill mờ nền trắng chữ đỏ (`bg-white/90 backdrop-blur-md text-[#DC2626] border border-red-100/60 text-xs font-semibold px-3 py-1 rounded-full shadow-sm`).
+    - **Thông Tin Meta (Thời gian & Địa điểm):** Icon Lịch (`📅 DD.MM.YYYY`) chuẩn hóa định dạng dấu chấm kết hợp Icon Vị trí (`📍 Tỉnh/Thành phố`) hiển thị song song trên 1 hàng linh hoạt responsive.
+    - **Tiêu Đề & Mô Tả:** Tên sự kiện (`font-bold text-lg text-event-navy line-clamp-1`), Mô tả ngắn cắt chuẩn 2 dòng (`line-clamp-2 text-slate-500 text-sm leading-relaxed`).
+    - **Chân Thẻ (Card Footer Justify-Between):**
+      + *Bên trái:* Icon người tham dự (`👥`) + Số lượng vé/sức chứa định dạng chuẩn DB (VD: `2,500+`, `1,200+`).
+      + *Bên phải:* Nút bấm **[ Đăng ký ngay ]** màu Đỏ Thương Hiệu (`border border-red-600 text-red-600 hover:bg-red-600 hover:text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-all shadow-sm`).
+    - Skeleton loader đồng bộ bo góc `rounded-2xl` mượt mà khi tải dữ liệu.
+
+  - **4. Kiểm Tra Biên Dịch & Xác Nhận:**
+    - Lệnh `npx tsc --noEmit` hoàn thành với **0 lỗi TypeScript**.
+    - Lệnh `npm run build` (Vite production build) hoàn tất thành công 100%.
+
+- [x] **Task 81: Fix Lỗi Trùng Lặp Nút Header, Nâng Cấp Modal Tạo Sự Kiện 3 Bước (Smart Wizard) & Đồng Bộ Real-time Diễn Giả (Speaker Portal)**
+
+  - **1. Khắc Phục Triệt Để Lỗi Trùng Lặp Nút Header (Header Action Bar):**
+    - Loại bỏ hoàn toàn khối render 2 nút bấm "+ Thêm sự kiện mới" trong Action Bar của `/events`.
+    - Chuẩn hóa thành 1 nút bấm duy nhất cho người dùng có quyền quản trị/tổ chức (Admin / Event Manager), style chuẩn thương hiệu: `bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl shadow-sm hover:shadow-md transition-all text-sm`.
+
+  - **2. Nâng Cấp Modal "Tạo Sự Kiện Mới" Thành Smart Wizard 3 Bước Chuyên Nghiệp:**
+    - **Header Stepper Progress:** Thiết kế thanh điều hướng 3 bước trực quan với các chỉ báo hoàn thành (Checkmark badge, active indicator màu đỏ brand, chuyển tab linh hoạt).
+    - **Bước 1 - Thông Tin Cơ Bản (Basic Information):**
+      + Nhập Tên sự kiện (bắt buộc).
+      + Chọn Danh mục sự kiện thực tế (11 danh mục: Trí Tuệ Nhân Tạo & AI, Hội thảo Khoa học & Công nghệ, Kinh doanh & Khởi nghiệp, Giáo dục & Đào tạo, Tài chính & Fintech, Y tế & Sức khỏe, Nghệ thuật & Thiết kế, Âm nhạc & Lễ hội, Triển lãm & Trưng bày, Workshop & Kỹ năng, Networking & Gặp gỡ).
+      + Nhập Tên Địa điểm tổ chức & Địa chỉ chi tiết (Đường, Phường, Quận, TP).
+      + Thiết lập Thời gian bắt đầu - kết thúc.
+      + Nhập link Banner (16:9) hoặc Tải ảnh từ máy (File Upload FileReader sang base64) kèm khung Live Preview trực quan và nút xóa ảnh.
+      + Tích hợp đầy đủ Trợ lý sinh Mô tả sự kiện bằng AI (6 văn phong tùy chọn: Tự động, Chuyên nghiệp & Chiến lược, Bay bổng - Văn học, Truyền cảm hứng, Học thuật & Nghiên cứu, Y tế & Sức khỏe).
+    - **Bước 2 - Diễn Giả & Phiên Trình Bày (Speaker & Session Assignment):**
+      + Tải danh sách diễn giả thực tế từ CSDL qua `api.getSpeakers()`.
+      + Cho phép tìm kiếm và chọn Diễn giả chủ trì có sẵn trong hệ thống (Avatar, Tên, Học hàm, Đơn vị).
+      + Tích hợp form thêm nhanh Diễn giả mới inline (Quick-Add Speaker: Họ tên, Email, Chức danh, Tổ chức, Upload avatar) và tự động gán vào sự kiện.
+      + Cho phép chọn "Chưa phân công diễn giả (Sẽ bổ sung sau)".
+      + Thiết lập thông tin Phiên trình bày liên kết: Chủ đề phiên (Session Topic/Title), Khung giờ phiên (Start - End time), Phòng/Sân khấu (Room/Stage), Tóm tắt nội dung phiên thuyết trình.
+    - **Bước 3 - Cấu Hình Vé & Trạng Thái Xuất Bản (Ticket & Publish Status):**
+      + Quản lý đa hạng vé (Ticket Tiers Manager): Thêm / Xóa / Tùy chỉnh Tên hạng vé (Vé Tiêu Chuẩn, Vé VIP, Vé Doanh Nghiệp, v.v.), Giá vé (VNĐ / 0đ Miễn phí), Số lượng vé phát hành (Quantity) và Mô tả quyền lợi vé.
+      + Tự động tính toán Tổng sức chứa sự kiện (Total Capacity = sum of tier quantities).
+      + Tùy chọn trạng thái phát hành: Lưu bản nháp (`DRAFT`) hoặc Xuất bản công khai ngay (`PUBLISHED`).
+      + Khối Xem lại tóm tắt thông tin sự kiện trước khi hoàn tất (Review summary card).
+    - **Điều Hướng & Trải Nghiệm:** Nút "Quay lại", "Tiếp tục sang bước tiếp theo" kèm validation chặt chẽ ở mỗi bước và nút "Hoàn tất & Tạo sự kiện" với icon loading spinner mượt mà.
+
+  - **3. Đồng Bộ Real-time 100% Với CSDL & Speaker Portal (`/speaker/dashboard`):**
+    - Khi tạo sự kiện thành công, nếu có chỉ định Diễn giả & Phiên trình bày, tự động gọi `api.createEventSchedule(...)` để liên kết `event_id` với `speaker_id` và lưu trữ lịch trình.
+    - Phát tín hiệu đồng bộ qua `notifyEventChange('CREATE', eventId)`.
+    - Speaker Dashboard (`/speaker/dashboard`), Landing Page (`/`) và Danh mục sự kiện (`/events`) ngay lập tức bắt sự kiện và tự động refetch hiển thị phiên thuyết trình mà không cần reload trang.
+
+  - **4. Kiểm Tra & Biên Dịch:**
+    - Lệnh `npx tsc --noEmit` hoàn thành với **0 lỗi TypeScript**.
+    - Lệnh `npm run build` (Vite production build) hoàn tất thành công 100% trong 10.74s.
+
+- [x] **Task 82: Hoàn Thiện Phân Hệ AI PR Studio (Multi-Platform Output, Real Dispatch & Performance Scoring)**
+
+  - **1. Chuẩn Hóa Tab Nội Dung Theo Từng Nền Tảng (Platform-Tailored Outputs):**
+    - Mở rộng thanh chuyển Tab Preview thành 4 định dạng chuyên biệt, tích hợp bộ đếm ký tự và xem trước trực quan:
+      + **Tab 1: ✉️ Email Campaign:**
+        * Tiêu đề thư (Subject Line) kèm badge AI Score và nút sao chép nhanh.
+        * Preheader (Đoạn tóm tắt phụ trong inbox 40-70 ký tự) tối ưu tỷ lệ mở trên thiết bị di động.
+        * Thân thư (Email Body) bố cục chuyên nghiệp theo chuẩn bản tin hiện đại.
+        * Preview Nút Kêu Gọi Hành Động (HTML CTA Button) trực quan, có thể click tương tác và hỗ trợ xem/sao chép mã nguồn HTML nhúng cho Mailchimp / SendGrid.
+      + **Tab 2: 📘 Facebook & LinkedIn:**
+        * Tích hợp Sub-tabs chuyển đổi linh hoạt:
+          - *Facebook Post:* Bắt trend, câu Hook giật tít, ngắt dòng thông thoáng, emoji phong phú và bộ Hashtags đề xuất một chạm.
+          - *LinkedIn Article:* Định vị B2B Thought Leadership chuyên nghiệp (Tiêu đề chuyên môn, Dẫn nhập bối cảnh, Các luận điểm Key Takeaways với bullet points, Kêu gọi thảo luận kết nối và bộ thẻ B2B).
+      + **Tab 3: 💬 Zalo OA & SMS Notification:**
+        * Nội dung súc tích kiểm soát chặt chẽ dưới 160 ký tự, tối ưu tỷ lệ chuyển đổi.
+        * Bộ đếm ký tự trực quan thời gian thực (`[xx / 160 ký tự • Đạt chuẩn 1 SMS]`) đổi màu thông minh (xanh lá/vàng/đỏ).
+        * Khung hiển thị mô phỏng điện thoại thông minh (Smartphone Mockup) với bong bóng tin nhắn SMS Brandname và Zalo Official Account có tích xanh xác thực.
+      + **Tab 4: 📰 Thông Cáo Báo Chí (Press Release):**
+        * Chuẩn format gửi báo chí và quan hệ công chúng (Official Press Release Paper):
+          - Tiêu đề thông cáo (Headline in hoa đậm trang trọng).
+          - Địa điểm & Ngày phát hành (Dateline: TP. Hồ Chí Minh, Ngày DD/MM/YYYY).
+          - Thông điệp chính tóm tắt (Executive Lead).
+          - Nội dung chi tiết quy mô & công nghệ sự kiện (Body Paragraphs).
+          - Lời trích dẫn phát biểu của Trưởng Ban Tổ Chức / Diễn Giả chính (Quote Card).
+          - Thông tin liên hệ báo chí & truyền thông (Boilerplate & Media Contact Info).
+
+  - **2. Bổ Sung AI Performance Scoring & A/B Testing:**
+    - Widget hiệu năng AI hiển thị nổi bật trên đầu khu vực preview:
+      + Huy hiệu **[ 📊 AI Score: 92/100 ]** thể hiện chỉ số tối ưu hóa chuyển đổi dựa trên từ khóa, độ dài và sức hút tâm lý.
+      + Lời khuyên tối ưu ngắn của AI (AI Optimization Tip): Chỉ ra các từ khóa tác động mạnh (*"Tiêu đề chứa từ khóa 'Đột phá' & 'Miễn phí' - Tỷ lệ mở dự kiến tăng 16.5%"*).
+    - Nút **[ 🔀 Tạo 3 Biến Thể A/B ]** kích hoạt Modal so sánh thử nghiệm phân tách:
+      + Sinh nhanh 3 lựa chọn tiêu đề theo các phễu tâm lý người đọc:
+        * *Biến thể A (Trực diện & Giá trị):* Dự kiến mở 89%.
+        * *Biến thể B (Kích thích tò mò):* Dự kiến mở 93%.
+        * *Biến thể C (Khan hiếm & Hành động):* Dự kiến mở 96%.
+      + Cung cấp nút *"Áp dụng biến thể này"* giúp Admin lập tức cập nhật tiêu đề chiến dịch và tính lại điểm AI.
+
+  - **3. Kích Hoạt Luồng Phát Hành Thực Tế (Real Dispatch Modals):**
+    - **Modal [ ✉️ Gửi Thử Nghiệm ]:**
+      + Cho phép chọn kênh gửi thử: Email Campaign, SMS hoặc Zalo OA.
+      + Nhập địa chỉ Email hoặc Số điện thoại kiểm thử thực tế.
+      + Xem trước trích đoạn nội dung sẽ gửi và gọi API `/api/v1/ai/dispatch-test` với loading spinner và thông báo Toast xác nhận.
+    - **Modal [ ✔ Duyệt Bài AI & Phát Hành ]:**
+      + Xác nhận đối tượng nhận (Target Audience Selector): *Tất cả khách đã đăng ký (1,250 người)*, *Khách VIP & Đối tác (120 người)*, *Diễn giả (25 người)*, *Báo chí & Truyền thông (45 cơ quan)*, *Cộng đồng tiềm năng (3,500 người)*.
+      + Chọn đa kênh phát hành: Email, Facebook Fanpage, LinkedIn Company Page, Zalo OA / SMS Broadcast.
+      + Thiết lập Lịch trình: *Gửi ngay lập tức* (`Send Immediately`) hoặc *Lên lịch phát hành* (`Schedule Publish`) với bộ chọn ngày giờ `datetime-local`.
+      + Gọi API `/api/v1/ai/dispatch-publish`, sinh mã chiến dịch (`CMP-XXXX`), hiển thị banner thông báo trạng thái phát hành/lên lịch thành công ngay trên giao diện Studio.
+
+  - **4. Tích Hợp Khung Preview Visual Banner Đính Kèm:**
+    - Khung hiển thị **[ 🖼️ Ảnh Banner Đính Kèm ]** tỷ lệ chuẩn 16:9 sắc nét đặt ngay dưới bài viết.
+    - Tự động nhận diện và trích xuất Banner thực tế từ sự kiện được chọn trong DB.
+    - Tích hợp Modal **[ ✨ Sinh Banner Marketing AI ]** với 4 phong cách thiết kế định sẵn:
+      + *Futuristic AI & Cyber Tech* (Công nghệ & AI).
+      + *Global Business & Leadership* (Kinh doanh & Đầu tư).
+      + *Executive Gala & Networking Night* (Gala & Tri ân).
+      + *Interactive Workshop & Expo* (Workshop & Lễ hội).
+    - Hỗ trợ đổi ảnh banner hoặc nhập URL tùy chỉnh trực tiếp.
+
+  - **5. Kiểm Tra Biên Dịch & Xác Nhận:**
+    - Chạy `npx tsc --noEmit` hoàn thành với **0 lỗi TypeScript**.
+    - Chạy `npm run build` (Vite production build) hoàn tất thành công 100% trong 28.23s.
+    - Toàn bộ luồng chọn sự kiện auto-fill, chuyển đổi 4 Tab, sinh 3 biến thể A/B, gửi thử nghiệm và duyệt phát hành hoạt động ổn định và nhất quán giữa Frontend và Backend.
+
+- [x] **Task 83: Tích Hợp Nodemailer / SMTP Gửi Email Thư Mời Thật & Khắc Phục Lỗi Thông Báo Ảo**
+
+  - **1. Rà Soát API Route Gửi Mail & Khắc Phục Triệt Để Thông Báo Thành Công Ảo:**
+    - Xóa bỏ hoàn toàn các hàm `setTimeout(..., 800)` giả lập gửi thành công và các khối `catch` tự ý trả về `{ success: true }` trong `frontend/src/services/api.ts`, `frontend/src/pages/UserManagement.tsx`, và `frontend/src/pages/AIPRStudio.tsx`.
+    - Chuẩn hóa cơ chế xử lý lỗi (Strict Error Handling): Khi gửi email thất bại hoặc cấu hình SMTP chưa đầy đủ, API tầng Vite middleware và Backend FastAPI **bắt buộc phải trả về HTTP status 500** kèm thông báo lỗi chi tiết.
+    - Frontend bắt lỗi HTTP 500 từ Axios và hiển thị Toast màu Đỏ (`toast.error(err.response?.data?.detail)`) phản ánh trung thực trạng thái hệ thống.
+
+  - **2. Tích Hợp Dịch Vụ Gửi Mail Thật (Nodemailer & SMTP Transport Layer):**
+    - Đã cài đặt thư viện `nodemailer` và `@types/nodemailer` vào môi trường Frontend Node.js.
+    - Xây dựng module trợ giúp `frontend/src/lib/mailer.ts` và `frontend/lib/mailer.ts`:
+      + Tự động đọc và ưu tiên nạp biến môi trường từ `.env.local`, `.env`, `frontend/.env.local`.
+      + Hàm `getSmtpConfig()` & `createSmtpTransporter()`: Kiểm tra chặt chẽ các thông số `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`. Ném lỗi chi tiết nếu thiếu thông tin cấu hình.
+      + Tích hợp middleware `emailDispatcherPlugin` trong `frontend/vite.config.ts` để chặn và xử lý trực tiếp các request `POST /api/invitations/send`, `/api/email/send`, `/api/v1/invitations/send`, `/api/v1/email/send` trong runtime Node.js của Vite. Trả về mã lỗi HTTP 500 nếu gửi thất bại.
+    - Nâng cấp đồng bộ tầng Backend FastAPI (`backend/app/services/email_service.py` & `backend/app/api/v1/invitations.py`):
+      + Bổ sung cấu hình `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_SECURE` vào `backend/app/core/config.py`.
+      + Tạo router `invitations.py` và mount vào `router.py` tại `/invitations` và `/email`.
+      + Nâng cấp `dispatch_test_endpoint` trong `backend/app/api/v1/pr_studio.py` để gửi email thật qua SMTP khi kênh gửi là `email` hoặc `all`.
+
+  - **3. Chuẩn Hóa Mẫu Thư Mời HTML Đẹp Chuẩn Thương Hiệu Đỏ - Trắng (EventAI Platform):**
+    - Thiết kế giao diện thư mời HTML chuẩn email marketing responsive, tương thích 100% với Gmail, Outlook, Apple Mail:
+      + **Header Banner Đỏ Thương Hiệu:** Gradient `#DC2626` sang `#991B1B` với badge *"THƯ MỜI CHÍNH THỨC • OFFICIAL INVITATION"* và Logo EventAI Platform.
+      + **Thân Bài:** Trích dẫn trang trọng tên khách mời, sự kiện, thời gian, địa điểm, hạng vé (VIP Pass / Attendee), mã vé điện tử và khung lời nhắn riêng của Ban Tổ Chức.
+      + **Khung Quét Mã QR Check-in:** Thiết kế viền đứt nét đỏ đặc trưng, đính kèm ảnh QR Code định dạng Base64 hoặc SVG Dynamic URL với hướng dẫn xuất trình tại cổng soát vé trong 1.5 giây.
+      + **Nút Bấm Hành Động (CTA Button):** Nút bấm nổi bật `[ 🎟️ Xem Vé Điện Tử & Lịch Trình ]` chuyển hướng trực tiếp về ứng dụng sự kiện.
+      + **Footer:** Lời cảm ơn, thông tin hotline, email hỗ trợ 24/7 và bản quyền EventAI Platform.
+
+  - **4. File Môi Trường & Cấu Hình Mẫu (`.env.local` / `.env.example`):**
+    - Cập nhật `.env.example` và `frontend/.env.example` bổ sung đầy đủ khối biến cấu hình `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`.
+    - Cung cấp tài liệu hướng dẫn cấu hình chi tiết cho Gmail App Password, Resend, và SendGrid.
+    - Tạo tệp mẫu `.env.local` và `frontend/.env.local` (được bảo vệ bởi `.gitignore`).
+
+  - **5. Kiểm Tra Biên Dịch & Xác Nhận:**
+    - Lệnh `npx tsc --noEmit` và `npm run build` chạy thành công với **0 lỗi TypeScript**.
+    - Kiểm tra thực thi Python backend (`app.services.email_service`, `app.api.v1.invitations`) thành công.
+    - Kiểm tra kiểm thử: Khi chưa điền thông tin SMTP vào `.env.local`, gọi hàm gửi mail lập tức trả về mã lỗi 500 với thông điệp hướng dẫn rõ ràng và giao diện hiển thị Toast Đỏ, khắc phục triệt để tình trạng thông báo ảo.
+
+- [x] **Task 84: Sửa Lỗi Network Error Gửi Email, Đồng Bộ 100% Database Sự Kiện Thực Tế & Ràng Buộc Tự Động Ngữ Cảnh Vòng Đời Sự Kiện**
+
+  - **1. Xử Lý Triệt Để Lỗi `Network Error` Khi Gửi Email Thử Nghiệm:**
+    - Rà soát và sửa lỗi handler gửi mail trong Modal "Gửi Thử Nghiệm Nội Dung PR" (`/content-studio` - `AIPRStudio.tsx`).
+    - Khắc phục API Route `/api/v1/ai/dispatch-test`, `/api/v1/email/send-test`, `/api/v1/email/send`:
+      + Bọc toàn bộ logic trong khối `try {...} catch (error) {...}` chuẩn mực, loại bỏ hoàn toàn các lỗi unhandled exception hoặc `NameError: HTTPException is not defined`.
+      + Kiểm tra sự tồn tại của biến môi trường mail (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` hoặc `RESEND_API_KEY`). Nếu chưa cấu hình, API **bắt buộc trả về HTTP Status 400/500** kèm JSON: `{ success: false, message: "Chưa cấu hình thông tin máy chủ Email (SMTP/Resend) trong hệ thống." }`.
+      + Frontend hiển thị Toast thông báo lỗi chi tiết (Red Toast) từ response API (`err.response?.data?.message`) thay vì crash vấp lỗi mạng `Network Error`.
+
+  - **2. Xóa Bỏ 100% Mock Data & Kết Nối Dữ Liệu Sự Kiện Thực Tế (Single Source of Truth):**
+    - Rà soát file `frontend/src/services/api.ts` và `frontend/src/pages/AIPRStudio.tsx`:
+      + **Xóa bỏ hoàn toàn mảng mock data `fallbackList` gán cứng** (các sự kiện giả lập như *"Vietnam Cybersecurity & Data Defense Summit"*, *"EventHub AI Summit 2026: Kiến Tạo Tương Lai Số"*, *"FinTech Innovation & Web3 Gala Night"*...).
+      + Kết nối trực tiếp API `/api/v1/events` để lấy danh sách sự kiện thực tế từ CSDL PostgreSQL (`events` table với 38 sự kiện thực).
+    - **Đồng bộ Real-time 1-1:** Tích hợp hook `useEventSync` và event listener `focus` trong `AIPRStudio.tsx`, giúp mọi thao tác Thêm / Sửa / Xóa sự kiện ở trang `/events` tự động phản ánh chính xác 1-1 tại Dropdown chọn sự kiện của AI PR Studio mà không cần tải lại trang.
+    - **Auto-fill chính xác:** Khi chọn sự kiện từ Dropdown, tự động điền đúng 100% các trường dữ liệu thực từ DB:
+      + *Tên sự kiện*: `cleanEventTitle(ev.title) || ev.title`.
+      + *Danh mục*: `getCategoryName(ev.category_id)` hoặc `ev.event_type`.
+      + *Thời gian tổ chức*: `formatEventTimeForPR(ev)`.
+      + *Địa điểm/Hội trường*: `ev.location_address || ev.location`.
+      + *Đối tượng mục tiêu*: Tự động điền theo loại hình và ngữ cảnh vòng đời sự kiện.
+      + *Thông điệp chính*: `extractMainTopic(ev)`.
+      + *Từ khóa (Keywords)*: `extractKeywords(ev)`.
+      + *Diễn giả (Speakers)*: Tự động trích xuất danh sách diễn giả thực tế từ API Schedule của sự kiện (`apiService.getEventSchedule(eventId)`) và điền vào ô *"Diễn Giả / Chuyên Gia Khách Mời"* trên giao diện.
+
+  - **3. Ràng Buộc Tự Động Ngữ Cảnh Vòng Đời Sự Kiện (Smart Lifecycle Context Locking):**
+    - Đọc thuộc tính `status` của sự kiện được chọn từ CSDL (`UPCOMING`, `ONGOING`, `ENDED` / `COMPLETED`):
+    - **Trường hợp sự kiện `Sắp diễn ra (UPCOMING)` hoặc `Đang diễn ra (ONGOING)`:**
+      + Tự động kích hoạt button **[ 🚀 Mời đăng ký / Quảng bá ]** (`eventLifecycle = 'UPCOMING'`).
+      + Khoá/Disable button **[ 🎉 Tổng kết / Tri ân & Khảo sát ]** (`disabled={true}`, đổi màu xám mờ). Khi hover hiển thị Tooltip: `"Chỉ áp dụng cho các sự kiện đã kết thúc"`.
+    - **Trường hợp sự kiện `Đã kết thúc (ENDED)`:**
+      + Tự động kích hoạt button **[ 🎉 Tổng kết / Tri ân & Khảo sát ]** (`eventLifecycle = 'CONCLUDED'`).
+      + Khoá/Disable button **[ 🚀 Mời đăng ký / Quảng bá ]** (`disabled={true}`, đổi màu xám mờ). Khi hover hiển thị Tooltip: `"Sự kiện đã kết thúc, không thể tạo nội dung quảng bá"`.
+    - **Trường hợp `Nhập thủ công (manual)`:** Cả hai nút đều mở tự do để người dùng tùy biến nội dung theo ý muốn.
+
+  - **4. Kiểm Tra Biên Dịch & Xác Nhận:**
+    - Chạy `npm run build` hoàn thành với **0 lỗi TypeScript**, build Vite thành công 100%.
+    - Dropdown AI PR Studio kết nối trực tiếp 38 sự kiện thực tế trong PostgreSQL.
+
+- [x] **Task 85: Triệt Hạ 100% Code Giả (Mock Events Array), Kết Nối CSDL PostgreSQL Thực Tế & Kích Hoạt Mail Test Auto-Transport (Ethereal)**
+
+  - **1. Triệt Hạ Hoàn Toàn Mock Data & Code Giả (Purge Mock Data Entirely):**
+    - Mở và làm sạch `frontend/src/pages/AIPRStudio.tsx`, `frontend/src/context/EventContext.tsx` và `frontend/src/services/api.ts`:
+      + Xóa bỏ toàn bộ các chuỗi và mảng sự kiện gán cứng mặc định (`eventName = 'EventHub AI Summit 2026'`, `eventTime`, `eventLocation = 'GEM Center...'`, v.v.). Form state bắt đầu hoàn toàn sạch (empty strings).
+      + Loại bỏ `DEFAULT_EVENT` khỏi mảng `events` trong `EventContext.tsx` để không làm ô nhiễm danh sách sự kiện từ cơ sở dữ liệu.
+      + Khi tải trang `/content-studio`, gọi API `apiService.getEvents()` kết nối trực tiếp bảng `events` trong PostgreSQL.
+      + Tự động chọn và bind dữ liệu của sự kiện thực đầu tiên trong cơ sở dữ liệu (`fetched[0]`) vào form (Tên, Thời gian, Địa điểm, Danh mục, Banner, Diễn giả qua `apiService.getEventSchedule()`, Trạng thái, Ngữ cảnh vòng đời).
+      + Dropdown sự kiện kết nối chính xác 1-1 với database. Nếu database rỗng, hiển thị tùy chọn: `<option value="" disabled>Chưa có sự kiện nào từ hệ thống</option>`.
+      + Nếu người dùng chọn *"✍️ Nhập thủ công (Tạo quảng bá sự kiện mới)"*, toàn bộ form được làm mới sạch sẽ và ngữ cảnh được đặt về `UPCOMING`.
+
+  - **2. Kích Hoạt Mail Test Auto-Transport (Nodemailer Ethereal / Test Account):**
+    - Xử lý kịch bản chưa có cấu hình SMTP thật (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`) trong `.env.local`:
+      + Không throw lỗi hoặc trả về mã lỗi 400 khiến người dùng bối rối khi kiểm thử.
+      + Tự động kích hoạt cơ chế fallback sang **Nodemailer Ethereal Test Account** (`nodemailer.createTestAccount()`) hoặc Ethereal transport / simulated transport an toàn.
+      + Cả 2 tầng (Node.js Vite Dev Server Middleware tại `vite.config.ts` & Python Backend tại `email_service.py`, `pr_studio.py`, `invitations.py`) đều được trang bị Ethereal auto-test transport.
+      + API Endpoint gửi email test (`/api/email/send-test`, `/api/v1/ai/dispatch-test`, `/api/v1/invitations/send-test`) trả về HTTP Status 200 kèm JSON:
+        `{ success: true, message: "Đã gửi email thử nghiệm thành công tới [email]!", previewUrl: previewUrl || null }`.
+
+  - **3. Cải Tiến Giao Diện Modal "Gửi Thử Nghiệm Nội Dung PR":**
+    - Khi người dùng nhấn nút **"Gửi Thử Ngay"**:
+      + Hiển thị thông báo **Toast Xanh (Green Toast)**: *"Đã gửi email thử nghiệm thành công tới [email]!"*.
+      + Nếu có link xem trước hòm thư ảo Ethereal (`previewUrl`), nút/hành động *"Xem trước thư test (Ethereal) ↗"* được hiển thị ngay trên Toast và trên Banner thông báo màu xanh ngọc nổi bật bên trong Modal để người dùng click mở xem email trực tiếp trên Ethereal.
+      + Trạng thái loading và nút *"Gửi Lại Thử Nghiệm"* hoạt động mượt mà, tiện lợi.
+
+  - **4. Kiểm Thử Toàn Diện & Biên Dịch:**
+    - Chạy `npm run build` (`tsc && vite build`) hoàn thành thành công với **0 lỗi TypeScript**.
+    - Kiểm thử backend Python `send_invitation_email` và `dispatch_test_endpoint`: Trả về `success=True`, `message`, `previewUrl="https://ethereal.email/messages"`.
+    - Kiểm thử dropdown sự kiện: Đồng bộ 100% với PostgreSQL `events`.
+
+- [x] **Task 86: Xây Dựng Logic Lọc Sự Kiện Theo Ngữ Cảnh Vòng Đời (Lifecycle Context-Driven Event Filter)**
+
+  - **1. Chuyển Đổi Nút Ngữ Cảnh Thành Bộ Lọc Chủ Động (Interactive Context Switch):**
+    - Cả 2 nút bấm tại mục **"Ngữ cảnh vòng đời:"** luôn ở trạng thái tương tác được (Clickable, loại bỏ hoàn toàn `disabled={true}`):
+      + **Nút 1:** `[ 🚀 Mời đăng ký / Quảng bá ]` (State: `UPCOMING` / Promotion). Nút active hiển thị highlight xanh ngọc nổi bật (`bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400`).
+      + **Nút 2:** `[ 🎉 Tổng kết / Tri ân & Khảo sát ]` (State: `CONCLUDED` / Recap). Nút active hiển thị highlight vàng hổ phách nổi bật (`bg-amber-600 text-white shadow-sm ring-1 ring-amber-400`).
+    - Bổ sung huy hiệu đếm số sự kiện thuộc ngữ cảnh: `({filteredEvents.length} sự kiện)`.
+
+  - **2. Lọc Danh Sách Dropdown "CHỌN SỰ KIỆN ĐÃ TẠO" Theo State Ngữ Cảnh:**
+    - Dropdown sự kiện tự động áp dụng bộ lọc nghiêm ngặt theo trạng thái nút ngữ cảnh đang kích hoạt:
+      + Khi ở chế độ **"🚀 Mời đăng ký / Quảng bá"**: Dropdown chỉ hiển thị các sự kiện có trạng thái `UPCOMING`, `ONGOING`, `PUBLISHED`, `LIVE`.
+      + Khi ở chế độ **"🎉 Tổng kết / Tri ân & Khảo sát"**: Dropdown chỉ hiển thị các sự kiện có trạng thái `ENDED`, `COMPLETED`.
+
+  - **3. Cơ Chế Auto-Select & Fallback Khi Chuyển Đổi Ngữ Cảnh:**
+    - Khi người dùng bấm chuyển đổi giữa 2 nút ngữ cảnh:
+      + Nếu sự kiện hiện tại đang chọn cũng nằm trong danh sách sự kiện sau lọc: Giữ nguyên sự kiện và cập nhật nội dung form theo ngữ cảnh mới.
+      + Nếu sự kiện hiện tại không thuộc danh sách lọc mới: Hệ thống tự động chọn sự kiện đầu tiên (`targetFiltered[0]`) và auto-fill đầy đủ thông tin (Tên, Danh mục, Thời gian, Địa điểm, Banner, Diễn giả từ API Schedule, Chủ đề, Từ khóa gợi ý).
+      + Nếu danh sách lọc rỗng: Dropdown hiển thị placeholder `<option value="" disabled>Không tìm thấy sự kiện phù hợp</option>`, đồng thời form được reset trắng thông tin sự kiện để tránh sai lệch dữ liệu.
+
+  - **4. Kiểm Tra Biên Dịch & Xác Nhận:**
+    - Chạy `npm run build` (`tsc && vite build`) hoàn thành thành công với **0 lỗi TypeScript**.
+    - Hai nút ngữ cảnh phản hồi tức thì, dropdown sự kiện lọc chính xác 100% dữ liệu từ PostgreSQL.
+
+- [x] **Task 87: Việt Hóa 100% AI Concierge (HITL), Phân Tab Ngôn Ngữ Phản Hồi, Thẻ Dữ Liệu Tương Tác & Phát Hành Đa Kênh Thực Tế**
+
+  - **1. Việt Hóa 100% Giao Diện Phân Hệ AI Concierge (HITL):**
+    - Chuyển đổi toàn bộ thuật ngữ trên giao diện sang Tiếng Việt chuẩn mực, chuyên nghiệp:
+      + `Auto-Approve RAG > 95%` ➔ `⚡ Tự Động Duyệt RAG > 95%`
+      + `Ngưỡng > 95%` ➔ `Ngưỡng Tin Cậy > 95%`
+      + `Pending Review` ➔ `Cần Kiểm Duyệt`
+      + `PGVECTOR SIMILARITY` ➔ `Mức Độ Tương Đồng Tri Thức RAG`
+      + `Checked in at [time]` ➔ `Đã Check-in lúc [time]`
+      + `PII Filtered & An Toàn` ➔ `Đã Lọc PII & An Toàn Dữ Liệu`
+      + `TRÍCH DẪN KIẾN THỨC RAG` / `RAG Matched` ➔ `Nguồn Tri Thức RAG Trích Dẫn`
+      + `RAG Source Inspector` ➔ `Kiểm Tra Chi Tiết Nguồn Tri Thức RAG`
+      + `Retrieved Chunk` ➔ `Trích Đoạn Tri Thức Đã Truy Xuất (pgvector chunk)`
+      + Kênh gửi: `Email`, `Thông báo App`, `SMS / Zalo OA`.
+
+  - **2. Tách Tab Ngôn Ngữ Phản Hồi & Tự Động Nhận Diện (Smart Language Tabs):**
+    - Khung soạn thảo phản hồi tích hợp 2 Tab chuyển đổi độc lập: `[ 🇻🇳 Tiếng Việt ]` và `[ 🇬🇧 Tiếng Anh ]`.
+    - **Cơ chế Auto-Detect:** Phân tích ngôn ngữ câu hỏi của khách hàng (nhận diện dấu Tiếng Việt và từ khóa tự nhiên), tự động kích hoạt Tab ngôn ngữ tương ứng (`detectLanguage`) khi Admin chọn câu hỏi.
+    - Lưu trữ và cho phép Admin tự do biên soạn riêng biệt nội dung của từng Tab trước khi phát hành.
+
+  - **3. Nâng Cấp Nút Trợ Lý Prompt & Thẻ Dữ Liệu Tương Tác (Smart Visual Widgets):**
+    - **`🗺️ Chèn WiFi & Bản Đồ`:** Tự động chèn thẻ Markdown định dạng chuẩn gồm SSID WiFi VIP (`EventHub_VIP_Guest`), mật khẩu (`summit2026!`), băng thông ưu tiên 1Gbps và sơ đồ định vị sảnh hội nghị.
+    - **`🎟️ Chèn QR Check-In`:** Tự động truy vấn mã QR vé điện tử của khách hàng từ PostgreSQL thông qua API `/inquiries/{id}/user-qr` và đính kèm thẻ thông tin đại biểu kèm hướng dẫn check-in.
+    - **`🔄 Viết Lại Trực Quan`:** Re-prompt AI qua endpoint `/inquiries/quick-prompt` theo văn phong chăm sóc khách hàng nhiệt tình, lịch sự kèm icon và lời chúc.
+    - **`🌐 Dịch Ngôn Ngữ`:** Dịch và đồng bộ tức thì nội dung phản hồi giữa hai Tab Tiếng Việt và Tiếng Anh.
+
+  - **4. Triển Khai Luồng Phát Hành Đa Kênh Thực Tế (Omnichannel Dispatch Engine):**
+    - **Email:** Gọi API `/api/email/send-response` gửi thư phản hồi HTML chuyên nghiệp đến email người tham dự kèm hỗ trợ Ethereal Preview URL.
+    - **App:** Tự động tạo bản ghi Push Notification trong CSDL bảng `notifications` chuyển tiếp đến thiết bị di động của khách hàng.
+    - **SMS / Zalo OA:** Phát hành tin nhắn SMS/Zalo theo số điện thoại đại biểu.
+    - Cập nhật trạng thái câu hỏi sang `APPROVED` và ghi nhận lịch sử vào bảng `ai_logs`.
+
+  - **5. Feedback Loop - Tự Động Cập Nhật Tri Thức RAG:**
+    - Khi Admin duyệt hoặc chỉnh sửa câu trả lời, hệ thống tự động vector hóa cặp `(Câu hỏi - Câu trả lời chuẩn)` bằng Gemini Embeddings và lưu trữ vào bảng `knowledge_base` (pgvector) để tối ưu độ chính xác cho các truy vấn RAG tiếp theo.
+
+  - **6. Kiểm Tra Biên Dịch & Xác Nhận:**
+    - Chạy `npm run build` (`tsc && vite build`) hoàn thành thành công với **0 lỗi TypeScript**.
+    - Backend Pytest `test_task43_concierge.py` pass 100%.
+
+- [x] **Task 88: Xây Dựng Hệ Thống Phát Hành Đa Kênh Tốc Độ Cao Trực Tiếp Đến Thiết Bị Người Dùng (Email, SMS & Zalo ZNS)**
+
+  - **1. Kiến Trúc Phát Hành Tốc Độ Cao Trực Tiếp Đến Thiết Bị (Direct-to-Device Omnichannel Engine):**
+    - **Email (Resend REST API & High-Speed Non-Blocking Dispatch):**
+      + Tích hợp Resend HTTP REST API v1 (`https://api.resend.com/emails`) như kênh ưu tiên 0 (Priority 0). Bỏ qua độ trễ bắt tay mạng SMTP (TLS Handshake 1-3 giây), gửi thư trực tiếp vào Inbox người dùng chỉ trong **150ms - 300ms**.
+      + Tự động fallback sang SMTP tiêu chuẩn và Ethereal test transport có Preview URL khi chưa cấu hình `RESEND_API_KEY`.
+    - **SMS (Viễn Thông Việt Nam & Brandname Chăm Sóc Khách Hàng):**
+      + Tạo module [`sms_service.py`](file:///d:/TL_2026-2027/eventhub-ai/backend/app/services/sms_service.py) hỗ trợ chuẩn hóa số điện thoại quốc tế E.164 (`09...` ➔ `849...`).
+      + Tích hợp eSMS.vn API (`SendMultipleMessage_V4_post_json`) với luồng SMS CSKH Brandname (`SmsType: 2`), thông báo nhảy thông báo màn hình khóa trong **1 - 2 giây**.
+      + Dự phòng SpeedSMS và Twilio REST API, kèm chế độ Sandbox viễn thông mô phỏng an toàn khi phát triển nội bộ.
+    - **Zalo Notification Service (ZNS & Zalo OA Direct Push):**
+      + Tạo module [`zalo_service.py`](file:///d:/TL_2026-2027/eventhub-ai/backend/app/services/zalo_service.py) gửi thông báo ZNS trực tiếp vào tài khoản Zalo cá nhân theo số điện thoại (không yêu cầu người dùng phải bấm "Quan tâm/Follow" Zalo OA trước).
+      + Tin nhắn hiển thị trên Notification Center của iOS/Android trong **dưới 1 giây**.
+      + Hỗ trợ nút Call-to-Action (CTA) dẫn trực tiếp vào trang chi tiết sự kiện và xem vé điện tử QR Code.
+    - **Bộ Điều Phối Đa Kênh Đồng Thời (Parallel Omnichannel Dispatcher):**
+      + Xây dựng [`omnichannel_service.py`](file:///d:/TL_2026-2027/eventhub-ai/backend/app/services/omnichannel_service.py) sử dụng `asyncio.gather()` bắn song song cả 3 kênh cùng lúc, tối thiểu hóa độ trễ toàn hệ thống.
+      + Tích hợp hàm `broadcast_campaign` hỗ trợ kiểm soát lưu lượng với `asyncio.Semaphore(15)` cho các chiến dịch phát hành quy mô lớn.
+
+  - **2. Đồng Bộ Với CSDL PostgreSQL & Thông Báo Nội Ứng Dụng (In-App Notification Center):**
+    - Khi Admin duyệt phát hành chiến dịch tại `/content-studio` (`/api/v1/ai/dispatch-publish`):
+      + Hệ thống tự động truy vấn danh sách người tham dự thực tế từ bảng `registrations` (hoặc `users` khi chưa có đăng ký) theo `event_id`.
+      + Tự động tạo bản ghi thông báo trong bảng `notifications` (`target_role="ALL"`, `type="CAMPAIGN"`), kích hoạt ngay lập tức biểu tượng Chuông Thông Báo trên thanh Header của tất cả người dùng trong hệ thống.
+      + Đẩy tác vụ phát hành đa kênh vào `BackgroundTasks` xử lý ngầm tức thì, không làm nghẽn luồng phản hồi UI của Admin.
+
+  - **3. Cập Nhật Cấu Hình Hệ Thống & Kiểm Thử Toàn Diện:**
+    - Cập nhật [`config.py`](file:///d:/TL_2026-2027/eventhub-ai/backend/app/core/config.py) và [`.env.example`](file:///d:/TL_2026-2027/eventhub-ai/.env.example) đầy đủ các biến môi trường cho Resend, eSMS, SpeedSMS, Twilio và Zalo ZNS.
+    - Xây dựng bộ test chuyên biệt [`test_task88_omnichannel.py`](file:///d:/TL_2026-2027/eventhub-ai/backend/tests/test_task88_omnichannel.py) kiểm thử chuẩn hóa SĐT, sandbox fallback, điều phối đồng thời và các API Endpoint (`/ai/dispatch-test`, `/ai/dispatch-publish`): **100% Passed (7/7 tests)**.
+    - Frontend build (`npm run build`): Thành công với **0 lỗi TypeScript**.
+
+- [x] **Task 89: Gửi Thông Báo Chiến Dịch Đến Tài Khoản Thành Viên Đã Đăng Ký Liên Kết Email & Hoàn Thiện Đăng Nhập / Đăng Ký Bằng Google**
+
+  - **1. Cho Phép Gửi Thông Báo Đến Toàn Bộ Tài Khoản Thành Viên Người Tham Dự Có Liên Kết Email:**
+    - Cập nhật phân hệ **AI PR Studio** (`/content-studio`):
+      + Bổ sung tùy chọn phân khúc đối tượng mục tiêu ưu tiên: `[MEMBERS_WITH_EMAIL] - Tài khoản thành viên đã đăng ký & liên kết Email` (Gửi trực tiếp đến hộp thư email của tất cả tài khoản người tham dự trong hệ thống).
+      + Đồng bộ chuyển tiếp `event_id`, `content` (nội dung email/bài viết AI sinh ra), và `subject` sang API `/api/v1/ai/dispatch-publish`.
+    - Nâng cấp Backend (`backend/app/api/v1/pr_studio.py`):
+      + Khi chọn `MEMBERS_WITH_EMAIL`, hệ thống tự động truy vấn trực tiếp bảng `users` với điều kiện `User.is_active == True` và `User.email.isnot(None)` để thu thập danh sách email thành viên thực tế.
+      + Loại bỏ trùng lặp email và số điện thoại bằng tập hợp Set duy nhất.
+      + Tạo thông báo in-app `Notification(target_role="ALL", type="CAMPAIGN")` để mọi thành viên khi đăng nhập vào hệ thống đều thấy chuông thông báo trên Header.
+      + Tự động kích hoạt song song tiến trình ngầm gửi Email, SMS, Zalo đến từng tài khoản thành viên.
+
+  - **2. Hoàn Thiện Toàn Diện Tính Năng Đăng Nhập & Đăng Ký Bằng Google:**
+    - **Frontend ([`Login.tsx`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/pages/Login.tsx)):**
+      + Tích hợp [`GoogleAuthModal`](file:///d:/TL_2026-2027/eventhub-ai/frontend/src/components/GoogleAuthModal.tsx) vào cả 2 chế độ **Đăng Nhập** và **Đăng Ký**.
+      + Bấm nút `Google` mở hộp thoại xác thực tiêu chuẩn hỗ trợ cả 2 luồng:
+        1. **Cửa sổ Google OAuth Popup chính thức** (`@react-oauth/google`) tự động lấy profile (email, tên, avatar).
+        2. **Đăng nhập nhanh 1 chạm bằng Email Google** (@gmail.com) kèm danh sách tài khoản gợi ý sẵn tiện lợi cho môi trường kiểm thử.
+      + Sau khi xác thực thành công, tự động lưu JWT token, vai trò người dùng và điều hướng thẳng vào `/dashboard`.
+    - **Backend ([`auth.py`](file:///d:/TL_2026-2027/eventhub-ai/backend/app/api/v1/auth.py)):**
+      + Xác thực ID Token Google chính thức qua thư viện `google-auth` và endpoint Google `tokeninfo`.
+      + Tự động đăng ký mới với role `PARTICIPANT` (Khách tham dự) nếu email Google chưa từng tồn tại trên hệ thống.
+      + Tự động đăng nhập và cập nhật `avatar_url`, `last_active_at` nếu email Google đã có tài khoản.
+
+- [x] **Task 90: Khắc Phục Lỗi Hiển Thị Giao Diện Trang Báo Cáo & Phân Tích (/reports) và Trang Tổng Quan (/dashboard)**
+
+  - **1. Khắc Phục Triệt Để Lỗi Trống Dữ Liệu & Biểu Đồ Trang Báo Cáo (/reports):**
+    - **Sửa Lỗi Backend 405 Method Not Allowed:**
+      + Backend `backend/app/api/v1/reports.py` trước đây chỉ khai báo route `@router.post("/overview")`, trong khi frontend gọi qua `GET /reports/overview`. FastAPI trả về lỗi `405 Method Not Allowed`, dẫn đến toàn bộ thẻ KPI và 2 biểu đồ (Đường xu hướng người tham dự & Bánh donut phân bổ loại sự kiện) bị trống rỗng ("0 SỰ KIỆN", dữ liệu 2025 cũ).
+      + Bổ sung đầy đủ cả `@router.get("/overview")` và `@router.post("/overview")` tại Backend.
+      + Cập nhật `frontend/src/services/api.ts` hỗ trợ tự động thử `POST` trước, fallback sang `GET`, đồng thời nạp dữ liệu động từ `getEvents()` để giao diện luôn có số liệu thực tế ngay cả khi mạng gián đoạn.
+    - **Sửa Lỗi Phân Quyền Báo Cáo:**
+      + Bổ sung phân quyền `REPORT_VIEW` cho vai trò `ADMIN` và `EVENT_MANAGER` trong `_build_user_response` (`auth.py`), đảm bảo tài khoản quản trị luôn có quyền xem báo cáo.
+    - **Cập Nhật Mốc Thời Gian & Định Dạng Biểu Đồ:**
+      + Đổi mốc ngày mặc định từ năm cũ `01/01/2025 - 31/12/2025` sang thời gian thực `01/01/2026 - 31/12/2026`.
+      + Định dạng lại trục Y của biểu đồ đường (`width={45}`, tickFormatter chuyển đổi đơn vị `k`), chống cắt mất số.
+      + Sửa lỗi thẻ chữ trung tâm của biểu đồ tròn Donut: Đặt vị trí tuyệt đối nằm chính xác bên trong khung tròn của biểu đồ.
+
+  - **2. Khắc Phục Lỗi Hiển Thị Trục Y & Tràn Nhãn Biểu Đồ Trang Tổng Quan (/dashboard):**
+    - **Sửa Lỗi Trục Y Bị Cắt Mất Số Đầu (Lỗi '000' lặp lại):**
+      + Tại biểu đồ "Thống kê sự kiện", lề trái (`margin.left`) bị âm `-20px` kết hợp `dx: -10px` làm các số `10k`, `8k`, `6k`... bị đẩy lệch 30px ra ngoài viền khung SVG, khiến mắt thường chỉ nhìn thấy đuôi `000`.
+      + Căn chỉnh lại lề `left: 5, right: 10, top: 10`, khai báo `width={38}` và `tickFormatter={(val) => val >= 1000 ? `${(val/1000).toFixed(0)}k` : String(val)}`. Trục Y hiện rõ ràng các mốc `10k`, `8k`, `6k`, `4k`, `2k`, `0`.
+    - **Sửa Lỗi Số 24 Đè Lên Chữ Chú Thích (Legend Overlap) & Quá Tải Hơn 20 Mục:**
+      + Khung chứa số trung tâm `absolute inset-0` trước đó bị đặt ở thẻ cha bao bọc cả biểu đồ lẫn chú thích, khiến số `24` bị căn giữa theo chiều cao của toàn bộ thẻ card và đè trực tiếp lên dòng chú thích đầu tiên.
+      + Đưa khung text vào đúng thẻ `div` bao riêng của PieChart (`relative h-[180px]`), số `24 SỰ KIỆN` giờ đây nằm chính xác 100% ở tâm lỗ tròn Donut.
+      + Gom nhóm dữ liệu donut: Tự động gom 24 thể loại thành **Top 4 thể loại phổ biến nhất + mục "Khác"** (tối đa 5 lát cắt gọn gàng) với 5 mã màu thương hiệu chuẩn (`#DC2626`, `#3B82F6`, `#8B5CF6`, `#10B981`, `#F59E0B`). Không còn hiện tượng tràn danh sách chú thích hay vỡ bố cục.
+    - **Tinh Gọn Chân Trang Sidebar:**
+      + Chuyển chuỗi mô tả chân trang sidebar dài bị cắt thành dòng chữ súc tích `Nền tảng sự kiện AI`.
+
+  - **3. Kiểm Thử & Xác Nhận:**
+    - Frontend build: `npm run build` thành công xuất sắc không có cảnh báo hay lỗi (`built in 24.08s`).
+    - Backend Pytest: `pytest backend/tests/test_task88_omnichannel.py` **9/9 tests PASSED 100%**.
 

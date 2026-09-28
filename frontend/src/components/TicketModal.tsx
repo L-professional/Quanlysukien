@@ -230,11 +230,11 @@ export const TicketModal: React.FC<TicketModalProps> = ({
                   Ca Diễn Thuyết / Session:
                 </span>
                 <h4 className="font-bold text-sm text-white leading-snug">{ticket.schedule_title}</h4>
-                <p className="text-xs text-slate-400">{ticket.event_title || 'EventHub AI Summit 2026'}</p>
+                <p className="text-xs text-slate-400">{ticket.event_title || 'Sự kiện hệ thống'}</p>
               </div>
             ) : (
               <h4 className="font-bold text-sm text-white line-clamp-2">
-                {ticket.event_title || 'Hội Nghị Công Nghệ AI 2026'}
+                {ticket.event_title || 'Sự kiện hệ thống'}
               </h4>
             )}
 

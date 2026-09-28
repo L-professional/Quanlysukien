@@ -6,6 +6,7 @@ import {
   Home, Calendar, Users, Cpu, CheckSquare, Square
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { GoogleAuthModal } from "../components/GoogleAuthModal";
 
 const BG_IMG = "/assets/backgroud_login.webp";
 
@@ -95,6 +96,8 @@ export const Login: React.FC = () => {
   const [form, setForm] = useState<FormState>({
     fullName: "", email: "", password: "", confirmPassword: ""
   });
+  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+
 
   useEffect(() => {
     if (isAuthenticated) navigate("/dashboard", { replace: true });
@@ -378,7 +381,7 @@ export const Login: React.FC = () => {
                         <div className="flex-1 h-px bg-gray-200" />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <SocialBtn onClick={() => toast.info("Tính năng Google đang phát triển.")}><GoogleIcon />Google</SocialBtn>
+                        <SocialBtn onClick={() => setIsGoogleModalOpen(true)}><GoogleIcon />Google</SocialBtn>
                         <SocialBtn onClick={() => toast.info("Tính năng Microsoft đang phát triển.")}><MicrosoftIcon />Microsoft</SocialBtn>
                       </div>
                     </div>
@@ -439,7 +442,7 @@ export const Login: React.FC = () => {
                         <div className="flex-1 h-px bg-gray-200" />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <SocialBtn onClick={() => toast.info("Tính năng Google đang phát triển.")}><GoogleIcon />Google</SocialBtn>
+                        <SocialBtn onClick={() => setIsGoogleModalOpen(true)}><GoogleIcon />Google</SocialBtn>
                         <SocialBtn onClick={() => toast.info("Tính năng Microsoft đang phát triển.")}><MicrosoftIcon />Microsoft</SocialBtn>
                       </div>
                     </div>
@@ -458,6 +461,17 @@ export const Login: React.FC = () => {
 
         </div>
       </main>
+
+      {/* Google Sign-in / Sign-up Modal */}
+      <GoogleAuthModal
+        isOpen={isGoogleModalOpen}
+        onClose={() => setIsGoogleModalOpen(false)}
+        onSuccess={() => {
+          setIsGoogleModalOpen(false);
+          toast.success("Chào mừng bạn đến với EventAI!");
+          navigate("/dashboard", { replace: true });
+        }}
+      />
     </div>
   );
 };
