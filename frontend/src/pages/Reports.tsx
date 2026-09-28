@@ -12,6 +12,9 @@ import {
 import { useAuth } from '../context/AuthContext';
 import PermissionGuard from '../components/PermissionGuard';
 import { apiService as api } from '../services/api';
+import { cleanEventTitle } from '../components/EventCard';
+import { useEventSync } from '../services/eventSync';
+import { Event } from '../types';
 
 const COLORS = ['#DC2626', '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B'];
 const TABS = ['Tổng quan', 'Hiệu quả sự kiện', 'Người tham dự', 'Vé & QR', 'Diễn giả', 'Feedback', 'AI', 'Hệ thống'];
@@ -34,7 +37,7 @@ export const Reports: React.FC = () => {
 
   // Filter States
   const [filters, setFilters] = useState({
-    date_range: '01/01/2025 - 31/12/2025',
+    date_range: '01/01/2026 - 31/12/2026',
     event_id: '' as string | number,
     report_type: 'Tổng quan',
     location: '',
@@ -47,6 +50,18 @@ export const Reports: React.FC = () => {
   const [donutData, setDonutData] = useState<any[]>([]);
   const [barChartData, setBarChartData] = useState<any[]>([]);
   const [reportTableData, setReportTableData] = useState<any[]>([]);
+  const [eventsList, setEventsList] = useState<Event[]>([]);
+
+  const fetchRealEvents = async () => {
+    try {
+      const data = await api.getEvents();
+      if (Array.isArray(data)) {
+        setEventsList(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch events list for reports:", err);
+    }
+  };
 
   const fetchOverview = async (currentFilters: any) => {
     try {
@@ -72,12 +87,21 @@ export const Reports: React.FC = () => {
       setReportTableData(data || []);
     } catch (err) {
       console.error("Failed to fetch reports list", err);
-      // Fallback
-      setReportTableData([
-        { id: 1, name: 'Báo cáo Tech Summit 2025', type: 'Hiệu quả sự kiện', period: '01/03/2025 - 16/03/2025', creator: 'Nguyễn Văn Admin', date: '16/03/2025', status: 'Hoàn thành' }
-      ]);
+      setReportTableData([]);
     }
   };
+
+  useEffect(() => {
+    fetchRealEvents();
+  }, []);
+
+  useEventSync(() => {
+    fetchRealEvents();
+    if (activeTab === 'Tổng quan') {
+      fetchOverview(filters);
+      fetchReportsList();
+    }
+  });
 
   useEffect(() => {
     if (activeTab === 'Tổng quan') {
@@ -233,11 +257,14 @@ export const Reports: React.FC = () => {
             <select 
               value={filters.event_id}
               onChange={(e) => setFilters({...filters, event_id: e.target.value})}
-              className="w-full px-3 h-10 border border-[#E5EAF2] rounded-lg bg-[#F6F8FC] text-[13px] font-medium text-[#12213A] outline-none"
+              className="w-full px-3 h-10 border border-[#E5EAF2] rounded-lg bg-[#F6F8FC] text-[13px] font-medium text-[#12213A] outline-none cursor-pointer"
             >
-              <option value="">Tất cả sự kiện</option>
-              <option value="1">Tech Summit 2025</option>
-              <option value="2">AI & Future 2025</option>
+              <option value="">Tất cả sự kiện ({eventsList.length})</option>
+              {eventsList.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  #{ev.id} - {cleanEventTitle(ev.title) || ev.title}
+                </option>
+              ))}
             </select>
           </div>
           <div className="flex-1 min-w-[150px]">
@@ -333,10 +360,16 @@ export const Reports: React.FC = () => {
               </div>
               <div className="h-[300px] w-full mt-4">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={lineChartData} margin={{ top: 5, right: 20, left: -20, bottom: 0 }}>
+                  <LineChart data={lineChartData} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5EAF2" />
                     <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} dy={10} />
-                    <YAxis tick={{ fontSize: 12, fill: '#64748B' }} axisLine={false} tickLine={false} dx={-10} />
+                    <YAxis
+                      width={45}
+                      tick={{ fontSize: 12, fill: '#64748B' }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(val: number) => (val >= 1000 ? `${(val / 1000).toFixed(0)}k` : String(val))}
+                    />
                     <RechartsTooltip 
                       contentStyle={{ borderRadius: '8px', border: '1px solid #E5EAF2' }}
                       itemStyle={{ fontSize: '13px', fontWeight: 600 }}
@@ -353,8 +386,8 @@ export const Reports: React.FC = () => {
               <div>
                 <h3 className="text-[16px] font-bold text-[#12213A]">Phân bố loại sự kiện</h3>
               </div>
-              <div className="flex-1 flex flex-col justify-center relative mt-6">
-                <div className="h-[220px]">
+              <div className="flex-1 flex flex-col justify-center mt-6">
+                <div className="relative h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={donutData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={2} dataKey="value" stroke="none">
@@ -363,10 +396,10 @@ export const Reports: React.FC = () => {
                       <RechartsTooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5EAF2', padding: '6px 10px' }} itemStyle={{ fontSize: '13px', fontWeight: 600 }} />
                     </PieChart>
                   </ResponsiveContainer>
-                </div>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4">
-                  <span className="text-3xl font-bold text-[#12213A]">{(donutData || []).reduce((acc, curr) => acc + curr.value, 0)}</span>
-                  <span className="text-[11px] text-[#64748B] font-bold uppercase tracking-wide">Sự kiện</span>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-3xl font-bold text-[#12213A]">{(donutData || []).reduce((acc, curr) => acc + curr.value, 0)}</span>
+                    <span className="text-[11px] text-[#64748B] font-bold uppercase tracking-wide">Sự kiện</span>
+                  </div>
                 </div>
                 <div className="mt-4 space-y-2">
                   {donutData.map((entry, idx) => (
@@ -376,7 +409,7 @@ export const Reports: React.FC = () => {
                         <span className="text-[13px] font-semibold text-[#12213A]">{entry.name}</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-[13px] font-bold text-[#12213A]">{entry.value}</span>
+                        <span className="text-[13px] font-bold text-[#12213A]">{entry.value}%</span>
                       </div>
                     </div>
                   ))}

@@ -240,7 +240,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-bold text-[#12213A] truncate">EventAI</div>
-                <div className="text-[9px] text-[#64748B] truncate mt-0.5" title="Nền tảng quản lý sự kiện tích hợp AI">Nền tảng quản lý sự kiện...</div>
+                <div className="text-[10px] text-[#64748B] font-medium leading-tight mt-0.5">Nền tảng sự kiện AI</div>
                 <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-slate-200/50">
                   <div className="text-[10px] font-medium text-slate-500">Phiên bản hệ thống</div>
                   <div className="text-[10px] font-bold text-[#12213A]">v1.0.0</div>

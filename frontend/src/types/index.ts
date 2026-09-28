@@ -117,6 +117,8 @@ export interface EventScheduleItem {
   description?: string;
   speaker_name: string;
   speaker_role?: string;
+  speaker_avatar?: string;
+  speaker_company?: string;
   start_time: string;
   end_time: string;
   room_location: string;
@@ -137,6 +139,23 @@ export interface EventScheduleItem {
   is_bookmarked?: boolean;
   wifiName?: string;
   wifiPassword?: string;
+}
+
+export interface Speaker {
+  id: number;
+  full_name: string;
+  email: string;
+  job_title: string;
+  organization?: string;
+  avatar_url?: string;
+}
+
+export interface TicketTier {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  description?: string;
 }
 
 export interface InquiryReply {

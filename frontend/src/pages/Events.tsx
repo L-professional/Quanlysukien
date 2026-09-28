@@ -37,6 +37,11 @@ import {
   MessageSquare,
   BellRing,
   ExternalLink,
+  ChevronRight,
+  ChevronLeft,
+  Upload,
+  ArrowRight,
+  ArrowLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiService as api } from '../services/api';
@@ -51,7 +56,7 @@ import {
 } from '../components/EventCard';
 import { TicketModal, TicketData } from '../components/TicketModal';
 import { notifyEventChange, useEventSync } from '../services/eventSync';
-import { Event } from '../types';
+import { Event, Speaker, TicketTier } from '../types';
 
 export const Events: React.FC = () => {
   const { user, userRole } = useAuth();
@@ -78,17 +83,83 @@ export const Events: React.FC = () => {
   const [aiStyle, setAiStyle] = useState<string>('auto');
   const [isAiGeneratingDesc, setIsAiGeneratingDesc] = useState(false);
 
-  // Create Modal State
+  // Task 81: Constants & Smart Wizard 3-Step Create Modal State
+  const EVENT_CATEGORIES = [
+    'Trí Tuệ Nhân Tạo & AI',
+    'Hội thảo Khoa học & Công nghệ',
+    'Kinh doanh & Khởi nghiệp',
+    'Giáo dục & Đào tạo',
+    'Tài chính & Fintech',
+    'Y tế & Sức khỏe',
+    'Nghệ thuật & Thiết kế',
+    'Âm nhạc & Lễ hội',
+    'Triển lãm & Trưng bày',
+    'Workshop & Kỹ năng',
+    'Networking & Gặp gỡ',
+  ];
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createStep, setCreateStep] = useState<1 | 2 | 3>(1);
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [newEvent, setNewEvent] = useState<any>({
     title: '',
     category_id: 1,
-    event_type: 'Hội thảo',
+    event_type: 'Trí Tuệ Nhân Tạo & AI',
     location: '',
+    location_address: '',
+    start_date: '',
+    end_date: '',
+    cover_image: '',
     description: '',
-    status: 'DRAFT',
+    status: 'PUBLISHED',
     capacity: 500,
+    ticket_price: 0,
   });
+
+  // Task 81: Speakers & Session Assignment State (Step 2)
+  const [speakersList, setSpeakersList] = useState<Speaker[]>([]);
+  const [selectedSpeakerId, setSelectedSpeakerId] = useState<number | null>(null);
+  const [speakerSearchQuery, setSpeakerSearchQuery] = useState('');
+  const [isQuickAddSpeaker, setIsQuickAddSpeaker] = useState(false);
+  const [quickSpeaker, setQuickSpeaker] = useState({
+    full_name: '',
+    email: '',
+    job_title: '',
+    organization: '',
+    avatar_url: '',
+  });
+  const [sessionDetails, setSessionDetails] = useState({
+    title: '',
+    start_time: '09:00',
+    end_time: '11:30',
+    room_location: 'Hội trường chính (Grand Hall)',
+    description: '',
+  });
+
+  // Task 81: Ticket Configuration Tiers State (Step 3)
+  const [ticketTiers, setTicketTiers] = useState<TicketTier[]>([
+    {
+      id: 'tier-1',
+      name: 'Vé Tiêu Chuẩn (Standard Pass)',
+      price: 0,
+      quantity: 300,
+      description: 'Tham dự toàn bộ các phiên thuyết trình chung và khu vực triển lãm.',
+    },
+    {
+      id: 'tier-2',
+      name: 'Vé VIP (VIP Access)',
+      price: 499000,
+      quantity: 150,
+      description: 'Hàng ghế ưu tiên, networking trà chiều cao cấp & tài liệu độc quyền.',
+    },
+    {
+      id: 'tier-3',
+      name: 'Vé Doanh Nghiệp (Enterprise)',
+      price: 1200000,
+      quantity: 50,
+      description: 'Dành cho nhóm đoàn, khu vực VIP Lounge & hỗ trợ xuất hóa đơn VAT.',
+    },
+  ]);
 
   // Edit Modal State
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
@@ -169,11 +240,23 @@ export const Events: React.FC = () => {
   // 2. Dynamic Metric KPI Calculations from real Database data
   const kpiData = useMemo(() => {
     const list = allEvents.length > 0 ? allEvents : events;
-    const upcoming = list.filter((e) => e.status === 'UPCOMING' || e.status === 'upcoming').length;
-    const ongoing = list.filter((e) => e.status === 'ONGOING' || e.status === 'ongoing' || e.status === 'LIVE' || e.status === 'live').length;
-    const completed = list.filter((e) => e.status === 'COMPLETED' || e.status === 'completed' || e.status === 'ended').length;
-    const draft = list.filter((e) => e.status === 'DRAFT' || e.status === 'draft').length;
-    const total = upcoming + ongoing + completed + draft;
+    const upcoming = list.filter((e) =>
+      ['UPCOMING', 'upcoming', 'PUBLISHED', 'published'].includes(e.status)
+    ).length;
+    const ongoing = list.filter((e) =>
+      ['ONGOING', 'ongoing', 'LIVE', 'live'].includes(e.status)
+    ).length;
+    const completed = list.filter((e) =>
+      ['COMPLETED', 'completed', 'ended'].includes(e.status)
+    ).length;
+    const draft = list.filter((e) =>
+      ['DRAFT', 'draft'].includes(e.status)
+    ).length;
+    const total = list.filter((e) =>
+      ['UPCOMING', 'ONGOING', 'COMPLETED', 'DRAFT', 'LIVE', 'PUBLISHED', 'upcoming', 'ongoing', 'completed', 'draft', 'live', 'published'].includes(
+        e.status
+      )
+    ).length;
     return {
       total,
       upcoming,
@@ -198,11 +281,17 @@ export const Events: React.FC = () => {
       });
     }
     if (statusFilter) {
-      list = list.filter((e) => e.status === statusFilter);
+      if (statusFilter === 'UPCOMING') {
+        list = list.filter((e) =>
+          ['UPCOMING', 'upcoming', 'PUBLISHED', 'published'].includes(e.status)
+        );
+      } else {
+        list = list.filter((e) => e.status === statusFilter);
+      }
     } else {
-      // Khi ở chế độ "Tổng sự kiện", đồng bộ khớp chính xác với 4 trạng thái được theo dõi
+      // Khi ở chế độ "Tổng sự kiện", đồng bộ khớp chính xác với tất cả sự kiện hợp lệ trong hệ thống
       list = list.filter((e) =>
-        ['UPCOMING', 'ONGOING', 'COMPLETED', 'DRAFT', 'LIVE', 'upcoming', 'ongoing', 'completed', 'draft', 'live'].includes(
+        ['UPCOMING', 'ONGOING', 'COMPLETED', 'DRAFT', 'LIVE', 'PUBLISHED', 'upcoming', 'ongoing', 'completed', 'draft', 'live', 'published'].includes(
           e.status
         )
       );
@@ -258,25 +347,232 @@ export const Events: React.FC = () => {
     }
   };
 
-  // ================= Event Handlers =================
-  const handleCreate = async () => {
+  // Load speakers on component mount
+  const loadSpeakersList = async () => {
     try {
-      await api.createEvent(newEvent);
-      toast.success('Sự kiện đã được tạo thành công.');
-      notifyEventChange('CREATE');
-      setIsCreateModalOpen(false);
-      setNewEvent({
-        title: '',
-        category_id: 1,
-        event_type: 'Hội thảo',
-        location: '',
-        description: '',
-        status: 'DRAFT',
-        capacity: 500,
+      const data = await api.getSpeakers();
+      if (Array.isArray(data)) {
+        setSpeakersList(data);
+      }
+    } catch (e) {
+      console.error('Error fetching speakers list:', e);
+    }
+  };
+
+  useEffect(() => {
+    loadSpeakersList();
+  }, []);
+
+  const resetWizardForm = () => {
+    setCreateStep(1);
+    setNewEvent({
+      title: '',
+      category_id: 1,
+      event_type: 'Trí Tuệ Nhân Tạo & AI',
+      location: '',
+      location_address: '',
+      start_date: '',
+      end_date: '',
+      cover_image: '',
+      description: '',
+      status: 'PUBLISHED',
+      capacity: 500,
+      ticket_price: 0,
+    });
+    setSelectedSpeakerId(null);
+    setSpeakerSearchQuery('');
+    setIsQuickAddSpeaker(false);
+    setQuickSpeaker({
+      full_name: '',
+      email: '',
+      job_title: '',
+      organization: '',
+      avatar_url: '',
+    });
+    setSessionDetails({
+      title: '',
+      start_time: '09:00',
+      end_time: '11:30',
+      room_location: 'Hội trường chính (Grand Hall)',
+      description: '',
+    });
+    setTicketTiers([
+      {
+        id: 'tier-1',
+        name: 'Vé Tiêu Chuẩn (Standard Pass)',
+        price: 0,
+        quantity: 300,
+        description: 'Tham dự toàn bộ các phiên thuyết trình chung và khu vực triển lãm.',
+      },
+      {
+        id: 'tier-2',
+        name: 'Vé VIP (VIP Access)',
+        price: 499000,
+        quantity: 150,
+        description: 'Hàng ghế ưu tiên, networking trà chiều cao cấp & tài liệu độc quyền.',
+      },
+      {
+        id: 'tier-3',
+        name: 'Vé Doanh Nghiệp (Enterprise)',
+        price: 1200000,
+        quantity: 50,
+        description: 'Dành cho nhóm đoàn, khu vực VIP Lounge & hỗ trợ xuất hóa đơn VAT.',
+      },
+    ]);
+  };
+
+  const handleAddTicketTier = () => {
+    const newTier: TicketTier = {
+      id: `tier-${Date.now()}`,
+      name: 'Hạng vé mới',
+      price: 200000,
+      quantity: 50,
+      description: 'Quyền lợi vé tham gia sự kiện',
+    };
+    setTicketTiers((prev) => [...prev, newTier]);
+  };
+
+  const handleUpdateTicketTier = (id: string, field: keyof TicketTier, value: any) => {
+    setTicketTiers((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, [field]: value } : t))
+    );
+  };
+
+  const handleRemoveTicketTier = (id: string) => {
+    if (ticketTiers.length <= 1) {
+      toast.warning('Sự kiện cần tối thiểu 1 hạng vé');
+      return;
+    }
+    setTicketTiers((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const handleSaveQuickSpeaker = async () => {
+    if (!quickSpeaker.full_name.trim()) {
+      toast.warning('Vui lòng nhập họ và tên diễn giả');
+      return;
+    }
+    if (!quickSpeaker.email.trim() || !quickSpeaker.email.includes('@')) {
+      toast.warning('Vui lòng nhập địa chỉ email hợp lệ của diễn giả');
+      return;
+    }
+
+    try {
+      const created = await api.createSpeaker({
+        full_name: quickSpeaker.full_name.trim(),
+        email: quickSpeaker.email.trim(),
+        job_title: quickSpeaker.job_title.trim() || 'Diễn giả chuyên môn',
+        organization: quickSpeaker.organization.trim() || 'Tổ chức đối tác',
+        avatar_url:
+          quickSpeaker.avatar_url ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(
+            quickSpeaker.full_name
+          )}&background=DC2626&color=fff`,
       });
+
+      setSpeakersList((prev) => [created, ...prev.filter((s) => s.id !== created.id)]);
+      setSelectedSpeakerId(created.id);
+      setIsQuickAddSpeaker(false);
+      setQuickSpeaker({ full_name: '', email: '', job_title: '', organization: '', avatar_url: '' });
+      toast.success(`Đã thêm nhanh diễn giả "${created.full_name}" thành công!`);
+    } catch {
+      toast.error('Không thể tạo diễn giả.');
+    }
+  };
+
+  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Dung lượng ảnh banner không được vượt quá 5MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setNewEvent((prev: any) => ({ ...prev, cover_image: reader.result as string }));
+      toast.success('Đã tải ảnh banner lên thành công');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setQuickSpeaker((prev) => ({ ...prev, avatar_url: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Task 81: Smart Wizard Submit Handler (3-Step Event & Session Creator)
+  const handleCreate = async () => {
+    if (!newEvent.title?.trim()) {
+      toast.warning('Vui lòng nhập Tên sự kiện ở Bước 1!');
+      setCreateStep(1);
+      return;
+    }
+    if (!newEvent.location?.trim()) {
+      toast.warning('Vui lòng nhập Địa điểm tổ chức ở Bước 1!');
+      setCreateStep(1);
+      return;
+    }
+
+    setIsCreatingEvent(true);
+    try {
+      const totalCapacity =
+        ticketTiers.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0) || 500;
+      const minTicketPrice =
+        ticketTiers.length > 0 ? Math.min(...ticketTiers.map((t) => Number(t.price) || 0)) : 0;
+      const selectedSpeaker = speakersList.find((s) => s.id === selectedSpeakerId);
+
+      const eventPayload = {
+        ...newEvent,
+        capacity: totalCapacity,
+        ticket_price: minTicketPrice,
+        ticket_tiers: ticketTiers,
+        speaker_name: selectedSpeaker?.full_name || undefined,
+        speaker_id: selectedSpeaker?.id || undefined,
+        session_title: sessionDetails.title.trim() || newEvent.title.trim(),
+      };
+
+      const created = await api.createEvent(eventPayload);
+      const createdId = created?.id || Date.now();
+
+      // If speaker or session info was specified, create schedule item
+      if (selectedSpeaker || sessionDetails.title.trim()) {
+        try {
+          await api.createEventSchedule(createdId, {
+            title: sessionDetails.title.trim() || created?.title || newEvent.title,
+            description: sessionDetails.description || created?.description || newEvent.description,
+            speaker_name: selectedSpeaker ? selectedSpeaker.full_name : 'Diễn giả danh dự',
+            speaker_role: selectedSpeaker ? selectedSpeaker.job_title || 'Diễn giả' : 'Diễn giả',
+            speaker_avatar: selectedSpeaker?.avatar_url,
+            speaker_company: selectedSpeaker?.organization,
+            start_time: sessionDetails.start_time || newEvent.start_date || '09:00',
+            end_time: sessionDetails.end_time || newEvent.end_date || '11:30',
+            room_location: sessionDetails.room_location || newEvent.location || 'Hội trường chính',
+            day_number: 1,
+            date_label: 'Ngày 1',
+            track: newEvent.event_type || 'Chính',
+          });
+        } catch (scheduleErr) {
+          console.warn('Schedule sync notice:', scheduleErr);
+        }
+      }
+
+      // Synchronize with database and notify speaker dashboard / landing page
+      notifyEventChange('CREATE', createdId);
+      toast.success('Sự kiện mới đã được tạo và đồng bộ Real-time thành công!');
+      setIsCreateModalOpen(false);
+      resetWizardForm();
       fetchAllAndFilteredData();
-    } catch (err) {
-      toast.error('Lỗi khi tạo sự kiện.');
+    } catch (err: any) {
+      console.error('Failed to create event:', err);
+      toast.error(
+        err.response?.data?.detail || 'Không thể tạo sự kiện. Vui lòng kiểm tra lại!'
+      );
+    } finally {
+      setIsCreatingEvent(false);
     }
   };
 
@@ -667,25 +963,17 @@ export const Events: React.FC = () => {
             <FileOutput size={16} />
             <span>Xuất danh sách</span>
           </button>
-          <PermissionGuard requirePermission={['EVENT_CREATE']} fallback={<></>}>
+          {canManage && (
             <button
               type="button"
-              onClick={() => setIsCreateModalOpen(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-xl transition-all font-bold text-sm shadow-sm hover:shadow-md cursor-pointer"
+              onClick={() => {
+                resetWizardForm();
+                setIsCreateModalOpen(true);
+              }}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer text-sm"
             >
               <Plus size={18} />
-              <span>➕ Thêm sự kiện mới</span>
-            </button>
-          </PermissionGuard>
-          {/* Fallback: show button directly if user is admin/manager (handles demo accounts without permissions array) */}
-          {canManage && !user?.permissions?.length && (
-            <button
-              type="button"
-              onClick={() => setIsCreateModalOpen(true)}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-xl transition-all font-bold text-sm shadow-sm hover:shadow-md cursor-pointer"
-            >
-              <Plus size={18} />
-              <span>➕ Thêm sự kiện mới</span>
+              <span>+ Thêm sự kiện mới</span>
             </button>
           )}
         </div>
@@ -2055,225 +2343,939 @@ export const Events: React.FC = () => {
         </div>
       )}
 
-      {/* ================= MODAL 6: CREATE EVENT MODAL (With AI Generator) ================= */}
+      {/* ================= MODAL 6: CREATE EVENT SMART WIZARD (Task 81) ================= */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/70 rounded-t-2xl">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Plus className="text-[#DC2626]" size={22} />
-                Tạo sự kiện mới
-              </h2>
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-4 flex-1">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Tên sự kiện <span className="text-[#DC2626]">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newEvent.title}
-                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] focus:ring-2 focus:ring-[#DC2626]/10 text-sm font-medium"
-                  placeholder="Ví dụ: Hội nghị AI &amp; Tự Động Hóa 2026"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Loại sự kiện <span className="text-[#DC2626]">*</span>
-                  </label>
-                  <select
-                    value={newEvent.event_type}
-                    onChange={(e) => setNewEvent({ ...newEvent, event_type: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm font-medium bg-white"
-                  >
-                    <option value="Trí Tuệ Nhân Tạo">Trí Tuệ Nhân Tạo</option>
-                    <option value="Hội thảo">Hội thảo</option>
-                    <option value="Hội nghị">Hội nghị</option>
-                    <option value="Triển lãm">Triển lãm</option>
-                    <option value="Workshop">Workshop</option>
-                    <option value="Gala">Gala</option>
-                    <option value="Networking">Networking</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Trạng thái khởi tạo
-                  </label>
-                  <select
-                    value={newEvent.status}
-                    onChange={(e) => setNewEvent({ ...newEvent, status: e.target.value })}
-                    className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm font-medium bg-white"
-                  >
-                    <option value="DRAFT">Bản nháp</option>
-                    <option value="UPCOMING">Sắp diễn ra</option>
-                    <option value="PUBLISHED">Đã xuất bản</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Địa điểm tổ chức <span className="text-[#DC2626]">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={newEvent.location}
-                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm"
-                  placeholder="Ví dụ: GEM Center, Quận 1, TP.HCM hoặc NCC Hà Nội"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Thời gian bắt đầu
-                  </label>
-                  <input
-                    type="text"
-                    value={newEvent.start_date || ''}
-                    onChange={(e) => setNewEvent({ ...newEvent, start_date: e.target.value })}
-                    placeholder="15/10/2026 08:30"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Thời gian kết thúc
-                  </label>
-                  <input
-                    type="text"
-                    value={newEvent.end_date || ''}
-                    onChange={(e) => setNewEvent({ ...newEvent, end_date: e.target.value })}
-                    placeholder="16/10/2026 17:30"
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Sức chứa tối đa (Capacity)
-                  </label>
-                  <input
-                    type="number"
-                    value={newEvent.capacity || ''}
-                    onChange={(e) =>
-                      setNewEvent({ ...newEvent, capacity: parseInt(e.target.value) || 500 })
-                    }
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm"
-                    placeholder="500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Giá vé (VNĐ / 0 = Miễn phí)
-                  </label>
-                  <input
-                    type="number"
-                    value={newEvent.ticket_price ?? ''}
-                    onChange={(e) =>
-                      setNewEvent({ ...newEvent, ticket_price: parseInt(e.target.value) || 0 })
-                    }
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm"
-                    placeholder="0 (Miễn phí)"
-                    min={0}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Link ảnh Banner (16:9)
-                </label>
-                <input
-                  type="text"
-                  value={newEvent.cover_image || ''}
-                  onChange={(e) => setNewEvent({ ...newEvent, cover_image: e.target.value })}
-                  placeholder="https://images.unsplash.com/... (để trống sẽ dùng ảnh mặc định)"
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm"
-                />
-              </div>
-
-              {/* Description With AI Generator */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Mô tả sự kiện
-                  </label>
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={aiStyle}
-                      onChange={(e) => setAiStyle(e.target.value)}
-                      disabled={isAiGeneratingDesc}
-                      className="text-[11px] bg-white border border-slate-200 text-slate-700 rounded-lg px-2.5 py-1 font-medium focus:outline-none focus:border-[#DC2626] cursor-pointer"
-                    >
-                      <option value="auto">🌐 Tự động (Theo chủ đề)</option>
-                      <option value="professional">💼 Chuyên nghiệp &amp; Chiến lược</option>
-                      <option value="literary">🎨 Bay bổng - Văn học</option>
-                      <option value="inspirational">🚀 Truyền cảm hứng</option>
-                      <option value="academic">🎓 Học thuật &amp; Nghiên cứu</option>
-                      <option value="wellness">🌿 Y tế &amp; Sức khỏe (Wellness)</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => handleAiGenerateDescription(false)}
-                      disabled={isAiGeneratingDesc}
-                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-[11px] font-bold rounded-lg shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer active:scale-95"
-                    >
-                      {isAiGeneratingDesc ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300" />
-                          <span>AI Đang Soạn Thảo...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                          <span>✨ Sinh mô tả bằng AI</span>
-                        </>
-                      )}
-                    </button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[92vh] border border-slate-100 overflow-hidden">
+            {/* Wizard Header & Stepper Tabs */}
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/80">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-red-100 text-[#DC2626] flex items-center justify-center font-bold shadow-2xs">
+                    <Sparkles size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-slate-900">
+                      Tạo sự kiện mới
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Quy trình thiết lập 3 bước chuẩn hóa kết nối CSDL và Diễn giả
+                    </p>
                   </div>
                 </div>
-                <textarea
-                  rows={4}
-                  value={newEvent.description || ''}
-                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
-                  placeholder="Nhấp vào '✨ Sinh mô tả bằng AI' để tự động tạo nội dung cuốn hút..."
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm leading-relaxed"
-                />
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-200/60 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* 3-Step Stepper Progress Bar */}
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                {/* Step 1 Tab */}
+                <button
+                  type="button"
+                  onClick={() => setCreateStep(1)}
+                  className={`flex items-center gap-2.5 p-2 sm:p-2.5 rounded-xl text-left transition-all ${
+                    createStep === 1
+                      ? 'bg-red-600 text-white shadow-sm ring-2 ring-red-500/20'
+                      : createStep > 1
+                      ? 'bg-red-50 text-red-700 hover:bg-red-100/80 border border-red-100'
+                      : 'bg-white text-slate-400 border border-slate-200'
+                  }`}
+                >
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                      createStep === 1
+                        ? 'bg-white text-red-600'
+                        : createStep > 1
+                        ? 'bg-red-600 text-white'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {createStep > 1 ? <Check size={12} strokeWidth={3} /> : '1'}
+                  </div>
+                  <div className="min-w-0 hidden sm:block">
+                    <div className="text-xs font-bold truncate">1. Thông tin cơ bản</div>
+                    <div
+                      className={`text-[10px] truncate ${
+                        createStep === 1 ? 'text-red-100' : 'text-slate-500'
+                      }`}
+                    >
+                      Tên, ngày, địa điểm
+                    </div>
+                  </div>
+                </button>
+
+                {/* Step 2 Tab */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newEvent.title?.trim() && newEvent.location?.trim()) {
+                      setCreateStep(2);
+                    } else {
+                      toast.warning('Vui lòng nhập Tên và Địa điểm sự kiện trước');
+                    }
+                  }}
+                  className={`flex items-center gap-2.5 p-2 sm:p-2.5 rounded-xl text-left transition-all ${
+                    createStep === 2
+                      ? 'bg-red-600 text-white shadow-sm ring-2 ring-red-500/20'
+                      : createStep > 2
+                      ? 'bg-red-50 text-red-700 hover:bg-red-100/80 border border-red-100'
+                      : 'bg-white text-slate-400 border border-slate-200'
+                  }`}
+                >
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                      createStep === 2
+                        ? 'bg-white text-red-600'
+                        : createStep > 2
+                        ? 'bg-red-600 text-white'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    {createStep > 2 ? <Check size={12} strokeWidth={3} /> : '2'}
+                  </div>
+                  <div className="min-w-0 hidden sm:block">
+                    <div className="text-xs font-bold truncate">2. Diễn giả & Phiên</div>
+                    <div
+                      className={`text-[10px] truncate ${
+                        createStep === 2 ? 'text-red-100' : 'text-slate-500'
+                      }`}
+                    >
+                      Gán speaker, lịch trình
+                    </div>
+                  </div>
+                </button>
+
+                {/* Step 3 Tab */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newEvent.title?.trim() && newEvent.location?.trim()) {
+                      setCreateStep(3);
+                    } else {
+                      toast.warning('Vui lòng hoàn thành Bước 1 trước');
+                    }
+                  }}
+                  className={`flex items-center gap-2.5 p-2 sm:p-2.5 rounded-xl text-left transition-all ${
+                    createStep === 3
+                      ? 'bg-red-600 text-white shadow-sm ring-2 ring-red-500/20'
+                      : 'bg-white text-slate-400 border border-slate-200'
+                  }`}
+                >
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                      createStep === 3
+                        ? 'bg-white text-red-600'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    3
+                  </div>
+                  <div className="min-w-0 hidden sm:block">
+                    <div className="text-xs font-bold truncate">3. Vé & Trạng thái</div>
+                    <div
+                      className={`text-[10px] truncate ${
+                        createStep === 3 ? 'text-red-100' : 'text-slate-500'
+                      }`}
+                    >
+                      Hạng vé, xuất bản
+                    </div>
+                  </div>
+                </button>
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/70 rounded-b-2xl flex justify-between items-center">
-              <button
-                type="button"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 font-semibold text-sm cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleCreate}
-                disabled={!newEvent.title || !newEvent.location}
-                className="px-6 py-2.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white rounded-xl font-bold text-sm shadow-sm transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
-              >
-                <span>Tạo sự kiện ngay</span>
-                <Navigation2 size={15} className="rotate-90" />
-              </button>
+            {/* Wizard Body Content */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1">
+              {/* ================= STEP 1: BASIC INFORMATION ================= */}
+              {createStep === 1 && (
+                <div className="space-y-4 animate-in fade-in duration-200">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Tên sự kiện <span className="text-[#DC2626]">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newEvent.title}
+                      onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] focus:ring-2 focus:ring-[#DC2626]/10 text-sm font-semibold text-slate-800"
+                      placeholder="Ví dụ: Diễn đàn AI & Tự Động Hóa Doanh Nghiệp 2026"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Danh mục sự kiện <span className="text-[#DC2626]">*</span>
+                      </label>
+                      <select
+                        value={newEvent.event_type}
+                        onChange={(e) => setNewEvent({ ...newEvent, event_type: e.target.value })}
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm font-medium bg-white"
+                      >
+                        {EVENT_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Tên Địa điểm / Trung tâm <span className="text-[#DC2626]">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={newEvent.location}
+                        onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm"
+                        placeholder="Ví dụ: GEM Center, Quận 1, TP. Hồ Chí Minh"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Địa chỉ chi tiết (Đường, Phường, Quận, Thành phố)
+                    </label>
+                    <input
+                      type="text"
+                      value={newEvent.location_address || ''}
+                      onChange={(e) => setNewEvent({ ...newEvent, location_address: e.target.value })}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm"
+                      placeholder="Số 8 Nguyễn Bỉnh Khiêm, Phường Đa Kao, Quận 1, TP. Hồ Chí Minh"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Thời gian bắt đầu
+                      </label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input
+                          type="text"
+                          value={newEvent.start_date || ''}
+                          onChange={(e) => setNewEvent({ ...newEvent, start_date: e.target.value })}
+                          placeholder="15/10/2026 08:30"
+                          className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Thời gian kết thúc
+                      </label>
+                      <div className="relative">
+                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input
+                          type="text"
+                          value={newEvent.end_date || ''}
+                          onChange={(e) => setNewEvent({ ...newEvent, end_date: e.target.value })}
+                          placeholder="16/10/2026 17:30"
+                          className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Banner Image URL & File Upload with Preview */}
+                  <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3">
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                      Ảnh bìa Banner sự kiện (Tỉ lệ 16:9)
+                    </label>
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      <div className="relative flex-1 w-full">
+                        <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input
+                          type="text"
+                          value={newEvent.cover_image || ''}
+                          onChange={(e) => setNewEvent({ ...newEvent, cover_image: e.target.value })}
+                          placeholder="Dán link ảnh https://images.unsplash.com/... hoặc tải từ máy"
+                          className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-xs bg-white"
+                        />
+                      </div>
+                      <label className="w-full sm:w-auto px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5 shrink-0">
+                        <Upload size={14} className="text-[#DC2626]" />
+                        <span>Tải ảnh lên</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleBannerUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    {/* Banner Live Preview */}
+                    {newEvent.cover_image && (
+                      <div className="relative rounded-xl overflow-hidden border border-slate-200 h-36 bg-slate-900 group">
+                        <img
+                          src={newEvent.cover_image}
+                          alt="Banner Preview"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800';
+                          }}
+                        />
+                        <div className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-bold backdrop-blur-xs">
+                          Xem trước Banner
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setNewEvent({ ...newEvent, cover_image: '' })}
+                          className="absolute bottom-2 right-2 px-2 py-1 rounded-lg bg-red-600/90 hover:bg-red-700 text-white text-xs font-semibold"
+                        >
+                          Xóa ảnh
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Description With AI Generator */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Mô tả sự kiện
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <select
+                          value={aiStyle}
+                          onChange={(e) => setAiStyle(e.target.value)}
+                          disabled={isAiGeneratingDesc}
+                          className="text-[11px] bg-white border border-slate-200 text-slate-700 rounded-lg px-2.5 py-1 font-medium focus:outline-none focus:border-[#DC2626] cursor-pointer"
+                        >
+                          <option value="auto">🌐 Tự động (Theo chủ đề)</option>
+                          <option value="professional">💼 Chuyên nghiệp &amp; Chiến lược</option>
+                          <option value="literary">🎨 Bay bổng - Văn học</option>
+                          <option value="inspirational">🚀 Truyền cảm hứng</option>
+                          <option value="academic">🎓 Học thuật &amp; Nghiên cứu</option>
+                          <option value="wellness">🌿 Y tế &amp; Sức khỏe (Wellness)</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => handleAiGenerateDescription(false)}
+                          disabled={isAiGeneratingDesc}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white text-[11px] font-bold rounded-lg shadow-xs hover:shadow transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+                        >
+                          {isAiGeneratingDesc ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-300" />
+                              <span>AI Đang Soạn Thảo...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                              <span>✨ Sinh mô tả bằng AI</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    <textarea
+                      rows={4}
+                      value={newEvent.description || ''}
+                      onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                      placeholder="Nhấp vào '✨ Sinh mô tả bằng AI' để tự động tạo nội dung cuốn hút..."
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:outline-none focus:border-[#DC2626] text-sm leading-relaxed"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ================= STEP 2: SPEAKER & SESSION ASSIGNMENT ================= */}
+              {createStep === 2 && (
+                <div className="space-y-5 animate-in fade-in duration-200">
+                  {/* Info notice */}
+                  <div className="p-3 bg-red-50 border border-red-200/80 rounded-2xl flex items-start gap-3">
+                    <Users className="text-[#DC2626] shrink-0 mt-0.5" size={18} />
+                    <div className="text-xs text-slate-700">
+                      <span className="font-bold text-red-900">Kết nối Diễn Giả &amp; Sân Khấu: </span>
+                      Chỉ định Diễn giả chủ trì &amp; thiết lập phiên trình bày. Dữ liệu sẽ tự động đồng bộ sang Speaker Portal (<code>/speaker/dashboard</code>).
+                    </div>
+                  </div>
+
+                  {/* Speaker Selector Section */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                      <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        Diễn giả chủ trì (Speaker)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsQuickAddSpeaker(!isQuickAddSpeaker)}
+                        className="text-xs font-bold text-[#DC2626] hover:text-[#B91C1C] flex items-center gap-1 cursor-pointer"
+                      >
+                        {isQuickAddSpeaker ? '← Chọn từ danh sách có sẵn' : '+ Thêm nhanh diễn giả mới'}
+                      </button>
+                    </div>
+
+                    {/* Quick Add Speaker Inline Form */}
+                    {isQuickAddSpeaker ? (
+                      <div className="p-4 bg-slate-50 border border-red-200 rounded-2xl space-y-3">
+                        <div className="text-xs font-bold text-slate-800">
+                          Thêm diễn giả mới vào hệ thống
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                              Họ và tên diễn giả <span className="text-red-600">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={quickSpeaker.full_name}
+                              onChange={(e) =>
+                                setQuickSpeaker({ ...quickSpeaker, full_name: e.target.value })
+                              }
+                              placeholder="TS. Nguyễn Văn A"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-[#DC2626]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                              Email diễn giả <span className="text-red-600">*</span>
+                            </label>
+                            <input
+                              type="email"
+                              value={quickSpeaker.email}
+                              onChange={(e) =>
+                                setQuickSpeaker({ ...quickSpeaker, email: e.target.value })
+                              }
+                              placeholder="speaker@eventhub.ai"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-[#DC2626]"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                              Chức danh / Học hàm
+                            </label>
+                            <input
+                              type="text"
+                              value={quickSpeaker.job_title}
+                              onChange={(e) =>
+                                setQuickSpeaker({ ...quickSpeaker, job_title: e.target.value })
+                              }
+                              placeholder="Lead AI Scientist / Chuyên gia"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-[#DC2626]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                              Tổ chức / Đơn vị
+                            </label>
+                            <input
+                              type="text"
+                              value={quickSpeaker.organization}
+                              onChange={(e) =>
+                                setQuickSpeaker({ ...quickSpeaker, organization: e.target.value })
+                              }
+                              placeholder="FPT Software / VinAI / ĐH Quốc Gia"
+                              className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-[#DC2626]"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="text"
+                            value={quickSpeaker.avatar_url}
+                            onChange={(e) =>
+                              setQuickSpeaker({ ...quickSpeaker, avatar_url: e.target.value })
+                            }
+                            placeholder="Link ảnh đại diện (để trống sẽ tự sinh avatar)"
+                            className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-[#DC2626]"
+                          />
+                          <label className="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-semibold cursor-pointer shrink-0 flex items-center gap-1.5">
+                            <Upload size={13} className="text-[#DC2626]" />
+                            <span>Tải ảnh</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleAvatarUpload}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setIsQuickAddSpeaker(false)}
+                            className="px-3 py-1.5 border border-slate-200 bg-white text-slate-600 text-xs font-semibold rounded-xl hover:bg-slate-100 cursor-pointer"
+                          >
+                            Hủy bỏ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveQuickSpeaker}
+                            className="px-4 py-1.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold rounded-xl shadow-xs cursor-pointer"
+                          >
+                            Lưu &amp; Chọn diễn giả này
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Speakers Selection List */
+                      <div className="space-y-3">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                          <input
+                            type="text"
+                            value={speakerSearchQuery}
+                            onChange={(e) => setSpeakerSearchQuery(e.target.value)}
+                            placeholder="Tìm kiếm diễn giả theo tên, chức vụ, cơ quan..."
+                            className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-[#DC2626] bg-slate-50/50"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto p-1">
+                          {/* Option: No speaker assigned yet */}
+                          <div
+                            onClick={() => setSelectedSpeakerId(null)}
+                            className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center gap-3 ${
+                              selectedSpeakerId === null
+                                ? 'border-[#DC2626] bg-red-50/40 ring-1 ring-[#DC2626]'
+                                : 'border-slate-200 hover:border-slate-300 bg-white'
+                            }`}
+                          >
+                            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center shrink-0">
+                              <UserIcon size={18} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-bold text-slate-800">
+                                Chưa phân công diễn giả
+                              </div>
+                              <div className="text-[11px] text-slate-500 truncate">
+                                Phân công và bổ nhiệm sau khi chuẩn bị
+                              </div>
+                            </div>
+                            {selectedSpeakerId === null && (
+                              <CheckCircle2 size={16} className="text-[#DC2626] shrink-0" />
+                            )}
+                          </div>
+
+                          {/* Filtered Speakers List */}
+                          {speakersList
+                            .filter((s) => {
+                              const q = speakerSearchQuery.toLowerCase();
+                              return (
+                                s.full_name.toLowerCase().includes(q) ||
+                                (s.job_title || '').toLowerCase().includes(q) ||
+                                (s.organization || '').toLowerCase().includes(q)
+                              );
+                            })
+                            .map((s) => (
+                              <div
+                                key={s.id}
+                                onClick={() => setSelectedSpeakerId(s.id)}
+                                className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center gap-3 ${
+                                  selectedSpeakerId === s.id
+                                    ? 'border-[#DC2626] bg-red-50/40 ring-1 ring-[#DC2626]'
+                                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                                }`}
+                              >
+                                <img
+                                  src={s.avatar_url}
+                                  alt={s.full_name}
+                                  className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                      s.full_name
+                                    )}&background=DC2626&color=fff`;
+                                  }}
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-xs font-bold text-slate-900 truncate">
+                                    {s.full_name}
+                                  </div>
+                                  <div className="text-[11px] text-slate-500 truncate">
+                                    {s.job_title} • {s.organization}
+                                  </div>
+                                </div>
+                                {selectedSpeakerId === s.id && (
+                                  <CheckCircle2 size={16} className="text-[#DC2626] shrink-0" />
+                                )}
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Session Details Section */}
+                  <div className="p-4 bg-slate-50/90 border border-slate-200/90 rounded-2xl space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Clock size={16} className="text-[#DC2626]" />
+                      <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                        Thông tin Phiên trình bày liên kết
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Chủ đề phiên thuyết trình (Session Topic / Title)
+                      </label>
+                      <input
+                        type="text"
+                        value={sessionDetails.title || (newEvent.title ? `Keynote: ${newEvent.title}` : '')}
+                        onChange={(e) =>
+                          setSessionDetails({ ...sessionDetails, title: e.target.value })
+                        }
+                        placeholder="VD: Keynote: Đột phá Trí Tuệ Nhân Tạo & Định hình Kỷ nguyên mới 2026"
+                        className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white font-medium focus:outline-none focus:border-[#DC2626]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Giờ bắt đầu phiên
+                        </label>
+                        <input
+                          type="text"
+                          value={sessionDetails.start_time}
+                          onChange={(e) =>
+                            setSessionDetails({ ...sessionDetails, start_time: e.target.value })
+                          }
+                          placeholder="09:00"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-[#DC2626]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Giờ kết thúc phiên
+                        </label>
+                        <input
+                          type="text"
+                          value={sessionDetails.end_time}
+                          onChange={(e) =>
+                            setSessionDetails({ ...sessionDetails, end_time: e.target.value })
+                          }
+                          placeholder="11:30"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-[#DC2626]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          Phòng / Sân khấu (Room)
+                        </label>
+                        <input
+                          type="text"
+                          value={sessionDetails.room_location}
+                          onChange={(e) =>
+                            setSessionDetails({ ...sessionDetails, room_location: e.target.value })
+                          }
+                          placeholder="Hội trường Grand Hall"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-[#DC2626]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Tóm tắt nội dung phiên thuyết trình
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={sessionDetails.description}
+                        onChange={(e) =>
+                          setSessionDetails({ ...sessionDetails, description: e.target.value })
+                        }
+                        placeholder="Nội dung chuyên sâu chia sẻ về xu hướng chuyển đổi số, mô hình ngôn ngữ lớn..."
+                        className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-[#DC2626]"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ================= STEP 3: TICKET CONFIGURATION & PUBLISH STATUS ================= */}
+              {createStep === 3 && (
+                <div className="space-y-5 animate-in fade-in duration-200">
+                  {/* Ticket Tiers Manager */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Ticket size={16} className="text-[#DC2626]" />
+                        <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+                          Cấu hình các hạng vé (Ticket Tiers)
+                        </label>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddTicketTier}
+                        className="px-3 py-1 bg-red-50 hover:bg-red-100 text-[#DC2626] font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <Plus size={14} />
+                        <span>Thêm hạng vé</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {ticketTiers.map((tier, index) => (
+                        <div
+                          key={tier.id}
+                          className="p-3.5 bg-slate-50/80 border border-slate-200 rounded-2xl space-y-2.5"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-slate-700">
+                              Hạng vé #{index + 1}
+                            </span>
+                            {ticketTiers.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveTicketTier(tier.id)}
+                                className="text-slate-400 hover:text-red-600 p-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                                title="Xóa hạng vé này"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="sm:col-span-1">
+                              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                Tên hạng vé
+                              </label>
+                              <input
+                                type="text"
+                                value={tier.name}
+                                onChange={(e) =>
+                                  handleUpdateTicketTier(tier.id, 'name', e.target.value)
+                                }
+                                placeholder="VD: Vé VIP / Vé Tiêu Chuẩn"
+                                className="w-full px-3 py-1.5 border border-slate-200 rounded-xl text-xs bg-white font-medium focus:outline-none focus:border-[#DC2626]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                Giá vé (VNĐ / 0 = Miễn phí)
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                step={10000}
+                                value={tier.price}
+                                onChange={(e) =>
+                                  handleUpdateTicketTier(
+                                    tier.id,
+                                    'price',
+                                    parseInt(e.target.value) || 0
+                                  )
+                                }
+                                className="w-full px-3 py-1.5 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-[#DC2626]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                                Số lượng vé (Sức chứa)
+                              </label>
+                              <input
+                                type="number"
+                                min={1}
+                                value={tier.quantity}
+                                onChange={(e) =>
+                                  handleUpdateTicketTier(
+                                    tier.id,
+                                    'quantity',
+                                    parseInt(e.target.value) || 1
+                                  )
+                                }
+                                className="w-full px-3 py-1.5 border border-slate-200 rounded-xl text-xs bg-white focus:outline-none focus:border-[#DC2626]"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <input
+                              type="text"
+                              value={tier.description || ''}
+                              onChange={(e) =>
+                                handleUpdateTicketTier(tier.id, 'description', e.target.value)
+                              }
+                              placeholder="Mô tả quyền lợi: Chỗ ngồi ưu tiên, networking trà chiều..."
+                              className="w-full px-3 py-1.5 border border-slate-200 rounded-xl text-[11px] bg-white text-slate-600 focus:outline-none focus:border-[#DC2626]"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Calculated Capacity KPI */}
+                    <div className="mt-3 p-3 bg-red-50/60 border border-red-100 rounded-2xl flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <Users size={16} className="text-[#DC2626]" />
+                        <span className="font-semibold text-slate-700">Tổng sức chứa sự kiện:</span>
+                      </div>
+                      <span className="font-extrabold text-[#DC2626] text-sm">
+                        {ticketTiers
+                          .reduce((sum, t) => sum + (Number(t.quantity) || 0), 0)
+                          .toLocaleString('vi-VN')}{' '}
+                        vé
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Publish Status Options */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
+                      Trạng thái phát hành sự kiện
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <label
+                        className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-start gap-3 ${
+                          newEvent.status === 'PUBLISHED'
+                            ? 'border-emerald-500 bg-emerald-50/30 ring-2 ring-emerald-500/20'
+                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="eventStatus"
+                          checked={newEvent.status === 'PUBLISHED'}
+                          onChange={() => setNewEvent({ ...newEvent, status: 'PUBLISHED' })}
+                          className="mt-1 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <div>
+                          <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                            <span>Xuất bản công khai (PUBLISHED)</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                              Khuyên dùng
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                            Hiển thị ngay trên Trang chủ &amp; Danh mục sự kiện. Khách tham quan có thể xem thông tin và đăng ký vé ngay.
+                          </div>
+                        </div>
+                      </label>
+
+                      <label
+                        className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-start gap-3 ${
+                          newEvent.status === 'DRAFT'
+                            ? 'border-amber-500 bg-amber-50/30 ring-2 ring-amber-500/20'
+                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="eventStatus"
+                          checked={newEvent.status === 'DRAFT'}
+                          onChange={() => setNewEvent({ ...newEvent, status: 'DRAFT' })}
+                          className="mt-1 text-amber-600 focus:ring-amber-500"
+                        />
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">
+                            Lưu bản nháp (DRAFT)
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                            Chỉ lưu trữ nội bộ cho Admin và Quản lý sự kiện. Chưa xuất hiện công khai trên Landing Page.
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Review Summary Before Finish */}
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5">
+                    <div className="font-bold text-slate-800">Tóm tắt sự kiện trước khi tạo:</div>
+                    <div className="text-slate-600 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+                      <span>
+                        📌 <b>Tên:</b> {newEvent.title || 'Chưa đặt tên'}
+                      </span>
+                      <span>
+                        🏷️ <b>Danh mục:</b> {newEvent.event_type}
+                      </span>
+                      <span>
+                        📍 <b>Địa điểm:</b> {newEvent.location || 'Chưa đặt'}
+                      </span>
+                      <span>
+                        🎤 <b>Diễn giả:</b>{' '}
+                        {speakersList.find((s) => s.id === selectedSpeakerId)?.full_name ||
+                          'Chưa phân công'}
+                      </span>
+                      <span>
+                        🎟️ <b>Tổng vé:</b>{' '}
+                        {ticketTiers.reduce((sum, t) => sum + (Number(t.quantity) || 0), 0)} vé ({ticketTiers.length} hạng)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Stepper Navigation Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/80 rounded-b-3xl flex justify-between items-center">
+              {createStep === 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-100 font-semibold text-xs sm:text-sm cursor-pointer transition-colors"
+                >
+                  Hủy bỏ
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setCreateStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : 1))}
+                  className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-100 font-semibold text-xs sm:text-sm cursor-pointer transition-colors flex items-center gap-1.5"
+                >
+                  <ChevronLeft size={16} />
+                  <span>Quay lại</span>
+                </button>
+              )}
+
+              {createStep < 3 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!newEvent.title?.trim()) {
+                      toast.warning('Vui lòng nhập Tên sự kiện');
+                      return;
+                    }
+                    if (!newEvent.location?.trim()) {
+                      toast.warning('Vui lòng nhập Địa điểm tổ chức');
+                      return;
+                    }
+                    setCreateStep((s) => (s < 3 ? ((s + 1) as 1 | 2 | 3) : 3));
+                  }}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>Tiếp tục bước {createStep + 1}</span>
+                  <ChevronRight size={16} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCreate}
+                  disabled={isCreatingEvent || !newEvent.title?.trim() || !newEvent.location?.trim()}
+                  className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs sm:text-sm shadow-sm transition-all disabled:opacity-50 cursor-pointer flex items-center gap-2"
+                >
+                  {isCreatingEvent ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Đang tạo &amp; Đồng bộ...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={16} />
+                      <span>Hoàn tất &amp; Tạo sự kiện</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

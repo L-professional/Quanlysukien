@@ -530,7 +530,7 @@ export const EventSchedule: React.FC = () => {
       qr_code_token: item.qr_code_token || `QR-SESSION-${item.id}`,
       qr_code_image: item.qr_code_image,
       ticket_type: 'Vé Tham Dự',
-      event_title: activeEvent.title || 'EventHub AI Summit 2026',
+      event_title: activeEvent.title || 'Sự kiện hệ thống',
       schedule_id: item.id,
       schedule_title: item.title,
       room_location: item.room_location,

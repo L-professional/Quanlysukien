@@ -4,6 +4,34 @@ import { useEventSync } from '../services/eventSync';
  
 import { Link } from 'react-router-dom';
 
+const formatDateDots = (dateStr?: string) => {
+  if (!dateStr) return 'Sắp diễn ra';
+  const match = dateStr.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
+  if (match) {
+    const d = match[1].padStart(2, '0');
+    const m = match[2].padStart(2, '0');
+    const y = match[3];
+    return `${d}.${m}.${y}`;
+  }
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}.${month}.${year}`;
+  }
+  return dateStr;
+};
+
+const formatLocationCity = (loc?: string) => {
+  if (!loc) return 'Việt Nam';
+  const parts = loc.split(',');
+  if (parts.length > 1) {
+    return parts[parts.length - 1].trim();
+  }
+  return loc.trim();
+};
+
 const LandingPage: React.FC = () => {
 
   const [featuredEvents, setFeaturedEvents] = useState<any[]>([]);
@@ -11,10 +39,25 @@ const LandingPage: React.FC = () => {
 
   const fetchHomepageEvents = useCallback(async () => {
     try {
-      const data = await api.getEvents();
-      // Filter: prefer homepage_visible events first, then featured
-      // Sort: featured first, then by homepage_order, then by start_time
-      const sorted = [...data].sort((a: any, b: any) => {
+      setLoadingEvents(true);
+      // API Integration: Fetch published events directly from Database (GET /api/events?status=PUBLISHED)
+      let data: any[] = [];
+      try {
+        data = await api.getEvents({ status: 'PUBLISHED' });
+      } catch (err) {
+        console.warn('GET /api/events?status=PUBLISHED failed, trying full event list', err);
+      }
+      if (!data || data.length === 0) {
+        data = await api.getEvents();
+      }
+
+      // Filter out draft or cancelled events from homepage
+      const activeEvents = (Array.isArray(data) ? data : []).filter(
+        (e: any) => e.status !== 'DRAFT' && e.status !== 'CANCELLED'
+      );
+
+      // Sort: featured first, then homepage_visible, then by homepage_order, then by start_time
+      const sorted = [...activeEvents].sort((a: any, b: any) => {
         // Featured events first
         if (b.featured && !a.featured) return 1;
         if (a.featured && !b.featured) return -1;
@@ -26,7 +69,7 @@ const LandingPage: React.FC = () => {
         const orderB = b.homepage_order ?? 999;
         if (orderA !== orderB) return orderA - orderB;
         // Finally by start_time ascending
-        return (a.start_time || '').localeCompare(b.start_time || '');
+        return (a.start_time || a.start_date || '').localeCompare(b.start_time || b.start_date || '');
       });
       setFeaturedEvents(sorted);
     } catch (err) {
@@ -390,30 +433,31 @@ const LandingPage: React.FC = () => {
         <section id="featured-events" className="py-24 bg-event-gray/50 border-t border-b border-event-border">
             <div className="container mx-auto px-6 xl:px-12 max-w-[1440px]">
                 
+                {/* Section Header */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 fade-up">
                     <div className="max-w-2xl">
-                        <div className="flex items-center gap-2 mb-3">
-                            <div className="w-2 h-2 bg-event-red"></div>
-                            <span className="text-event-red font-semibold text-sm tracking-wider uppercase">Khám phá</span>
+                        <div className="flex items-center gap-1.5 mb-3">
+                            <span className="text-[#DC2626] font-bold text-sm tracking-wider uppercase">▪ KHÁM PHÁ</span>
                         </div>
                         <h2 className="text-[36px] lg:text-[42px] font-bold text-event-navy leading-[1.3]">Sự kiện nổi bật</h2>
-                        <p className="text-event-text-sec text-[16px] mt-3">Khám phá những sự kiện sắp diễn ra được tổ chức và quản lý bởi nền tảng EventAI.</p>
+                        <p className="text-slate-500 text-[16px] mt-3">Khám phá những sự kiện sắp diễn ra được tổ chức và quản lý bởi nền tảng EventAI.</p>
                     </div>
                     <div className="mt-6 md:mt-0">
-                        <Link to="/events" className="text-event-navy font-semibold text-[15px] flex items-center gap-2 hover:text-event-red transition-colors group">
+                        <Link to="/events" className="text-event-navy font-semibold text-[15px] flex items-center gap-2 hover:text-[#DC2626] transition-colors group">
                             Xem tất cả sự kiện 
-                            <i className="ph ph-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
+                            <span className="transform group-hover:translate-x-1 transition-transform inline-block font-bold">→</span>
                         </Link>
                     </div>
                 </div>
                 
+                {/* 4-Column Grid Layout */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 lg:gap-8">
                     {loadingEvents ? (
                         // Loading skeleton cards
                         Array.from({ length: 4 }).map((_, idx) => (
-                            <div key={idx} className="bg-white rounded-lg border border-event-border overflow-hidden animate-pulse">
+                            <div key={idx} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden animate-pulse">
                                 <div className="aspect-video bg-slate-200" />
-                                <div className="p-6 space-y-3">
+                                <div className="p-5 space-y-3">
                                     <div className="h-3 bg-slate-200 rounded w-3/4" />
                                     <div className="h-5 bg-slate-200 rounded" />
                                     <div className="h-3 bg-slate-200 rounded w-full" />
@@ -427,37 +471,68 @@ const LandingPage: React.FC = () => {
                         ))
                     ) : featuredEvents && featuredEvents.length > 0 ? (
                         featuredEvents.slice(0, 4).map((evt: any, idx: number) => {
-                            const formattedDate = evt.start_time
-                                ? new Date(evt.start_time).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                                : 'Sắp diễn ra';
-                            const cover = evt.cover_image || 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?ixlib=rb-4.0.3&auto=format&fit=crop&w=1112&q=80';
-                            const attendees = evt.registered_count ?? evt.attendees_count ?? 0;
-                            const maxAttendees = evt.max_attendees ? `${evt.max_attendees}` : '∞';
+                            const formattedDate = formatDateDots(evt.start_date || evt.start_time);
+                            const cover = evt.cover_image || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80';
+                            const attendeesNum = evt.capacity || evt.registered_count || 1000;
+                            const attendeesDisplay = `${Number(attendeesNum).toLocaleString('vi-VN')}+`;
+                            const shortLocation = formatLocationCity(evt.location_address || evt.location);
+                            const categoryBadge = evt.event_type || evt.category || 'Công nghệ';
 
                             return (
-                                <div key={evt.id || idx} className="bg-white rounded-lg border border-event-border overflow-hidden card-hover fade-up flex flex-col" style={{ transitionDelay: `${idx * 100}ms` }}>
-                                    <div className="aspect-video relative overflow-hidden">
-                                        <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur text-event-navy text-xs font-bold px-3 py-1 rounded-sm shadow-sm">
-                                            {evt.category || 'Sự kiện'}
+                                <div 
+                                    key={evt.id || idx} 
+                                    className="rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all bg-white overflow-hidden flex flex-col group" 
+                                    style={{ transitionDelay: `${idx * 80}ms` }}
+                                >
+                                    {/* Ảnh Banner & Badge */}
+                                    <div className="aspect-video relative overflow-hidden bg-slate-100">
+                                        <div className="absolute top-3.5 left-3.5 z-10 bg-white/90 backdrop-blur-md text-[#DC2626] border border-red-100/60 text-xs font-semibold px-3 py-1 rounded-full shadow-sm">
+                                            {categoryBadge}
                                         </div>
-                                        <img src={cover} alt={evt.title} className="w-full h-full object-cover image-zoom" />
+                                        <img 
+                                            src={cover} 
+                                            alt={evt.title} 
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                                            loading="lazy"
+                                        />
                                     </div>
-                                    <div className="p-6 flex flex-col flex-1">
-                                        <div className="flex items-center justify-between text-xs font-semibold text-event-text-sec mb-3">
-                                            <span className="flex items-center gap-1.5"><i className="ph ph-calendar-blank text-event-red text-sm"></i> {formattedDate}</span>
-                                            <span className="flex items-center gap-1.5 truncate max-w-[120px]"><i className="ph ph-map-pin text-event-red text-sm"></i> {evt.location || 'Trực tuyến'}</span>
+
+                                    {/* Nội dung Card */}
+                                    <div className="p-5 flex flex-col flex-1">
+                                        {/* Thông Tin Meta (Thời gian & Địa điểm hiển thị song song) */}
+                                        <div className="flex items-center justify-between text-xs text-slate-500 font-medium mb-2.5">
+                                            <span className="flex items-center gap-1.5 shrink-0">
+                                                <span className="text-xs">📅</span> 
+                                                <span>{formattedDate}</span>
+                                            </span>
+                                            <span className="flex items-center gap-1.5 truncate max-w-[130px] ml-2" title={evt.location || 'Địa điểm tổ chức'}>
+                                                <span className="text-xs shrink-0">📍</span> 
+                                                <span className="truncate">{shortLocation}</span>
+                                            </span>
                                         </div>
-                                        <Link to="/events" className="text-[18px] font-bold text-event-navy mb-2 line-clamp-2 hover:text-event-red transition-colors cursor-pointer">
+
+                                        {/* Tiêu Đề & Mô Tả */}
+                                        <Link 
+                                            to="/events" 
+                                            className="font-bold text-lg text-event-navy hover:text-[#DC2626] transition-colors line-clamp-1 mb-2 block" 
+                                            title={evt.title}
+                                        >
                                             {evt.title}
                                         </Link>
-                                        <p className="text-event-text-sec text-[14px] line-clamp-2 mb-4 flex-1">
+                                        <p className="line-clamp-2 text-slate-500 text-sm mb-4 flex-1 leading-relaxed">
                                             {evt.description || 'Tham gia cùng các chuyên gia hàng đầu để trao đổi, học hỏi và kết nối mở rộng cơ hội.'}
                                         </p>
-                                        <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100">
-                                            <span className="text-xs font-semibold text-event-navy flex items-center gap-1.5">
-                                                <i className="ph ph-users text-event-text-sec text-sm"></i> {attendees} / {maxAttendees}
+
+                                        {/* Chân Thẻ (Card Footer - Flexbox Justify-Between) */}
+                                        <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-auto">
+                                            <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                                                <span className="text-sm">👥</span> 
+                                                <span>{attendeesDisplay}</span>
                                             </span>
-                                            <Link to="/events" className="btn-secondary px-4 py-1.5 rounded text-sm font-semibold hover:bg-event-red hover:text-white transition-colors">
+                                            <Link 
+                                                to="/events" 
+                                                className="border border-red-600 text-red-600 hover:bg-red-600 hover:text-white px-4 py-1.5 rounded-lg text-sm font-medium transition-all inline-flex items-center justify-center shadow-sm"
+                                            >
                                                 Đăng ký ngay
                                             </Link>
                                         </div>
@@ -466,11 +541,11 @@ const LandingPage: React.FC = () => {
                             );
                         })
                     ) : (
-                        <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-event-border p-8">
-                            <i className="ph ph-calendar-blank text-4xl text-slate-300 mb-3 block"></i>
+                        <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-100 shadow-sm p-8">
+                            <span className="text-4xl text-slate-300 mb-3 block">📅</span>
                             <h3 className="text-lg font-bold text-event-navy mb-1">Chưa có sự kiện nổi bật</h3>
-                            <p className="text-event-text-sec text-sm mb-4">Các sự kiện được quản lý trên hệ thống sẽ xuất hiện tại đây.</p>
-                            <Link to="/events" className="btn-secondary px-5 py-2 rounded text-sm font-semibold hover:bg-event-red hover:text-white transition-colors inline-block">
+                            <p className="text-slate-500 text-sm mb-4">Các sự kiện được quản lý trên hệ thống sẽ xuất hiện tại đây.</p>
+                            <Link to="/events" className="border border-red-600 text-red-600 hover:bg-red-600 hover:text-white px-5 py-2 rounded-xl text-sm font-semibold transition-colors inline-block shadow-sm">
                                 Xem tất cả sự kiện
                             </Link>
                         </div>

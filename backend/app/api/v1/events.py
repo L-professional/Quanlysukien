@@ -1217,33 +1217,148 @@ async def generate_session_description(payload: GenerateSessionDescriptionReques
 
 
 @router.post("/{id}/publish", response_model=EventResponse)
-async def publish_event(id: int):
-    # Mock logic - robust production logic should be here, but database is down.
-    return {"id": id, "title": "Mock", "location": "Mock", "status": "PUBLISHED"}
+async def publish_event(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.status = "PUBLISHED"
+    event.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(event)
+    return await get_event(id, db, current_user)
 
 @router.post("/{id}/unpublish", response_model=EventResponse)
-async def unpublish_event(id: int):
-    return {"id": id, "title": "Mock", "location": "Mock", "status": "DRAFT"}
+async def unpublish_event(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.status = "DRAFT"
+    event.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(event)
+    return await get_event(id, db, current_user)
 
 @router.post("/{id}/cancel", response_model=EventResponse)
-async def cancel_event(id: int):
-    return {"id": id, "title": "Mock", "location": "Mock", "status": "CANCELLED"}
+async def cancel_event(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.status = "CANCELLED"
+    event.cancelled_at = datetime.now(timezone.utc)
+    event.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(event)
+    return await get_event(id, db, current_user)
 
 @router.post("/{id}/archive", response_model=EventResponse)
-async def archive_event(id: int):
-    return {"id": id, "title": "Mock", "location": "Mock", "status": "ARCHIVED"}
+async def archive_event(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.status = "ARCHIVED"
+    event.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(event)
+    return await get_event(id, db, current_user)
 
 @router.post("/{id}/duplicate", response_model=EventResponse)
-async def duplicate_event(id: int):
-    return {"id": 999, "title": "Duplicated Event", "location": "Mock", "status": "DRAFT"}
+async def duplicate_event(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    orig = res.scalar_one_or_none()
+    if not orig:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    cloned = Event(
+        title=f"{orig.title} (Bản sao)",
+        slug=f"{orig.slug}-copy-{int(datetime.now(timezone.utc).timestamp())}" if orig.slug else None,
+        description=orig.description,
+        category_id=orig.category_id,
+        event_type=orig.event_type,
+        location=orig.location,
+        location_address=orig.location_address,
+        google_maps_url=orig.google_maps_url,
+        start_time=orig.start_time,
+        end_time=orig.end_time,
+        start_date=orig.start_date,
+        end_date=orig.end_date,
+        status="DRAFT",
+        capacity=orig.capacity,
+        registered_count=0,
+        cover_image=orig.cover_image,
+        homepage_visible=False,
+        featured=False,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db.add(cloned)
+    await db.commit()
+    await db.refresh(cloned)
+    return await get_event(cloned.id, db, current_user)
 
 @router.patch("/{id}/homepage", response_model=EventResponse)
-async def update_homepage_visibility(id: int, payload: dict):
-    return {"id": id, "title": "Mock", "location": "Mock", "status": "PUBLISHED"}
+async def update_homepage_visibility(
+    id: int,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.homepage_visible = payload.get("homepage_visible", True)
+    event.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(event)
+    return await get_event(id, db, current_user)
 
 @router.patch("/{id}/featured", response_model=EventResponse)
-async def update_featured(id: int, payload: dict):
-    return {"id": id, "title": "Mock", "location": "Mock", "status": "PUBLISHED"}
+async def update_featured(
+    id: int,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.featured = payload.get("featured", True)
+    event.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(event)
+    return await get_event(id, db, current_user)
 
 @router.post("/export")
 async def export_events(payload: dict):

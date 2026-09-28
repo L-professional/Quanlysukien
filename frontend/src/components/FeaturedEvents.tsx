@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, Ticket, ArrowRight, Star } from 'lucide-react';
 import { apiService as api } from '../services/api';
 import { cleanEventTitle, formatEventDateTime, EventItem } from './EventCard';
+import { useEventSync } from '../services/eventSync';
 
 interface FeaturedEventsProps {
   onRegisterClick?: (event: EventItem) => void;
@@ -39,24 +40,13 @@ export const FeaturedEvents: React.FC<FeaturedEventsProps> = ({ onRegisterClick,
 
   useEffect(() => {
     fetchFeaturedEvents();
-
-    const handleSync = () => {
-      fetchFeaturedEvents();
-    };
-    const handleStorageSync = (e: StorageEvent) => {
-      if (e.key === 'eventhub_sync_trigger') {
-        fetchFeaturedEvents();
-      }
-    };
-
-    window.addEventListener('eventhub:events-updated', handleSync);
-    window.addEventListener('storage', handleStorageSync);
-
-    return () => {
-      window.removeEventListener('eventhub:events-updated', handleSync);
-      window.removeEventListener('storage', handleStorageSync);
-    };
   }, []);
+
+  useEventSync(
+    useCallback(() => {
+      fetchFeaturedEvents();
+    }, [])
+  );
 
   const handleRegister = (event: EventItem, e: React.MouseEvent) => {
     e.preventDefault();

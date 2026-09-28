@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { apiService } from '../services/api';
 import { useEventSync } from '../services/eventSync';
+import { cleanEventTitle } from '../components/EventCard';
 import { Event } from '../types';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
@@ -51,20 +52,21 @@ const CHART_DATA_RANGES = {
   ],
 };
 
-const donutData = [
-  { name: 'Hội nghị', value: 45 },
-  { name: 'Workshop', value: 30 },
-  { name: 'Webinar', value: 15 },
-  { name: 'Khác', value: 10 },
-];
-const COLORS = ['#DC2626', '#3B82F6', '#8B5CF6', '#10B981'];
+interface DonutItem {
+  name: string;
+  value: number;
+  fullName?: string;
+  count?: number;
+}
 
-const recentEvents = [
-  { id: '1', name: 'AI Summit 2026', date: '25/11/2026', attendees: '1,200', status: 'Đang diễn ra', statusColor: 'bg-emerald-100 text-emerald-700' },
-  { id: '2', name: 'Tech Startup Workshop', date: '28/11/2026', attendees: '350', status: 'Sắp diễn ra', statusColor: 'bg-blue-100 text-blue-700' },
-  { id: '3', name: 'Global Marketing Trends', date: '01/12/2026', attendees: '850', status: 'Sắp diễn ra', statusColor: 'bg-blue-100 text-blue-700' },
-  { id: '4', name: 'Web3 & Blockchain', date: '15/11/2026', attendees: '500', status: 'Đã kết thúc', statusColor: 'bg-slate-100 text-slate-700' },
+const donutData: DonutItem[] = [
+  { name: 'Hội nghị', value: 45, fullName: 'Hội nghị Công nghệ' },
+  { name: 'Workshop', value: 30, fullName: 'Workshop Đào tạo' },
+  { name: 'Webinar', value: 15, fullName: 'Hội thảo trực tuyến' },
+  { name: 'Khác', value: 10, fullName: 'Các loại khác' },
 ];
+const COLORS = ['#DC2626', '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B'];
+
 
 const topSpeakers = [
   { id: 1, name: 'Giàng A Chiến', title: 'CEO, AI Tech', views: '12.5k' },
@@ -107,22 +109,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
   useEventSync(fetchDashboardEvents);
 
   const upcomingCount = useMemo(
-    () => events.filter((e) => e.status === 'UPCOMING' || e.status === 'upcoming').length,
+    () => events.filter((e) => ['UPCOMING', 'upcoming', 'PUBLISHED', 'published'].includes(e.status)).length,
     [events]
   );
   const ongoingCount = useMemo(
-    () => events.filter((e) => e.status === 'ONGOING' || e.status === 'ongoing' || e.status === 'LIVE' || e.status === 'live').length,
+    () => events.filter((e) => ['ONGOING', 'ongoing', 'LIVE', 'live'].includes(e.status)).length,
     [events]
   );
   const completedCount = useMemo(
-    () => events.filter((e) => e.status === 'COMPLETED' || e.status === 'completed' || e.status === 'ended').length,
+    () => events.filter((e) => ['COMPLETED', 'completed', 'ended'].includes(e.status)).length,
     [events]
   );
   const draftCount = useMemo(
-    () => events.filter((e) => e.status === 'DRAFT' || e.status === 'draft').length,
+    () => events.filter((e) => ['DRAFT', 'draft'].includes(e.status)).length,
     [events]
   );
-  const totalEventsCount = upcomingCount + ongoingCount + completedCount + draftCount;
+  const totalEventsCount = events.length;
 
   const totalAttendeesCount = useMemo(() => {
     const sum = events.reduce((acc, e) => acc + (e.registered_count ?? (e as any).attendees_count ?? 0), 0);
@@ -133,33 +135,46 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
     if (events.length === 0) return donutData;
     const catCounts: Record<string, number> = {};
     events.forEach(e => {
-      const cat = e.category || 'Khác';
+      const cat = (e.category || e.event_type || 'Công nghệ & AI').trim();
       catCounts[cat] = (catCounts[cat] || 0) + 1;
     });
     const total = events.length;
-    return Object.entries(catCounts).map(([name, count]) => ({
-      name,
-      value: Math.round((count / total) * 100),
+    const sorted = Object.entries(catCounts).sort((a, b) => b[1] - a[1]);
+    const top4 = sorted.slice(0, 4);
+    const others = sorted.slice(4);
+    const result = top4.map(([name, count]) => ({
+      name: name.length > 13 ? name.slice(0, 12) + '…' : name,
+      fullName: name,
+      value: Math.max(1, Math.round((count / total) * 100)),
     }));
+    if (others.length > 0) {
+      const othersCount = others.reduce((acc, [, c]) => acc + c, 0);
+      result.push({
+        name: 'Khác',
+        fullName: 'Các lĩnh vực khác',
+        value: Math.max(1, Math.round((othersCount / total) * 100)),
+      });
+    }
+    return result;
   }, [events]);
 
   const displayRecentEvents = useMemo(() => {
-    if (events.length === 0) return recentEvents;
+    if (events.length === 0) return [];
     const activeTracked = events.filter((e) =>
-      ['UPCOMING', 'ONGOING', 'COMPLETED', 'DRAFT', 'LIVE', 'upcoming', 'ongoing', 'completed', 'draft', 'live'].includes(
+      ['UPCOMING', 'ONGOING', 'COMPLETED', 'DRAFT', 'LIVE', 'PUBLISHED', 'upcoming', 'ongoing', 'completed', 'draft', 'live', 'published'].includes(
         e.status
       )
     );
     const source = activeTracked.length > 0 ? activeTracked : events;
-    return source.slice(0, 4).map(evt => {
-      const formattedDate = evt.start_time
+    return source.slice(0, 5).map(evt => {
+      const formattedDate = evt.start_date || (evt.start_time
         ? new Date(evt.start_time).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-        : '25/11/2026';
+        : 'Chưa xếp ngày');
       
       let statusText = 'Sắp diễn ra';
       let statusColor = 'bg-blue-100 text-blue-700';
       if (evt.status === 'PUBLISHED' || evt.status === 'published') {
-        statusText = 'Đang mở';
+        statusText = 'Đã xuất bản';
         statusColor = 'bg-emerald-100 text-emerald-700';
       } else if (evt.status === 'DRAFT' || evt.status === 'draft') {
         statusText = 'Bản nháp';
@@ -180,9 +195,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
 
       return {
         id: String(evt.id),
-        name: evt.title,
+        name: cleanEventTitle(evt.title) || evt.title,
         date: formattedDate,
-        attendees: `${evt.registered_count ?? evt.attendees_count ?? 0} / ${evt.max_attendees || '∞'}`,
+        attendees: `${evt.registered_count ?? (evt as any).attendees_count ?? 0} / ${evt.capacity || (evt as any).max_attendees || 500}`,
         status: statusText,
         statusColor: statusColor,
       };
@@ -271,10 +286,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
           </div>
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={CHART_DATA_RANGES[timeRange]} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
+              <LineChart data={CHART_DATA_RANGES[timeRange]} margin={{ top: 10, right: 10, left: 5, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5EAF2" />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} dy={10} />
-                <YAxis tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} dx={-10} />
+                <YAxis
+                  width={38}
+                  tick={{ fontSize: 11, fill: '#64748B' }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(val: number) => (val >= 1000 ? `${(val / 1000).toFixed(0)}k` : String(val))}
+                />
                 <RechartsTooltip 
                   contentStyle={{ borderRadius: '8px', border: '1px solid #E5EAF2', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   itemStyle={{ fontSize: '12px', fontWeight: 600 }}
@@ -293,17 +314,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
             <h3 className="text-[15px] font-bold text-[#12213A]">Loại sự kiện</h3>
             <p className="text-[12px] text-[#64748B] mt-0.5">Phân bổ tỷ trọng các sự kiện</p>
           </div>
-          <div className="flex-1 flex flex-col justify-center relative mt-4">
-            <div className="h-[180px]">
+          <div className="flex-1 flex flex-col justify-center mt-3">
+            <div className="relative h-[180px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={dynamicDonutData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={2}
+                    innerRadius={55}
+                    outerRadius={75}
+                    paddingAngle={3}
                     dataKey="value"
                     stroke="none"
                   >
@@ -314,22 +335,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
                   <RechartsTooltip 
                     contentStyle={{ borderRadius: '8px', border: '1px solid #E5EAF2', padding: '4px 8px' }}
                     itemStyle={{ fontSize: '12px', fontWeight: 600 }}
+                    formatter={(value: any, name: any, item: any) => [`${value}%`, item?.payload?.fullName || name]}
                   />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
-            {/* Custom Center Text */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4">
-              <span className="text-2xl font-bold text-[#12213A]">{totalEventsCount.toLocaleString('vi-VN')}</span>
-              <span className="text-[10px] text-[#64748B] font-semibold">Tổng số</span>
+              {/* Custom Center Text inside the donut hole */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-2xl font-bold text-[#12213A]">{totalEventsCount.toLocaleString('vi-VN')}</span>
+                <span className="text-[10px] text-[#64748B] font-semibold">Sự kiện</span>
+              </div>
             </div>
             {/* Custom Legend */}
-            <div className="grid grid-cols-2 gap-y-2 gap-x-1 mt-2">
+            <div className="grid grid-cols-2 gap-y-2 gap-x-2 mt-3">
               {dynamicDonutData.map((entry, idx) => (
-                <div key={idx} className="flex items-center gap-1.5">
+                <div key={idx} className="flex items-center gap-1.5" title={entry.fullName || entry.name}>
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
                   <span className="text-[11px] font-semibold text-[#12213A] truncate">{entry.name}</span>
-                  <span className="text-[10px] text-slate-400 ml-auto">{entry.value}%</span>
+                  <span className="text-[10px] text-slate-500 font-bold ml-auto">{entry.value}%</span>
                 </div>
               ))}
             </div>

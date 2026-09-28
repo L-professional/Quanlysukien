@@ -471,7 +471,7 @@ export const QRScanner: React.FC = () => {
     setIssueLoading(true);
     try {
       const res = await apiService.manualIssueTicket({
-        event_id: 1,
+        event_id: selectedEventId || activeEvent?.id || 1,
         full_name: issueForm.full_name.trim(),
         email: issueForm.email.trim(),
         ticket_type: issueForm.ticket_type,
@@ -547,7 +547,7 @@ export const QRScanner: React.FC = () => {
               Sự Kiện Đang Soát Vé (Gate Context)
             </span>
             <h2 className="text-base font-extrabold text-white leading-tight">
-              {events.find((e) => e.id === selectedEventId)?.title || activeEvent?.title || 'EventHub AI Summit 2026'}
+              {events.find((e) => e.id === selectedEventId)?.title || activeEvent?.title || 'Sự kiện hệ thống'}
             </h2>
           </div>
         </div>
