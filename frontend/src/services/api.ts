@@ -1574,22 +1574,43 @@ export const apiService = {
   }): Promise<Event[]> {
     try {
       const response = await apiClient.get<Event[]>('/events', { params });
-      if (response.data && Array.isArray(response.data)) {
+      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
         return response.data;
       }
     } catch (err) {
-      console.warn('Failed to fetch events from API:', err);
+      console.warn('Backend unavailable, using fallback event data:', err);
     }
+    // Try localStorage cache (user-created events)
     const cached = localStorage.getItem('eventhub_custom_events');
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch {
-        // Fallback
+        // ignore
       }
     }
-    return [];
+    // Last resort: static fallback dataset (shows events on Vercel without backend)
+    const { FALLBACK_EVENTS } = await import('../data/mockEvents');
+    let fallback = [...FALLBACK_EVENTS];
+    if (params?.status) {
+      fallback = fallback.filter(e => e.status === params.status);
+    }
+    if (params?.search) {
+      const q = params.search.toLowerCase();
+      fallback = fallback.filter(e =>
+        e.title.toLowerCase().includes(q) ||
+        (e.location || '').toLowerCase().includes(q) ||
+        (e.event_type || '').toLowerCase().includes(q)
+      );
+    }
+    if (params?.is_featured !== undefined) {
+      fallback = fallback.filter(e => e.featured === params.is_featured);
+    }
+    if (params?.limit) {
+      fallback = fallback.slice(0, params.limit);
+    }
+    return fallback;
   },
 
 
