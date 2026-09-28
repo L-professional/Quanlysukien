@@ -123,13 +123,11 @@ async def lifespan(app: FastAPI):
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_session_participant ON registrations (session_id, participant_id) WHERE session_id IS NOT NULL;"
             ))
             # Seed initial realistic capacity and registered_count for demo schedules if all registered_counts are 0
-            await conn.execute(text("""
-                UPDATE event_schedules SET capacity = 150, registered_count = 84 WHERE id = 1 AND registered_count = 0;
-                UPDATE event_schedules SET capacity = 500, registered_count = 340 WHERE id = 2 AND registered_count = 0;
-                UPDATE event_schedules SET capacity = 300, registered_count = 215 WHERE id = 3 AND registered_count = 0;
-                UPDATE event_schedules SET capacity = 200, registered_count = 136 WHERE id = 4 AND registered_count = 0;
-                UPDATE event_schedules SET capacity = 450, registered_count = 306 WHERE id = 5 AND registered_count = 0;
-            """))
+            await conn.execute(text("UPDATE event_schedules SET capacity = 150, registered_count = 84 WHERE id = 1 AND registered_count = 0;"))
+            await conn.execute(text("UPDATE event_schedules SET capacity = 500, registered_count = 340 WHERE id = 2 AND registered_count = 0;"))
+            await conn.execute(text("UPDATE event_schedules SET capacity = 300, registered_count = 215 WHERE id = 3 AND registered_count = 0;"))
+            await conn.execute(text("UPDATE event_schedules SET capacity = 200, registered_count = 136 WHERE id = 4 AND registered_count = 0;"))
+            await conn.execute(text("UPDATE event_schedules SET capacity = 450, registered_count = 306 WHERE id = 5 AND registered_count = 0;"))
         print("User, Registration & Event columns ensured.")
     except Exception as e:
         print(f"Warning: Column migration skipped: {e}")
@@ -140,6 +138,23 @@ async def lifespan(app: FastAPI):
         start_scheduler()
     except Exception as e:
         print(f"Warning: Could not start reminder scheduler: {e}")
+
+    # Auto-seed events if database is empty (for new deployments like Render)
+    try:
+        from app.core.database import AsyncSessionLocal
+        from sqlalchemy import text as sql_text
+        async with AsyncSessionLocal() as seed_session:
+            result = await seed_session.execute(sql_text("SELECT COUNT(*) FROM events"))
+            event_count = result.scalar()
+            if event_count == 0:
+                print("Database is empty. Running auto-seed for initial events...")
+                from app.db.seed_events import seed_20_realistic_events
+                seeded = await seed_20_realistic_events()
+                print(f"Auto-seed completed: {seeded} events added.")
+            else:
+                print(f"Database already has {event_count} events. Skipping seed.")
+    except Exception as e:
+        print(f"Warning: Auto-seed skipped: {e}")
 
     yield
 
