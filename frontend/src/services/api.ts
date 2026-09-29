@@ -25,6 +25,7 @@ import {
   TicketTier,
 } from '../types';
 import { matchesStatusFilter } from '../utils/eventStatus';
+import { FALLBACK_EVENTS } from '../data/mockEvents';
 
 export interface PRABVariant {
   variant: string;
@@ -1575,53 +1576,75 @@ export const apiService = {
     is_featured?: boolean;
     limit?: number;
   }): Promise<Event[]> {
+    let baseEvents: Event[] = [];
     try {
       const response = await apiClient.get<Event[]>('/events', { params });
       if (response.data && Array.isArray(response.data) && response.data.length > 0) {
-        return response.data;
+        baseEvents = response.data;
       }
     } catch (err) {
       console.warn('Backend unavailable, using fallback event data:', err);
     }
-    // Try localStorage cache (user-created events)
-    const cached = localStorage.getItem('eventhub_custom_events');
-    if (cached) {
-      try {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          let list = parsed;
-          if (params?.status) {
-            list = list.filter((e: any) => matchesStatusFilter(e, params.status));
-          }
-          return list;
-        }
-      } catch {
-        // ignore
-      }
+
+    // If backend returns nothing or is unreachable, load all 37 realistic events
+    if (baseEvents.length === 0) {
+      baseEvents = [...FALLBACK_EVENTS];
     }
-    // Last resort: static fallback dataset (shows events on Vercel without backend)
-    const { FALLBACK_EVENTS } = await import('../data/mockEvents');
-    let fallback = [...FALLBACK_EVENTS];
+
+    // Merge custom user-created events from localStorage (prepend without replacing the full catalog)
+    try {
+      const cached = localStorage.getItem('eventhub_custom_events');
+      if (cached) {
+        const parsed: Event[] = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingIds = new Set(baseEvents.map((e) => e.id));
+          const existingTitles = new Set(baseEvents.map((e) => (e.title || '').trim().toLowerCase()));
+          const customNew = parsed.filter(
+            (e) => !existingIds.has(e.id) && !existingTitles.has((e.title || '').trim().toLowerCase())
+          );
+          baseEvents = [...customNew, ...baseEvents];
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // Filter out locally deleted event IDs
+    try {
+      const deletedStr = localStorage.getItem('eventhub_deleted_ids');
+      if (deletedStr) {
+        const deletedIds = new Set<number>(JSON.parse(deletedStr));
+        baseEvents = baseEvents.filter((e) => !deletedIds.has(e.id));
+      }
+    } catch {}
+
+    // Apply filtering
+    let result = baseEvents;
     if (params?.status) {
-      fallback = fallback.filter(e => matchesStatusFilter(e, params.status));
+      result = result.filter((e) => matchesStatusFilter(e, params.status));
     }
     if (params?.search) {
       const q = params.search.toLowerCase();
-      fallback = fallback.filter(e =>
-        e.title.toLowerCase().includes(q) ||
-        (e.location || '').toLowerCase().includes(q) ||
-        (e.event_type || '').toLowerCase().includes(q)
+      result = result.filter(
+        (e) =>
+          (e.title || '').toLowerCase().includes(q) ||
+          (e.location || '').toLowerCase().includes(q) ||
+          (e.event_type || '').toLowerCase().includes(q)
+      );
+    }
+    if (params?.event_type) {
+      result = result.filter(
+        (e) => (e.event_type || '').toLowerCase() === params.event_type!.toLowerCase()
       );
     }
     if (params?.is_featured !== undefined) {
-      fallback = fallback.filter(e => e.featured === params.is_featured);
+      result = result.filter((e) => e.featured === params.is_featured);
     }
     if (params?.limit) {
-      fallback = fallback.slice(0, params.limit);
+      result = result.slice(0, params.limit);
     }
-    return fallback;
+    return result;
   },
-
 
   async createEvent(payload: Partial<Event>): Promise<Event> {
     try {
@@ -1669,25 +1692,39 @@ export const apiService = {
   async getEvent(eventId: number = 1): Promise<Event> {
     try {
       const response = await apiClient.get<Event>(`/events/${eventId}`);
-      return response.data;
+      if (response.data) return response.data;
     } catch {
-      return {
-        id: eventId,
-        title: 'EventHub AI Summit 2026',
-        description: 'Hội thảo quốc tế hàng đầu về Generative AI, RAG Vector Search và Tự Động Hóa Quản Trị Sự Kiện.',
-        category_id: 1,
-        location: 'GEM Center, TP. Hồ Chí Minh',
-        location_address: 'Số 8 Nguyễn Bỉnh Khiêm, Phường Đa Kao, Quận 1, TP. Hồ Chí Minh',
-        google_maps_url: 'https://maps.google.com/maps?q=GEM+Center+Ho+Chi+Minh&t=&z=16&ie=UTF8&iwloc=&output=embed',
-        start_time: '15-16 Oct 2026, 08:30 AM',
-        end_time: '16 Oct 2026, 17:30 PM',
-        start_date: '15/10/2026 08:30',
-        end_date: '16/10/2026 17:30',
-        status: 'ONGOING',
-        wifiName: 'EventHub_VIP_Guest',
-        wifiPassword: 'EventHub2026!',
-      };
+      // Backend offline
     }
+
+    try {
+      const cached = localStorage.getItem('eventhub_custom_events');
+      if (cached) {
+        const parsed: Event[] = JSON.parse(cached);
+        const found = parsed.find((e) => e.id === eventId);
+        if (found) return found;
+      }
+    } catch {}
+
+    const foundFallback = FALLBACK_EVENTS.find((e) => e.id === eventId);
+    if (foundFallback) return foundFallback;
+
+    return FALLBACK_EVENTS[0] || {
+      id: eventId,
+      title: 'AI Summit Vietnam 2026: Kiến Tạo Tương Lai Số',
+      description: 'Hội nghị thượng đỉnh quy tụ hơn 1,000 chuyên gia, CEO và nhà nghiên cứu AI hàng đầu thế giới.',
+      category_id: 1,
+      location: 'Trung Tâm Hội Nghị Quốc Gia (NCC), Hà Nội',
+      location_address: 'Đại lộ Thăng Long, Mễ Trì, Nam Từ Liêm, Hà Nội',
+      google_maps_url: 'https://maps.google.com/maps?q=National+Convention+Center+Hanoi&t=&z=16&ie=UTF8&iwloc=&output=embed',
+      start_time: '10/10/2026 08:30',
+      end_time: '11/10/2026 17:30',
+      start_date: '10/10/2026 08:30',
+      end_date: '11/10/2026 17:30',
+      status: 'PUBLISHED',
+      wifiName: 'NCC_EventHub',
+      wifiPassword: 'AISummit2026',
+    };
   },
 
   async updateEvent(eventId: number, payload: Partial<Event>): Promise<Event> {
@@ -1737,7 +1774,11 @@ export const apiService = {
   },
 
   async deleteEvent(eventId: number): Promise<{ status: string; message: string }> {
-    const response = await apiClient.delete<{ status: string; message: string }>(`/events/${eventId}`);
+    try {
+      await apiClient.delete<{ status: string; message: string }>(`/events/${eventId}`);
+    } catch (e) {
+      console.warn('Backend delete unavailable, deleting locally:', e);
+    }
     try {
       const cached = localStorage.getItem('eventhub_custom_events');
       if (cached) {
@@ -1755,6 +1796,12 @@ export const apiService = {
           localStorage.setItem('eventhub_custom_schedules', JSON.stringify(updatedSched));
         }
       }
+      const deletedStr = localStorage.getItem('eventhub_deleted_ids');
+      const deletedIds: number[] = deletedStr ? JSON.parse(deletedStr) : [];
+      if (!deletedIds.includes(eventId)) {
+        deletedIds.push(eventId);
+        localStorage.setItem('eventhub_deleted_ids', JSON.stringify(deletedIds));
+      }
       const selectedIdStr = localStorage.getItem('eventhub_selected_event_id');
       if (selectedIdStr && parseInt(selectedIdStr, 10) === eventId) {
         localStorage.removeItem('eventhub_selected_event_id');
@@ -1762,7 +1809,7 @@ export const apiService = {
     } catch (e) {
       console.warn('Error clearing local cache on deleteEvent:', e);
     }
-    return response.data;
+    return { status: 'success', message: 'Sự kiện đã được xóa thành công!' };
   },
 
   async generateEventDescription(payload: {
