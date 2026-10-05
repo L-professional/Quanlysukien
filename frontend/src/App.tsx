@@ -235,7 +235,74 @@ const AppRoutes: React.FC = () => {
   );
 };
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '1029384756-demo-eventhub-ai.apps.googleusercontent.com';
+const rawClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_ID = (rawClientId && !rawClientId.includes('YOUR_GOOGLE_CLIENT_ID'))
+  ? rawClientId
+  : '1029384756-demo-eventhub-ai.apps.googleusercontent.com';
+
+interface RootErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface RootErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+export class RootErrorBoundary extends React.Component<RootErrorBoundaryProps, RootErrorBoundaryState> {
+  constructor(props: RootErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): RootErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[RootErrorBoundary] Uncaught UI error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-slate-100">
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+              !
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Đang tải lại giao diện EventAI</h2>
+            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+              Trang web đang đồng bộ dữ liệu phiên bản mới nhất. Bạn có thể bấm vào nút dưới đây để tiếp tục đăng nhập hoặc tải lại trang.
+            </p>
+            <div className="flex flex-col gap-3">
+              <a
+                href="/login"
+                className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm"
+              >
+                🔐 Vào trang Đăng nhập hệ thống
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    localStorage.removeItem('eventhub_token');
+                    localStorage.removeItem('eventhub_user');
+                  } catch (_) {}
+                  window.location.reload();
+                }}
+                className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-all text-sm"
+              >
+                🔄 Tải lại trang (F5)
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export const AppContent: React.FC = () => (
   <BrowserRouter>
@@ -245,13 +312,21 @@ export const AppContent: React.FC = () => (
 );
 
 export const App: React.FC = () => (
-  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-    <AuthProvider>
-      <EventProvider>
-        <AppContent />
-      </EventProvider>
-    </AuthProvider>
-  </GoogleOAuthProvider>
+  <RootErrorBoundary>
+    <GoogleOAuthProvider
+      clientId={GOOGLE_CLIENT_ID}
+      onScriptLoadError={() => {
+        console.warn('Google Identity Service script warning (non-fatal)');
+      }}
+    >
+      <AuthProvider>
+        <EventProvider>
+          <AppContent />
+        </EventProvider>
+      </AuthProvider>
+    </GoogleOAuthProvider>
+  </RootErrorBoundary>
 );
 
 export default App;
+
