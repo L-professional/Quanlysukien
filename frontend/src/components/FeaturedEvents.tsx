@@ -27,8 +27,9 @@ export const FeaturedEvents: React.FC<FeaturedEventsProps> = ({ onRegisterClick,
       } else {
         // Fallback query if is_featured param was filtered differently
         const all = await api.getEvents();
-        const featured = all.filter((e: any) => e.featured || e.homepage_visible).slice(0, 4);
-        setEvents(featured.length > 0 ? featured : all.slice(0, 4));
+        const safeAll = Array.isArray(all) ? all : [];
+        const featured = safeAll.filter((e: any) => e.featured || e.homepage_visible).slice(0, 4);
+        setEvents(featured.length > 0 ? featured : safeAll.slice(0, 4));
       }
     } catch (err: any) {
       console.error('Failed to load featured events:', err);

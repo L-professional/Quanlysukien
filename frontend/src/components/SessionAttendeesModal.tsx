@@ -68,9 +68,12 @@ export const SessionAttendeesModal: React.FC<SessionAttendeesModalProps> = ({
     }
   }, [isOpen, session?.id, fetchAttendees]);
 
+  // Safe attendees reference
+  const safeAttendees = useMemo(() => (Array.isArray(attendees) ? attendees : []), [attendees]);
+
   // Real-time filtered attendees
   const filteredAttendees = useMemo(() => {
-    return attendees.filter((item) => {
+    return safeAttendees.filter((item) => {
       // Status filter
       if (statusFilter === 'checked_in' && !item.is_checked_in) return false;
       if (statusFilter === 'not_checked_in' && item.is_checked_in) return false;
@@ -87,13 +90,13 @@ export const SessionAttendeesModal: React.FC<SessionAttendeesModalProps> = ({
       }
       return true;
     });
-  }, [attendees, statusFilter, searchQuery]);
+  }, [safeAttendees, statusFilter, searchQuery]);
 
   const checkedInCount = useMemo(() => {
-    return attendees.filter((a) => a.is_checked_in).length;
-  }, [attendees]);
+    return safeAttendees.filter((a) => a.is_checked_in).length;
+  }, [safeAttendees]);
 
-  const notCheckedInCount = attendees.length - checkedInCount;
+  const notCheckedInCount = safeAttendees.length - checkedInCount;
 
   // Toggle check-in action
   const handleToggleCheckin = async (attendee: SessionAttendee) => {

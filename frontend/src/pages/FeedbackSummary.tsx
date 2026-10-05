@@ -627,10 +627,11 @@ export const FeedbackSummary: React.FC = () => {
   };
 
   // Filter feedback
-  const filteredFeedbacks = feedbackList.filter((item) => {
+  const safeFeedbackList = Array.isArray(feedbackList) ? feedbackList : [];
+  const filteredFeedbacks = safeFeedbackList.filter((item) => {
     const matchesSearch =
-      item.user_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.comment.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.user_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (item.comment || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (item.session_title && item.session_title.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStar = selectedStar === null || item.rating === selectedStar;
     return matchesSearch && matchesStar;

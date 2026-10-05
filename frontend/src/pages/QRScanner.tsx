@@ -80,7 +80,7 @@ export const QRScanner: React.FC = () => {
       navigator.mediaDevices
         .enumerateDevices()
         .then((devices) => {
-          const vInputs = devices.filter((d) => d.kind === 'videoinput');
+          const vInputs = (Array.isArray(devices) ? devices : []).filter((d) => d.kind === 'videoinput');
           setVideoDevices(vInputs);
           if (vInputs.length > 0 && !selectedDeviceId) {
             setSelectedDeviceId(vInputs[0].deviceId);
@@ -1098,7 +1098,7 @@ export const QRScanner: React.FC = () => {
 
             {recentScans.length > 0 ? (
               <div className="space-y-2 max-h-72 overflow-y-auto pr-1 divide-y divide-slate-100">
-                {recentScans
+                {(Array.isArray(recentScans) ? recentScans : [])
                   .filter((s) => {
                     if (historyFilter === 'SUCCESS') return s.status === 'SUCCESS';
                     if (historyFilter === 'ERROR') return s.status !== 'SUCCESS';

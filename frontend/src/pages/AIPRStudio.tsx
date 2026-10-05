@@ -329,19 +329,21 @@ export const AIPRStudio: React.FC = () => {
 
   // Danh sách sự kiện được lọc nghiêm ngặt theo Ngữ cảnh vòng đời đang chọn
   const filteredEvents = useMemo(() => {
-    return events.filter((ev) => isEventMatchingLifecycle(ev, eventLifecycle));
+    const list = Array.isArray(events) ? events : [];
+    return list.filter((ev) => isEventMatchingLifecycle(ev, eventLifecycle));
   }, [events, eventLifecycle]);
 
   // Xác định sự kiện đang được chọn từ danh sách sự kiện hệ thống
   const selectedEvent =
     filteredEvents.find((e) => e.id.toString() === selectedEventId) ||
-    events.find((e) => e.id.toString() === selectedEventId) ||
+    (Array.isArray(events) ? events : []).find((e) => e.id.toString() === selectedEventId) ||
     (activeEvent?.id ? activeEvent : null);
 
   // Xử lý chuyển đổi ngữ cảnh vòng đời (Đóng vai trò bộ lọc danh sách sự kiện)
   const handleSwitchLifecycle = (newLifecycle: 'UPCOMING' | 'CONCLUDED') => {
     setEventLifecycle(newLifecycle);
-    const targetFiltered = events.filter((ev) => isEventMatchingLifecycle(ev, newLifecycle));
+    const list = Array.isArray(events) ? events : [];
+    const targetFiltered = list.filter((ev) => isEventMatchingLifecycle(ev, newLifecycle));
 
     // Nếu sự kiện hiện tại cũng hợp lệ trong ngữ cảnh mới
     const currentInTarget = targetFiltered.find((e) => e.id.toString() === selectedEventId);
@@ -384,9 +386,10 @@ export const AIPRStudio: React.FC = () => {
 
   // Tự động đồng bộ và nạp dữ liệu khi activeEvent hoặc danh sách sự kiện hệ thống thay đổi
   useEffect(() => {
-    if (events.length === 0) return;
+    const list = Array.isArray(events) ? events : [];
+    if (list.length === 0) return;
 
-    const matching = events.filter((ev) => isEventMatchingLifecycle(ev, eventLifecycle));
+    const matching = list.filter((ev) => isEventMatchingLifecycle(ev, eventLifecycle));
     if (matching.length === 0) {
       if (selectedEventId !== '') {
         setSelectedEventId('');
@@ -2615,7 +2618,7 @@ ${generatedResults.press_release || ''}
                           onChange={() => {
                             if (isChecked) {
                               if (publishChannels.length > 1) {
-                                setPublishChannels(publishChannels.filter((c) => c !== ch.id));
+                                setPublishChannels((Array.isArray(publishChannels) ? publishChannels : []).filter((c) => c !== ch.id));
                               } else {
                                 toast.warning('Cần chọn ít nhất 1 kênh phát hành.');
                               }

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Search, Bell, User, ChevronDown, Menu, LogOut, Settings as SettingsIcon, ShieldCheck, Briefcase, Ticket, LogIn,
@@ -57,9 +57,11 @@ export const Header: React.FC<HeaderProps> = ({
       const data = await apiService.getEvents();
       if (Array.isArray(data)) {
         setSearchEvents(data.map((e: any) => ({ id: e.id, title: e.title, location: e.location })));
+      } else {
+        setSearchEvents([]);
       }
     } catch {
-      // silently ignore
+      setSearchEvents([]);
     }
   }, []);
 
@@ -67,9 +69,10 @@ export const Header: React.FC<HeaderProps> = ({
     if (!isAuthenticated) return;
     try {
       const data = await apiService.getNotifications();
-      setNotifications(data || []);
+      setNotifications(Array.isArray(data) ? data : []);
     } catch (err) {
       console.warn('Failed to fetch notifications in Header:', err);
+      setNotifications([]);
     }
   }, [isAuthenticated]);
 
@@ -118,11 +121,11 @@ export const Header: React.FC<HeaderProps> = ({
   ];
 
   const filteredNavShortcuts = searchQuery.trim()
-    ? SYSTEM_NAV_SHORTCUTS.filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()) || s.subtitle.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? (Array.isArray(SYSTEM_NAV_SHORTCUTS) ? SYSTEM_NAV_SHORTCUTS : []).filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()) || s.subtitle.toLowerCase().includes(searchQuery.toLowerCase()))
     : [];
 
   const filteredEvents = searchQuery.trim()
-    ? searchEvents.filter(e => e.title.toLowerCase().includes(searchQuery.toLowerCase()) || (e.location && e.location.toLowerCase().includes(searchQuery.toLowerCase())))
+    ? (Array.isArray(searchEvents) ? searchEvents : []).filter(e => e.title.toLowerCase().includes(searchQuery.toLowerCase()) || (e.location && e.location.toLowerCase().includes(searchQuery.toLowerCase())))
     : [];
 
   // Map roles to Vietnamese titles
@@ -136,12 +139,13 @@ export const Header: React.FC<HeaderProps> = ({
     ATTENDEE: 'Khách tham dự',
   };
 
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const safeNotifications: NotificationItem[] = useMemo(() => (Array.isArray(notifications) ? notifications : []), [notifications]);
+  const unreadCount = safeNotifications.filter((n: NotificationItem) => !n.is_read).length;
 
   const handleMarkAllRead = async () => {
     try {
       await apiService.markAllNotificationsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      setNotifications((prev) => (Array.isArray(prev) ? prev : []).map((n) => ({ ...n, is_read: true })));
       toast.success('Đã đánh dấu tất cả thông báo là đã đọc.');
     } catch {
       toast.error('Không thể đánh dấu đã đọc.');
@@ -153,7 +157,7 @@ export const Header: React.FC<HeaderProps> = ({
       if (!notif.is_read) {
         await apiService.markNotificationRead(notif.id);
         setNotifications((prev) =>
-          prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n))
+          (Array.isArray(prev) ? prev : []).map((n) => (n.id === notif.id ? { ...n, is_read: true } : n))
         );
       }
       setShowNotifications(false);
@@ -390,13 +394,13 @@ export const Header: React.FC<HeaderProps> = ({
 
                 {/* Notifications List */}
                 <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100">
-                  {notifications.length === 0 ? (
+                  {safeNotifications.length === 0 ? (
                     <div className="p-8 text-center text-slate-400 space-y-2">
                       <Bell className="w-8 h-8 mx-auto text-slate-300" />
                       <p className="text-xs font-medium">Bạn chưa có thông báo hoặc nhắc lịch nào</p>
                     </div>
                   ) : (
-                    notifications.map((item) => {
+                    safeNotifications.map((item: NotificationItem) => {
                       const isUnread = !item.is_read;
                       return (
                         <div

@@ -122,12 +122,13 @@ export const SystemLogs: React.FC = () => {
     toast.info('Đã xóa danh sách nhật ký hiển thị tạm thời.');
   };
 
-  const filteredLogs = logs.filter((log) => {
+  const safeLogs = Array.isArray(logs) ? logs : [];
+  const filteredLogs = safeLogs.filter((log) => {
     const matchesLevel = filterLevel === 'ALL' || log.level === filterLevel;
     const matchesSearch =
-      log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.actor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.time.includes(searchTerm);
+      (log.message || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.actor || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.time || '').includes(searchTerm);
     return matchesLevel && matchesSearch;
   });
 

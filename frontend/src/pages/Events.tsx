@@ -241,7 +241,7 @@ export const Events: React.FC = () => {
 
   // 2. Dynamic Metric KPI Calculations from real Database data
   const kpiData = useMemo(() => {
-    const list = allEvents.length > 0 ? allEvents : events;
+    const list = Array.isArray(allEvents) && allEvents.length > 0 ? allEvents : (Array.isArray(events) ? events : []);
     const upcoming = list.filter((e) => matchesStatusFilter(e, 'UPCOMING')).length;
     const ongoing = list.filter((e) => matchesStatusFilter(e, 'ONGOING')).length;
     const completed = list.filter((e) => matchesStatusFilter(e, 'COMPLETED')).length;
@@ -258,7 +258,7 @@ export const Events: React.FC = () => {
 
   // Real-time client-side filtered view for instant typing reaction
   const displayEvents = useMemo(() => {
-    let list = allEvents.length > 0 ? allEvents : events;
+    let list = Array.isArray(allEvents) && allEvents.length > 0 ? allEvents : (Array.isArray(events) ? events : []);
     if (search.trim()) {
       const q = search.toLowerCase().trim();
       list = list.filter((e) => {
@@ -420,7 +420,7 @@ export const Events: React.FC = () => {
       toast.warning('Sự kiện cần tối thiểu 1 hạng vé');
       return;
     }
-    setTicketTiers((prev) => prev.filter((t) => t.id !== id));
+    setTicketTiers((prev) => (Array.isArray(prev) ? prev : []).filter((t) => t.id !== id));
   };
 
   const handleSaveQuickSpeaker = async () => {
@@ -446,7 +446,7 @@ export const Events: React.FC = () => {
           )}&background=DC2626&color=fff`,
       });
 
-      setSpeakersList((prev) => [created, ...prev.filter((s) => s.id !== created.id)]);
+      setSpeakersList((prev) => [created, ...(Array.isArray(prev) ? prev : []).filter((s) => s.id !== created.id)]);
       setSelectedSpeakerId(created.id);
       setIsQuickAddSpeaker(false);
       setQuickSpeaker({ full_name: '', email: '', job_title: '', organization: '', avatar_url: '' });
@@ -2875,7 +2875,7 @@ export const Events: React.FC = () => {
                           </div>
 
                           {/* Filtered Speakers List */}
-                          {speakersList
+                          {(Array.isArray(speakersList) ? speakersList : [])
                             .filter((s) => {
                               const q = speakerSearchQuery.toLowerCase();
                               return (

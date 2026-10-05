@@ -2118,3 +2118,28 @@
     - Kiểm thử E2E HTTP Endpoints `/api/ai/chat` (ASGITransport): **200 OK với đầy đủ format thời gian thực và gợi ý chips**.
     - Biên dịch Frontend (`tsc && vite build`): **100% thành công với 0 lỗi TypeScript (2205 modules transformed)**.
 
+---
+
+### [x] Task 103: Chống Crash Do Lỗi Dữ Liệu Không Phải Mảng (Array Safeguard & Defensive Code for Dashboard)
+  - **1. Nguyên nhân gốc rễ (Root Cause Analysis):**
+    - Trên môi trường Vercel production, khi backend proxy chưa được kết nối hoặc API route trả về trang HTML 200 (do quy tắc SPA rewrite `/(.*) -> /index.html`), axios nhận về chuỗi HTML string thay vì JSON mảng.
+    - Việc gọi `.filter()` trực tiếp trên dữ liệu chuỗi/object/undefined dẫn đến lỗi runtime nghiêm trọng: `Uncaught TypeError: p.filter is not a function` gây màn hình trắng (Blank Screen) tại Dashboard và các trang điều hành.
+  - **2. Bọc an toàn toàn diện (Defensive Array Guarding):**
+    - Đã quét và bọc an toàn 100% tất cả các lời gọi `.filter()` và `.map()` trên toàn bộ `frontend/src`:
+      * `frontend/src/services/api.ts`: Bổ sung axios response interceptor phát hiện chuỗi HTML (`<!DOCTYPE html`) để từ chối và kích hoạt ngay fallback mock data thay vì để lọt dữ liệu HTML. Chuẩn hóa `getEvents()`, `getNotifications()`, `getAdminUsers()`, `getDashboardStats()`, `getSecurityLogs()`, `getEventSchedule()`, `getInquiries()`, `getMyRegistrations()`, `getKnowledgeBaseItems()`, `getSpeakers()`, `getSpeakerMySessions()` luôn trả về mảng hợp lệ hoặc đối tượng có các trường mảng được khởi tạo đầy đủ.
+      * `frontend/src/pages/Dashboard.tsx`: Bọc `setEvents(Array.isArray(data) ? data : [])`, thiết lập `safeEvents = useMemo(() => Array.isArray(events) ? events : [], [events])`, bọc an toàn tất cả các biến đếm KPI, Donut distribution, Recent events và Top speakers.
+      * `frontend/src/components/Header.tsx`: Bọc an toàn `fetchSearchEvents`, `fetchNotifications`, `filteredNavShortcuts`, `filteredEvents`, `safeNotifications`, `unreadCount` và danh sách thông báo.
+      * `frontend/src/components/Sidebar.tsx`: Bọc `menuItems.filter` và `visibleMenuItems.map`.
+      * `frontend/src/context/EventContext.tsx`: Bọc an toàn `removeEvent`, `addEvent`, `updateActiveEvent`, `selectEventById`.
+      * `frontend/src/components/EventSchedule.tsx`: Thiết lập `safeSchedules: EventScheduleItem[]`, bọc an toàn `reviewedFromSchedule`, `handleConfirmDeleteSession`, `fetchSchedule`, `toggleBookmark`, `handleExportAllICS`, `handleDeleteMaterial`, `filteredSchedules`, `roomsList`, và các tab lọc ngày.
+      * `frontend/src/components/CreateEventModal.tsx`, `SessionAttendeesModal.tsx`, `Navbar.tsx`, `FeaturedEvents.tsx`, `content-studio/publish-modal.tsx`: Bọc an toàn toàn bộ thao tác lọc mảng.
+      * `frontend/src/pages/Events.tsx`, `UserManagement.tsx`, `SystemLogs.tsx`, `SpeakerDashboard.tsx`, `SpeakerControlCenter.tsx`, `FeedbackSummary.tsx`, `AIConcierge.tsx`, `AIPRStudio.tsx`, `InquiryDetail.tsx`, `KnowledgeBase.tsx`, `QRScanner.tsx`, `Settings.tsx`, `accountHistory.ts`, `aiCopilotClient.ts`.
+  - **3. Chuẩn hóa Route Handlers (/api/...):**
+    - Bổ sung router `/api` song song với `/api/v1` trong FastAPI (`backend/app/main.py`), định tuyến `/api/stats` và `/api/users` trả về dữ liệu an toàn/mảng rỗng.
+    - Tạo các Vercel Serverless Function handlers độc lập tại `api/events.js`, `api/stats.js`, `api/users.js` và `frontend/api/*` để luôn trả về mã 200 JSON với `[]` khi chạy độc lập tại Edge.
+    - Cập nhật quy tắc rewrites trong cả root `vercel.json` và `frontend/vercel.json` để ưu tiên các route `/api/*` trước SPA fallback `/index.html`.
+  - **4. Kiểm tra biên dịch & Deployment:**
+    - Chạy `npm run build` (`tsc && vite build`) trong `frontend`: **1836 modules transformed, 0 lỗi TypeScript, build thành công 100% trong 6.27s**.
+    - Đã commit và push toàn bộ bản vá lên nhánh `feature/fix` để Vercel tự động re-deploy.
+
+

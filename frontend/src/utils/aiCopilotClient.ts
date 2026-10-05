@@ -97,7 +97,8 @@ export interface ClientCopilotOptions {
 }
 
 function _executeClientAutonomousCopilotInternal(options: ClientCopilotOptions): AttendeeChatResponse {
-  const { question, events, eventId, role = 'ATTENDEE' } = options;
+  const { question, events: rawEvents, eventId, role = 'ATTENDEE' } = options;
+  const events = Array.isArray(rawEvents) ? rawEvents : [];
   const qRaw = question.trim();
   const qLow = qRaw.toLowerCase();
   const qNorm = removeVietnameseDiacritics(qRaw);

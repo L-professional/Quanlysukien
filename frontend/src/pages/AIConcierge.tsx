@@ -605,7 +605,8 @@ export const AIConcierge: React.FC = () => {
       console.warn('Auto-approve API fallback:', err);
     }
 
-    const highConfidenceItems = inquiries.filter(
+    const safeInquiries = Array.isArray(inquiries) ? inquiries : [];
+    const highConfidenceItems = safeInquiries.filter(
       (item) => item.status === 'PENDING' && (item.ragSimilarity ?? 0) >= autoApproveThreshold
     );
 
@@ -651,7 +652,8 @@ export const AIConcierge: React.FC = () => {
 
   // Batch Approve All with RAG Similarity >= 90%
   const handleBatchApproveHighConfidence = async () => {
-    const highConfItems = inquiries.filter(
+    const safeInquiries = Array.isArray(inquiries) ? inquiries : [];
+    const highConfItems = safeInquiries.filter(
       (item) => item.status === 'PENDING' && (item.ragSimilarity ?? 0) >= 90
     );
 
@@ -738,10 +740,11 @@ export const AIConcierge: React.FC = () => {
     toast.success('Đã đưa trích dẫn RAG vào khung phản hồi hiện tại');
   };
 
-  const filteredInquiries = inquiries.filter(
+  const safeInquiriesList = Array.isArray(inquiries) ? inquiries : [];
+  const filteredInquiries = safeInquiriesList.filter(
     (i) =>
-      i.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      i.question.toLowerCase().includes(searchTerm.toLowerCase())
+      (i.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (i.question || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // VIP Prioritization: Câu hỏi VIP và Cần Gấp luôn nổi lên đầu hàng đợi
@@ -755,7 +758,7 @@ export const AIConcierge: React.FC = () => {
     return 0;
   });
 
-  const pendingCount = inquiries.filter((i) => i.status === 'PENDING').length;
+  const pendingCount = safeInquiriesList.filter((i) => i.status === 'PENDING').length;
   const detectedQuestionLang = detectLanguage(selectedInquiry.question);
 
   return (
