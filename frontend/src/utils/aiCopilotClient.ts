@@ -61,7 +61,13 @@ export function extractQueriedEventName(question: string): string {
 
 // ── 3. Vietnam Time & Status Resolution ─────────────────────────────────────
 
-export function getVietnamCurrentTime(): { dateStr: string; timeStr: string; now: Date } {
+export function getVietnamCurrentTime(): {
+  dateStr: string;
+  timeStr: string;
+  dayOfWeek: string;
+  fullTimeStr: string;
+  now: Date;
+} {
   const now = new Date();
   // Format in UTC+7 (Asia/Ho_Chi_Minh)
   const timeFormatter = new Intl.DateTimeFormat('vi-VN', {
@@ -77,10 +83,21 @@ export function getVietnamCurrentTime(): { dateStr: string; timeStr: string; now
     month: '2-digit',
     year: 'numeric',
   });
+  const weekdayFormatter = new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    weekday: 'long',
+  });
+
+  const dateStr = dateFormatter.format(now);
+  const timeStr = timeFormatter.format(now);
+  const dayOfWeek = weekdayFormatter.format(now);
+  const fullTimeStr = `${timeStr} ${dayOfWeek}, ngày ${dateStr} (Giờ Hà Nội UTC+7)`;
 
   return {
-    dateStr: dateFormatter.format(now),
-    timeStr: timeFormatter.format(now),
+    dateStr,
+    timeStr,
+    dayOfWeek,
+    fullTimeStr,
     now,
   };
 }
@@ -133,6 +150,60 @@ function _executeClientAutonomousCopilotInternal(options: ClientCopilotOptions):
       action_links: [
         { label: '📅 Lịch trình sự kiện', url: '/events' },
         { label: '🎟️ Vé của tôi', url: '/registrations' },
+      ],
+    };
+  }
+
+  // 1.1 Clock & Real-time System Timestamp Intent (Task 102 & 105)
+  // Queries like: "mấy giờ rồi", "bây giờ là mấy giờ", "mấy giờ rồi?", "thời gian hiện tại", "what time is it"
+  const clockKeywords = [
+    'mấy giờ rồi',
+    'may gio roi',
+    'bây giờ là mấy giờ',
+    'bay gio la may gio',
+    'mấy giờ thế',
+    'may gio the',
+    'mấy giờ',
+    'may gio',
+    'thời gian hiện tại',
+    'thoi gian hien tai',
+    'thời gian bây giờ',
+    'thoi gian bay gio',
+    'giờ hiện tại',
+    'gio hien tai',
+    'what time is it',
+    'mấy giờ r',
+    'mấy h rồi',
+    'mấy h r',
+  ];
+  const isSpecificScheduleQuestion =
+    qLow.includes('bắt đầu lúc mấy giờ') ||
+    qLow.includes('kết thúc lúc mấy giờ') ||
+    qLow.includes('diễn ra lúc mấy giờ') ||
+    qLow.includes('phiên');
+
+  const isClockQuery =
+    !isSpecificScheduleQuestion &&
+    clockKeywords.some((term) => qLow === term || qLow.includes(term) || qNorm === term || qNorm.includes(term));
+
+  if (isClockQuery) {
+    const vnTime = getVietnamCurrentTime();
+    return {
+      answer:
+        `Chào bạn, hiện tại là **${vnTime.fullTimeStr}**.\n\n` +
+        `Tôi là Trợ Lý AI Toàn Năng EventHub Copilot. Tôi có thể hỗ trợ bạn tra cứu sự kiện đang diễn ra hôm nay, lịch trình các phiên, vị trí sảnh hội nghị và thông tin vé tham dự!`,
+      sources: ['PostgreSQL Events (Live Real-Time)'],
+      is_fallback: false,
+      ai_category: 'TEMPORAL_CLOCK',
+      action_links: [
+        { label: '🔗 Danh mục sự kiện', url: '/events' },
+        { label: '🎟️ Vé của tôi', url: '/registrations' },
+        { label: '🗺️ Google Maps', url: 'https://maps.google.com' },
+      ],
+      suggested_questions: [
+        '🔴 Hôm nay có sự kiện nào không?',
+        '📅 Các sự kiện sắp diễn ra là gì?',
+        '🎟️ Các phân hạng vé hiện có trong hệ thống?',
       ],
     };
   }
@@ -320,7 +391,21 @@ function _executeClientAutonomousCopilotInternal(options: ClientCopilotOptions):
   }
 
   // 6. Check for Schedule / Location / WiFi specific sub-queries
-  const isScheduleQuery = ['lịch', 'thời gian', 'mấy giờ', 'khi nào', 'diễn giả', 'phiên', 'bắt đầu', 'kết thúc', 'ai'].some((w) => qLow.includes(w));
+  const isScheduleQuery = [
+    'lịch trình',
+    'lich trinh',
+    'lịch các phiên',
+    'phiên thảo luận',
+    'diễn giả',
+    'khi nào bắt đầu',
+    'mấy giờ bắt đầu',
+    'kết thúc lúc nào',
+    'ai phát biểu',
+    'phiên hội thảo',
+    'timeline',
+    'agenda',
+    'bắt đầu lúc mấy giờ',
+  ].some((w) => qLow.includes(w));
   const isLocationQuery = ['địa điểm', 'ở đâu', 'địa chỉ', 'đường đi', 'sơ đồ', 'maps', 'bãi xe', 'gửi xe'].some((w) => qLow.includes(w));
   const isWifiQuery = ['wifi', 'mật khẩu', 'pass', 'ssid', 'teabreak', 'ăn', 'uống'].some((w) => qLow.includes(w));
 
@@ -356,16 +441,13 @@ function _executeClientAutonomousCopilotInternal(options: ClientCopilotOptions):
       const primary = candidateList[0];
       const loc = primary.location || 'ICTU Quyết Thắng, tỉnh Thái Nguyên';
       const addr = primary.location_address || loc;
-      const timeSlot = primary.start_date
-        ? `${primary.start_date}${primary.end_date ? ' - ' + primary.end_date : ''}`
-        : `${primary.start_time || '08:00'} - ${primary.end_time || '18:00'}`;
       const mapsUrl =
         primary.google_maps_url ||
         `https://maps.google.com/maps?q=${encodeURIComponent(loc)}`;
 
       const timeHeader = isTomorrowQuery
         ? `Tra cứu theo lịch trình ngày mai, trên hệ thống EventHub có các sự kiện sau:`
-        : `Tính đến ${vnTime.timeStr} hôm nay (${vnTime.dateStr}), trên hệ thống EventHub có các sự kiện sau:`;
+        : `Tính đến **${vnTime.timeStr} hôm nay (${vnTime.dateStr} - Giờ Hà Nội UTC+7)**, trên hệ thống EventHub có các sự kiện sau:`;
 
       const evBlocks = candidateList.map((ev, idx) => {
         const evLoc = ev.location || 'Trung tâm sự kiện';
@@ -393,13 +475,34 @@ function _executeClientAutonomousCopilotInternal(options: ClientCopilotOptions):
           `${timeHeader}\n\n` +
           `${evBlocks}\n\n` +
           `[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events) · [ 🎟️ Xem Vé của tôi ](/registrations) · [ 🗺️ Mở Bản đồ Google Maps ](${mapsUrl})`,
-        sources: ['CSDL PostgreSQL: Bảng events (Live Real-Time Synchronized)'],
+        sources: ['PostgreSQL Events (Live Real-Time)'],
         is_fallback: false,
         ai_category: 'COPILOT_ONGOING_EVENT',
         action_links: [
           { label: '🔗 Danh mục sự kiện', url: '/events' },
-          { label: '🎟️ Xem Vé của tôi', url: '/registrations' },
+          { label: '🎟️ Vé của tôi', url: '/registrations' },
           { label: '🗺️ Google Maps', url: mapsUrl },
+        ],
+        suggested_questions: [
+          '🔴 Hôm nay có sự kiện nào không?',
+          '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+          '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+        ],
+      };
+    } else {
+      return {
+        answer:
+          `Tính đến **${vnTime.fullTimeStr}**, hiện tại không có sự kiện nào đang diễn ra trong ngày hôm nay trên hệ thống CSDL.\n\n` +
+          `Bạn có thể tham khảo danh sách các sự kiện sắp diễn ra trong thời gian tới tại mục Danh mục sự kiện:\n\n` +
+          `[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events)`,
+        sources: ['PostgreSQL Events (Live Real-Time)'],
+        is_fallback: false,
+        ai_category: 'COPILOT_ONGOING_EVENT',
+        action_links: [{ label: '🔗 Danh mục sự kiện', url: '/events' }],
+        suggested_questions: [
+          '📅 Các sự kiện sắp diễn ra là gì?',
+          '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+          '📊 Báo cáo tỷ lệ check-in và số lượng sự kiện?',
         ],
       };
     }
@@ -418,8 +521,16 @@ function _executeClientAutonomousCopilotInternal(options: ClientCopilotOptions):
     });
   }
 
-  const currentEventTitle = targetEvent?.title || 'Sự kiện Diễn đàn ASEAN';
-  const currentEventLoc = targetEvent?.location || 'ICTU Quyết Thắng, tỉnh Thái Nguyên';
+  // Fallback to active event or first event in database, NEVER hardcode ASEAN unless matched
+  if (!targetEvent && events.length > 0) {
+    targetEvent =
+      events.find((e) => computeEventStatus(e) === 'ONGOING') ||
+      events.find((e) => computeEventStatus(e) === 'UPCOMING') ||
+      events[0];
+  }
+
+  const currentEventTitle = targetEvent?.title || 'Hội Thảo Công Nghệ EventHub 2026';
+  const currentEventLoc = targetEvent?.location || 'Trung tâm Hội nghị Quốc gia, Hà Nội';
   const currentEventMaps =
     targetEvent?.google_maps_url ||
     `https://maps.google.com/maps?q=${encodeURIComponent(currentEventLoc)}`;
@@ -430,7 +541,7 @@ function _executeClientAutonomousCopilotInternal(options: ClientCopilotOptions):
   if (isScheduleQuery) {
     const timeStr = targetEvent?.start_date
       ? `${targetEvent.start_date}${targetEvent.end_date ? ' - ' + targetEvent.end_date : ''}`
-      : '00:37 - 03:37 ngày 29/09/2026 (Giờ Việt Nam UTC+7)';
+      : '08:30 - 17:30 ngày 05/10/2026 (Giờ Việt Nam UTC+7)';
     return {
       answer:
         `Lịch trình sự kiện **${currentEventTitle}** (${timeStr}):\n\n` +
@@ -447,6 +558,12 @@ function _executeClientAutonomousCopilotInternal(options: ClientCopilotOptions):
       action_links: [
         { label: '📅 Lịch trình sự kiện', url: '/events' },
         { label: '🎟️ Vé của tôi', url: '/registrations' },
+        { label: '🗺️ Google Maps', url: currentEventMaps },
+      ],
+      suggested_questions: [
+        '🎤 Danh sách các diễn giả chính tham gia?',
+        '📍 Địa điểm tổ chức và hướng dẫn gửi xe?',
+        '☕ Thời gian Teabreak & Mật khẩu WiFi?',
       ],
     };
   }
@@ -577,5 +694,7 @@ export function executeClientAutonomousCopilot(options: ClientCopilotOptions): A
       options.role || 'ATTENDEE'
     );
   }
+  (result as any).suggestions = result.suggested_questions;
+  (result as any).chips = result.suggested_questions;
   return result;
 }

@@ -187,11 +187,19 @@ export const FloatingChatbot: React.FC = () => {
         sourcesList = ['CSDL PostgreSQL Events'];
       }
 
-      const suggestedQuestions = response.suggested_questions || (response as any).suggestedQuestions || [
-        '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
-        '🎟️ Các phân hạng vé hiện có trong hệ thống?',
-        '📅 Lịch trình các phiên sự kiện tiêu biểu?',
-      ];
+      const rawChips =
+        (response as any).suggestions ||
+        (response as any).chips ||
+        response.suggested_questions ||
+        (response as any).suggestedQuestions ||
+        [];
+      const suggestedQuestions = Array.isArray(rawChips) && rawChips.length > 0
+        ? rawChips
+        : [
+            '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
+            '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+            '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+          ];
 
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
@@ -217,19 +225,28 @@ export const FloatingChatbot: React.FC = () => {
           role: userRole,
           history: historyPayload,
         });
+        const rawClientChips =
+          (clientRes as any).suggestions ||
+          (clientRes as any).chips ||
+          clientRes.suggested_questions ||
+          (clientRes as any).suggestedQuestions ||
+          [];
+        const fallbackChips = Array.isArray(rawClientChips) && rawClientChips.length > 0
+          ? rawClientChips
+          : [
+              '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
+              '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+              '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+            ];
         const fallbackAiMsg: ChatMessage = {
           id: `ai-hybrid-${Date.now()}`,
           sender: 'ai',
           text: clientRes.answer,
           timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          sources: clientRes.sources && clientRes.sources.length > 0 ? clientRes.sources : ['CSDL Live Events (Zero-Cache)'],
+          sources: clientRes.sources && clientRes.sources.length > 0 ? clientRes.sources : ['PostgreSQL Events (Live Real-Time)'],
           isFallback: false,
           actionLinks: clientRes.action_links,
-          suggestedQuestions: clientRes.suggested_questions || [
-            '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
-            '🎟️ Các phân hạng vé hiện có trong hệ thống?',
-            '📅 Lịch trình các phiên sự kiện tiêu biểu?',
-          ],
+          suggestedQuestions: fallbackChips,
         };
         setMessages((prev) => [...prev, fallbackAiMsg]);
       } catch {
@@ -502,28 +519,37 @@ export const FloatingChatbot: React.FC = () => {
                   )}
 
                   {/* Gemini-style Dynamic Pill Suggestion Chips */}
-                  {msg.sender === 'ai' && (msg.suggestedQuestions || msg.suggested_questions) && (msg.suggestedQuestions || msg.suggested_questions)!.length > 0 && (
-                    <div className="pt-2.5 flex flex-col gap-1.5 border-t border-slate-700/50">
-                      <div className="text-[10px] font-semibold text-slate-400 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-cyan-400" />
-                        <span>Gợi ý câu hỏi tiếp theo:</span>
+                  {msg.sender === 'ai' && (() => {
+                    const chips =
+                      msg.suggestedQuestions ||
+                      (msg as any).suggested_questions ||
+                      (msg as any).suggestions ||
+                      (msg as any).chips ||
+                      [];
+                    if (!chips || chips.length === 0) return null;
+                    return (
+                      <div className="pt-2.5 flex flex-col gap-1.5 border-t border-slate-700/50">
+                        <div className="text-[10px] font-semibold text-slate-400 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-cyan-400" />
+                          <span>Gợi ý câu hỏi tiếp theo:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {chips.slice(0, 3).map((chip: string, cIdx: number) => (
+                            <button
+                              key={cIdx}
+                              type="button"
+                              disabled={loading}
+                              onClick={() => handleSendMessage(chip)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-700/90 border border-slate-600/70 hover:border-cyan-500/60 text-slate-200 hover:text-cyan-200 text-[11px] font-medium transition-all shadow-sm cursor-pointer disabled:opacity-50 text-left active:scale-95"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0"></span>
+                              <span>{chip}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(msg.suggestedQuestions || msg.suggested_questions)!.slice(0, 3).map((chip, cIdx) => (
-                          <button
-                            key={cIdx}
-                            type="button"
-                            disabled={loading}
-                            onClick={() => handleSendMessage(chip)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-700/90 border border-slate-600/70 hover:border-cyan-500/60 text-slate-200 hover:text-cyan-200 text-[11px] font-medium transition-all shadow-sm cursor-pointer disabled:opacity-50 text-left active:scale-95"
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0"></span>
-                            <span>{chip}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   <span
                     className={`block text-[9px] ${

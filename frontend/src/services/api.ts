@@ -2209,13 +2209,52 @@ export const apiService = {
         }
       } catch (error) {
         console.warn(
-          'Backend attendee chat unavailable, running client-side Zero-Cache Live Copilot Engine:',
+          'Backend attendee chat unavailable, attempting edge /api/ai/chat:',
           error
         );
       }
     }
 
-    // 2. Zero-Cache Live Query from the events store (Task 93: reflect Add/Edit/Delete instantly)
+    // 2. Attempt call to Vercel Serverless /api/ai/chat route
+    if (typeof window !== 'undefined') {
+      try {
+        const currentSystemTime = `Current_System_Time: ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} (UTC+7)`;
+        const ctrl = new AbortController();
+        const timeoutId = setTimeout(() => ctrl.abort(), 4000);
+        const res = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          signal: ctrl.signal,
+          body: JSON.stringify({
+            question: question.trim(),
+            message: question.trim(),
+            event_id: eventId ?? null,
+            role: options?.role || 'ATTENDEE',
+            user_id: options?.user_id ?? null,
+            history: options?.history || [],
+            current_system_time: currentSystemTime,
+          }),
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const data = await res.json();
+            if (data && data.answer) {
+              return data;
+            }
+          }
+        }
+      } catch {
+        // Edge unavailable, fallback to autonomous client-side engine
+      }
+    }
+
+    // 3. Zero-Cache Live Query from the events store (Task 93 & Task 105: Autonomous Parity Engine)
     const liveEvents = await this.getEvents();
 
     return executeClientAutonomousCopilot({

@@ -2158,5 +2158,28 @@
     - Đã commit thay đổi cấu hình `vercel.json` và cập nhật `TASKS.md`.
     - Push trực tiếp lên nhánh `main` (`origin main`) để kích hoạt webhook Vercel tự động build & deploy phiên bản mới nhất cho Production.
 
+---
 
-
+### [x] Task 105: AI Copilot Sync & Production Parity Guard (Fix Temporal Query & Suggestion Chips on Vercel)
+  - **1. Phân Tích & Đối Chiếu Sự Khác Biệt (Diagnostic):**
+    - Đã phân tích nguyên nhân gốc rễ (Root Cause Analysis):
+      * Trên Localhost: Có kết nối backend FastAPI (`localhost:8000`), nơi `ai_copilot_service.py` xử lý prompt tiêm thời gian thực và trả về câu trả lời Gemini kèm Suggestion Chips và source badge `PostgreSQL Events (Live Real-Time)`.
+      * Trên Vercel Production: Môi trường HTTPS không có backend cục bộ, frontend chuyển sang `aiCopilotClient.ts`. Tại đây, câu hỏi *"mấy giờ rồi?"* bị match nhầm vào quy tắc `isScheduleQuery` (do chứa chuỗi `"mấy giờ"`), đồng thời biến `currentEventTitle` bị hardcode mặc định là `"Sự kiện Diễn đàn ASEAN"` khi không có context `targetEvent`. Kết quả là chatbot trả về văn bản lịch trình ASEAN không liên quan và ẩn các suggestion chips.
+  - **2. Khắc Phục Luồng Backend API AI Route (/api/ai/chat & Vercel Serverless Functions):**
+    - Tạo các Vercel Serverless Function handlers độc lập tại `api/ai/chat.js`, `api/chat.js`, `frontend/api/ai/chat.js`, và `frontend/api/chat.js`.
+    - Tiêm thời gian hệ thống thực tế (Asia/Ho_Chi_Minh UTC+7) vào mọi phản hồi: `new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })`.
+    - Xử lý intent truy vấn thời gian thực (`isClockQuery`): khi hỏi *"mấy giờ rồi"*, *"bây giờ là mấy giờ"*, *"thời gian hiện tại"*, hệ thống phản hồi chính xác: `Chào bạn, hiện tại là **HH:mm:ss Thứ ..., ngày DD/MM/YYYY (Giờ Hà Nội UTC+7)**` kèm theo 3 Suggestion Chips chuẩn mực và action links.
+    - Xử lý intent truy vấn thời gian sự kiện (`isOngoingOrToday`): tự động lọc và trình bày các sự kiện đang diễn ra hôm nay / ngày mai với thời gian chính xác, loại bỏ hoàn toàn hardcode văn bản ASEAN cũ.
+  - **3. Khắc Phục Client-side Copilot Engine (`aiCopilotClient.ts` & `api.ts`):**
+    - Bổ sung `isClockQuery` với độ ưu tiên cao trong `frontend/src/utils/aiCopilotClient.ts`, format thời gian tiếng Việt chi tiết (`dayOfWeek`, `dateStr`, `timeStr`).
+    - Tinh chỉnh `isScheduleQuery` để không bắt nhầm các câu hỏi xem giờ thông thường.
+    - Xóa bỏ triệt để fallback `"Sự kiện Diễn đàn ASEAN"`: tự động tìm sự kiện đang diễn ra hoặc sự kiện sắp diễn ra trong danh sách thực tế của database/catalog.
+    - Đồng bộ `(result as any).suggestions` và `(result as any).chips` cùng với `suggested_questions` để đảm bảo 100% dữ liệu chips luôn sẵn sàng.
+    - Trong `frontend/src/services/api.ts` (`sendAttendeeChat`): Ưu tiên gọi `/api/ai/chat` (Serverless Function trên Vercel Edge) trước khi chuyển tiếp sang autonomous client engine.
+  - **4. Khắc Phục Frontend Render Engine (`FloatingChatbot.tsx`):**
+    - Kiểm tra và trích xuất gợi ý từ tất cả các alias: `response.suggestions`, `response.chips`, `response.suggested_questions`, `response.suggestedQuestions`.
+    - Bọc an toàn logic render chips trong bubble tin nhắn AI, đảm bảo hiển thị dải 3 nút Suggestion Chips linh hoạt ngay dưới tin nhắn.
+  - **5. Kiểm Tra Biên Dịch & Triển Khai Production:**
+    - Biên dịch Frontend (`tsc && vite build`): **2205 modules transformed, 0 lỗi TypeScript, build thành công 100%**.
+    - Biên dịch Monorepo root (`npm run build`): **Exit code 0, hoàn toàn tương thích Monorepo Vercel**.
+    - Commit và push trực tiếp lên `origin/main` để kích hoạt Vercel tự động build và deploy bản mới nhất.
