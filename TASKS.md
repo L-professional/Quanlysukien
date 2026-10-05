@@ -2197,3 +2197,13 @@
     - Chuẩn hóa `render.yaml`: Khai báo tường minh `plan: free` cho cả Web Service (`eventhub-ai-backend`) và Database (`eventhub-db`). Loại bỏ triệt để yêu cầu nhập thẻ tín dụng khi triển khai Blueprint miễn phí trên Render.
     - Bổ sung `healthCheckPath: /health`, `autoDeploy: true`, hỗ trợ deploy song song Web Service FastAPI và Database PostgreSQL hoàn toàn miễn phí chỉ với 1 cú click.
 
+---
+
+### [x] Task 107: Bổ Sung Dependency 'greenlet' Cho SQLAlchemy AsyncIO Trên Render
+  - **1. Nguyên nhân lỗi (Root Cause):**
+    - Khi khởi chạy môi trường Linux trên Render với Python 3.11, module `sqlalchemy.ext.asyncio` yêu cầu bắt buộc phải cài đặt thư viện `greenlet` để quản lý context chuyển đổi coroutine / luồng bất đồng bộ của Async Engine. Thiếu thư viện này dẫn đến lỗi: `ImportError: The SQLAlchemy asyncio module requires that the Python 'greenlet' library is installed`.
+  - **2. Khắc phục & Đồng bộ:**
+    - Cập nhật `backend/requirements.txt`: Bổ sung `greenlet>=3.0.3` ngay sau `sqlalchemy>=2.0.28`.
+    - Đã commit và push trực tiếp lên nhánh `main` để Render kích hoạt tự động rebuild bản mới.
+
+
