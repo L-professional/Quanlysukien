@@ -2194,5 +2194,6 @@
   - **3. Cấu Hình CORS Mở Rộng Cho Vercel Domains:**
     - Cập nhật `backend/app/main.py`: Bổ sung `allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:.*|https://.*\.onrender\.com"` hỗ trợ toàn bộ domain Vercel Production và các link preview ngẫu nhiên của Vercel (`quanlysukien-*.vercel.app`) không bị chặn bởi trình duyệt.
   - **4. Cập Nhật Cấu Hình Render Blueprint (`render.yaml`):**
-    - Chuẩn hóa `render.yaml`: Bổ sung `healthCheckPath: /health`, `autoDeploy: true`, hỗ trợ deploy song song Web Service FastAPI và Database PostgreSQL chỉ với 1 cú click.
+    - Chuẩn hóa `render.yaml`: Khai báo tường minh `plan: free` cho cả Web Service (`eventhub-ai-backend`) và Database (`eventhub-db`). Loại bỏ triệt để yêu cầu nhập thẻ tín dụng khi triển khai Blueprint miễn phí trên Render.
+    - Bổ sung `healthCheckPath: /health`, `autoDeploy: true`, hỗ trợ deploy song song Web Service FastAPI và Database PostgreSQL hoàn toàn miễn phí chỉ với 1 cú click.
 
