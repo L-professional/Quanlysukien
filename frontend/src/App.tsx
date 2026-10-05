@@ -267,34 +267,55 @@ export class RootErrorBoundary extends React.Component<RootErrorBoundaryProps, R
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-slate-100">
+          <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-8 text-center border border-slate-100">
             <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
               !
             </div>
-            <h2 className="text-xl font-bold text-slate-800 mb-2">Đang tải lại giao diện EventAI</h2>
-            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-              Trang web đang đồng bộ dữ liệu phiên bản mới nhất. Bạn có thể bấm vào nút dưới đây để tiếp tục đăng nhập hoặc tải lại trang.
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Đã xảy ra sự cố hiển thị</h2>
+            <p className="text-slate-500 text-sm mb-4 leading-relaxed">
+              Trình duyệt gặp lỗi khi kết xuất thành phần giao diện. Bạn có thể làm mới trang hoặc chuyển nhanh đến các khu vực bên dưới.
             </p>
-            <div className="flex flex-col gap-3">
+
+            {this.state.error && (
+              <div className="mb-6 p-3 bg-red-50 text-red-700 text-xs text-left rounded-lg font-mono overflow-auto max-h-36 border border-red-200">
+                <div className="font-semibold text-red-800">Chi tiết lỗi kỹ thuật:</div>
+                <div className="mt-1 break-words">{this.state.error.message || String(this.state.error)}</div>
+                {this.state.error.stack && (
+                  <div className="mt-1 text-[10px] text-red-500 whitespace-pre-wrap max-h-20 overflow-y-auto">
+                    {this.state.error.stack}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2.5">
               <a
                 href="/login"
                 className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-all shadow-md flex items-center justify-center gap-2 text-sm"
               >
-                🔐 Vào trang Đăng nhập hệ thống
+                🔐 Vào trang Đăng nhập hệ thống (/login)
               </a>
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    localStorage.removeItem('eventhub_token');
-                    localStorage.removeItem('eventhub_user');
-                  } catch (_) {}
-                  window.location.reload();
-                }}
-                className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-all text-sm"
-              >
-                🔄 Tải lại trang (F5)
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href="/"
+                  className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-all text-sm text-center"
+                >
+                  🏠 Về Trang chủ
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      localStorage.removeItem('eventhub_token');
+                      localStorage.removeItem('eventhub_user');
+                    } catch (_) {}
+                    window.location.reload();
+                  }}
+                  className="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition-all text-sm"
+                >
+                  🔄 Tải lại trang (F5)
+                </button>
+              </div>
             </div>
           </div>
         </div>

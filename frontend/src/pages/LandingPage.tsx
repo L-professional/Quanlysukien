@@ -4,32 +4,42 @@ import { useEventSync } from '../services/eventSync';
  
 import { Link } from 'react-router-dom';
 
-const formatDateDots = (dateStr?: string) => {
-  if (!dateStr) return 'Sắp diễn ra';
-  const match = dateStr.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
-  if (match) {
-    const d = match[1].padStart(2, '0');
-    const m = match[2].padStart(2, '0');
-    const y = match[3];
-    return `${d}.${m}.${y}`;
+const formatDateDots = (dateVal?: any): string => {
+  if (!dateVal) return 'Sắp diễn ra';
+  try {
+    const dateStr = String(dateVal);
+    const match = dateStr.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
+    if (match) {
+      const d = match[1].padStart(2, '0');
+      const m = match[2].padStart(2, '0');
+      const y = match[3];
+      return `${d}.${m}.${y}`;
+    }
+    const d = new Date(dateVal);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}.${month}.${year}`;
+    }
+    return dateStr;
+  } catch (_) {
+    return 'Sắp diễn ra';
   }
-  const d = new Date(dateStr);
-  if (!isNaN(d.getTime())) {
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}.${month}.${year}`;
-  }
-  return dateStr;
 };
 
-const formatLocationCity = (loc?: string) => {
-  if (!loc) return 'Việt Nam';
-  const parts = loc.split(',');
-  if (parts.length > 1) {
-    return parts[parts.length - 1].trim();
+const formatLocationCity = (locVal?: any): string => {
+  if (!locVal) return 'Việt Nam';
+  try {
+    const locStr = String(locVal);
+    const parts = locStr.split(',');
+    if (parts.length > 1) {
+      return parts[parts.length - 1].trim();
+    }
+    return locStr.trim();
+  } catch (_) {
+    return 'Việt Nam';
   }
-  return loc.trim();
 };
 
 const LandingPage: React.FC = () => {
@@ -70,7 +80,7 @@ const LandingPage: React.FC = () => {
         const orderB = b.homepage_order ?? 999;
         if (orderA !== orderB) return orderA - orderB;
         // Finally by start_time ascending
-        return (a.start_time || a.start_date || '').localeCompare(b.start_time || b.start_date || '');
+        return String(a.start_time || a.start_date || '').localeCompare(String(b.start_time || b.start_date || ''));
       });
       setFeaturedEvents(sorted);
     } catch (err) {
