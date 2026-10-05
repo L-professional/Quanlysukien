@@ -99,6 +99,17 @@ const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="pr-studio"
+          element={
+            <ProtectedRoute
+              allowedRoles={['ADMIN', 'SUPER_ADMIN', 'EVENT_MANAGER']}
+              redirectTo="/dashboard"
+            >
+              <AIPRStudio />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Knowledge Base — Admin, Event Manager */}
         <Route

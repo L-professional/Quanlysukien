@@ -207,46 +207,179 @@ def render_invitation_email_html(
 </html>"""
 
 
-async def send_invitation_email(
-    to_email: str,
+def render_post_event_recap_email_html(
     recipient_name: str = "Quý Khách",
     event_title: str = "EventHub AI Summit 2026",
-    event_date: str = "15-16 Tháng 10, 2026 • 08:30 - 17:30",
+    event_date: str = "15-16 Tháng 10, 2026",
     event_location: str = "Trung tâm Hội nghị GEM Center, TP. Hồ Chí Minh",
-    ticket_type: str = "Vé Mời Danh Dự (VIP Pass)",
-    qr_token: Optional[str] = None,
-    qr_image: Optional[str] = None,
+    speakers: Optional[str] = "Ban Chuyên Gia & Diễn Giả Đầu Ngành AI",
+    event_id: Optional[int] = 1,
+    user_id: Optional[int] = None,
+    email: Optional[str] = None,
     event_url: str = "http://localhost:3000/events",
-    subject: Optional[str] = None,
     custom_message: Optional[str] = None,
-    role: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    Send real invitation email via SMTP Transport.
-    Strictly raises RuntimeError if SMTP credentials are missing or dispatch fails (no fake success).
-    """
-    if not to_email or not to_email.strip():
-        raise ValueError("Địa chỉ email người nhận không hợp lệ.")
+    api_base_url: str = "http://localhost:8000",
+) -> str:
+    """Render high-end Post-Event Recap & Direct Interactive Star Rating Email Template (Task 100)."""
+    ev_id = event_id or 1
+    u_id_param = f"&userId={user_id}" if user_id else ""
+    em_param = f"&email={urllib.parse.quote(email)}" if email else ""
 
-    to_email = to_email.strip()
-    if not qr_token:
-        qr_token = f"QR-EVENTAI-{uuid.uuid4().hex[:8].upper()}"
+    custom_msg_box = ""
+    if custom_message:
+        paragraphs = custom_message.strip().split("\n\n")
+        formatted_paragraphs = "".join([f'<p style="margin: 0 0 14px 0; font-size: 14px; line-height: 1.6; color: #334155;">{p.replace(chr(10), "<br/>")}</p>' for p in paragraphs if p.strip()])
+        custom_msg_box = f"""
+        <div style="background-color: #F8FAFC; border-left: 4px solid #4F46E5; padding: 18px 20px; border-radius: 10px; margin-bottom: 24px;">
+          {formatted_paragraphs}
+        </div>
+        """
 
-    qr_b64 = qr_image or generate_qr_base64(qr_token)
-    html_content = render_invitation_email_html(
-        recipient_name=recipient_name,
-        event_title=event_title,
-        event_date=event_date,
-        event_location=event_location,
-        ticket_type=ticket_type,
-        qr_token=qr_token,
-        event_url=event_url,
-        custom_message=custom_message,
-        role=role,
-        qr_base64=qr_b64,
-    )
+    star_items = [
+        {"stars": 1, "emoji": "⭐", "score": "1 Sao", "label": "Rất tệ", "color": "#DC2626", "bg": "#FFFFFF", "border": "#E2E8F0"},
+        {"stars": 2, "emoji": "⭐⭐", "score": "2 Sao", "label": "Kém", "color": "#EA580C", "bg": "#FFFFFF", "border": "#E2E8F0"},
+        {"stars": 3, "emoji": "⭐⭐⭐", "score": "3 Sao", "label": "Bình thường", "color": "#D97706", "bg": "#FFFFFF", "border": "#E2E8F0"},
+        {"stars": 4, "emoji": "⭐⭐⭐⭐", "score": "4 Sao", "label": "Hài lòng", "color": "#16A34A", "bg": "#FFFFFF", "border": "#E2E8F0"},
+        {"stars": 5, "emoji": "⭐⭐⭐⭐⭐", "score": "5 Sao", "label": "Tuyệt vời!", "color": "#CA8A04", "bg": "#FEF9C3", "border": "#FACC15"},
+    ]
+
+    star_tds = ""
+    for item in star_items:
+        rate_link = f"{api_base_url}/api/v1/feedback/quick-rate?eventId={ev_id}{u_id_param}{em_param}&stars={item['stars']}"
+        star_tds += f"""
+        <td align="center" style="padding: 4px;">
+          <a href="{rate_link}" target="_blank" style="display: block; background: {item['bg']}; border: 1.5px solid {item['border']}; border-radius: 12px; padding: 12px 8px; text-decoration: none; box-shadow: 0 2px 5px rgba(0,0,0,0.04); min-width: 65px;">
+            <span style="font-size: 18px; display: block; margin-bottom: 4px;">{item['emoji']}</span>
+            <span style="font-size: 11px; font-weight: 800; color: {item['color']}; display: block;">{item['score']}</span>
+            <span style="font-size: 9px; color: #64748B; font-weight: 600;">{item['label']}</span>
+          </a>
+        </td>
+        """
+
+    feedback_page_link = f"{event_url.replace('/events', '')}/feedback?eventId={ev_id}"
+
+    return f"""<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tri Ân & Khảo Sát Sự Kiện - EventAI Platform</title>
+</head>
+<body style="margin: 0; padding: 32px 12px; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color: #1E293B;">
+  <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 20px; overflow: hidden; border: 1px solid #E2E8F0; box-shadow: 0 10px 30px rgba(79, 70, 229, 0.08);">
+    
+    <!-- 1. Header: Banner Tím Đậm / Indigo Tri Ân -->
+    <tr>
+      <td style="background: linear-gradient(135deg, #1E1B4B 0%, #3730A3 100%); padding: 36px 28px; text-align: center;">
+        <div style="display: inline-block; background-color: rgba(255, 255, 255, 0.2); color: #FFFFFF; font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; padding: 4px 14px; border-radius: 9999px; margin-bottom: 12px;">
+          🙏 THƯ TRI ÂN & TỔNG KẾT • POST-EVENT RECAP
+        </div>
+        <h1 style="margin: 0; color: #FFFFFF; font-size: 24px; font-weight: 900; letter-spacing: -0.5px;">
+          {event_title}
+        </h1>
+        <p style="margin: 8px 0 0 0; color: #C7D2FE; font-size: 13px; font-weight: 500;">
+          Ban Tổ Chức xin chân thành cảm ơn sự hiện diện và đồng hành của Quý vị!
+        </p>
+      </td>
+    </tr>
+
+    <!-- 2. Thân Thư: Lời Chào Cá Nhân Hóa & Điểm Nhấn Tổng Kết -->
+    <tr>
+      <td style="padding: 36px 32px; background-color: #FFFFFF;">
+        <p style="margin: 0 0 16px 0; font-size: 16px; line-height: 1.6; color: #1E293B;">
+          Kính gửi Quý Khách <strong style="color: #4F46E5; font-size: 17px;">{recipient_name}</strong>,
+        </p>
+        <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+          Sự kiện <strong>{event_title}</strong> đã chính thức khép lại thành công rực rỡ. Ban Tổ Chức xin gửi lời tri ân sâu sắc nhất tới Quý vị vì đã dành thời gian quý báu tham dự và đóng góp tích cực vào các phiên thảo luận.
+        </p>
+
+        {custom_msg_box}
+
+        <!-- 3. Interactive Feedback Widget: Bộ Đánh Giá 5 Sao Trực Tiếp Trong Email (Task 100) -->
+        <div style="background: linear-gradient(135deg, #F8FAFC 0%, #EEF2FF 100%); border: 2px solid #C7D2FE; border-radius: 16px; padding: 24px 16px; text-align: center; margin: 28px 0;">
+          <div style="font-size: 11px; font-weight: 800; color: #4338CA; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">
+            ⭐ KHẢO SÁT HÀI LÒNG NHANH (1-CLICK DIRECT RATING)
+          </div>
+          <h3 style="margin: 0 0 8px 0; font-size: 17px; font-weight: 800; color: #1E293B;">
+            Bạn đánh giá trải nghiệm sự kiện hôm nay thế nào?
+          </h3>
+          <p style="margin: 0 0 18px 0; font-size: 12px; color: #64748B;">
+            Chạm vào số sao bên dưới để gửi phản hồi tức thì từ hộp thư (không yêu cầu đăng nhập):
+          </p>
+
+          <table align="center" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto 16px auto;">
+            <tr>
+              {star_tds}
+            </tr>
+          </table>
+
+          <p style="margin: 12px 0 0 0; font-size: 12px;">
+            <a href="{feedback_page_link}" target="_blank" style="color: #4F46E5; font-weight: 700; text-decoration: none;">
+              💬 Gửi thêm đóng góp ý kiến chi tiết cho Ban Quản Lý sự kiện &rarr;
+            </a>
+          </p>
+        </div>
+
+        <!-- 4. Footer Card: Thẻ Thông Tin Sự Kiện Đã Diễn Ra & Tải Tài Liệu E-Certificate (Task 100) -->
+        <div style="background-color: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 16px; padding: 22px; margin-bottom: 24px;">
+          <div style="font-size: 11px; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; border-bottom: 1px solid #E2E8F0; padding-bottom: 8px;">
+            📌 THẺ THÔNG TIN SỰ KIỆN • EVENT RECAP SUMMARY
+          </div>
+          <table width="100%" border="0" cellpadding="0" cellspacing="0" style="font-size: 13px; color: #334155; line-height: 2;">
+            <tr>
+              <td width="30%" style="color: #64748B; font-weight: 600;">Sự kiện:</td>
+              <td><strong style="color: #0F172A;">{event_title}</strong></td>
+            </tr>
+            <tr>
+              <td style="color: #64748B; font-weight: 600;">Thời gian:</td>
+              <td><strong style="color: #0F172A;">{event_date}</strong></td>
+            </tr>
+            <tr>
+              <td style="color: #64748B; font-weight: 600;">Địa điểm:</td>
+              <td><strong style="color: #0F172A;">{event_location}</strong></td>
+            </tr>
+            <tr>
+              <td style="color: #64748B; font-weight: 600;">Diễn giả chính:</td>
+              <td><span style="color: #4F46E5; font-weight: 700;">{speakers or 'Ban Chuyên Gia Đầu Ngành AI'}</span></td>
+            </tr>
+          </table>
+
+          <div style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed #CBD5E1; text-align: center;">
+            <a href="{event_url}" target="_blank" style="background: linear-gradient(135deg, #4338CA 0%, #312E81 100%); color: #FFFFFF; font-size: 13px; font-weight: 800; padding: 12px 24px; border-radius: 10px; text-decoration: none; display: inline-block; box-shadow: 0 4px 12px rgba(67, 56, 202, 0.25);">
+              📜 Tải Slide Bài Giảng & Nhận E-Certificate
+            </a>
+          </div>
+        </div>
+
+        <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #64748B; text-align: center;">
+          Hẹn gặp lại Quý vị trong các mùa sự kiện tiếp theo cùng hệ sinh thái <strong>EventHub AI</strong>!
+        </p>
+      </td>
+    </tr>
+
+    <!-- 5. Footer: Bản Quyền & Hotline -->
+    <tr>
+      <td style="background-color: #F8FAFC; padding: 24px; text-align: center; border-top: 1px solid #F1F5F9; color: #64748B; font-size: 12px; line-height: 1.6;">
+        <p style="margin: 0 0 4px 0; color: #1E293B; font-weight: 700;">
+          Ban Tổ Chức Hệ Thống EventAI Platform
+        </p>
+        <p style="margin: 0 0 8px 0; color: #64748B;">
+          Hotline: (+84) 28 3822 8899 | Email: press@eventhub.ai | Website: https://eventhub.ai
+        </p>
+        <p style="margin: 0; color: #94A3B8; font-size: 11px;">
+          © 2026 EventAI System. Thư tri ân phát hành tự động theo tiêu chuẩn bảo mật.
+        </p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>"""
+
+
 
 _cached_ethereal_account = None
+_ethereal_failed = False
+
 
 
 async def get_or_create_ethereal_account() -> Optional[Dict[str, Any]]:
@@ -287,9 +420,14 @@ async def send_invitation_email(
     subject: Optional[str] = None,
     custom_message: Optional[str] = None,
     role: Optional[str] = None,
+    campaign_type: Optional[str] = "PROMOTION",
+    event_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    speakers: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Send invitation or test email.
+    Supports Task 100 interactive 5-star rating widget when campaign_type is RECAP_THANKYOU.
     If SMTP credentials are configured, sends via real SMTP.
     If SMTP credentials are NOT configured or fail during testing, automatically falls back
     to Nodemailer Ethereal Test Account with preview URL (HTTP 200, no error thrown).
@@ -298,22 +436,38 @@ async def send_invitation_email(
         raise ValueError("Địa chỉ email người nhận không hợp lệ.")
 
     to_email = to_email.strip()
-    if not qr_token:
-        qr_token = f"QR-EVENTAI-{uuid.uuid4().hex[:8].upper()}"
+    is_recap = (campaign_type or "").upper() in ("RECAP_THANKYOU", "CONCLUDED", "THANKYOU")
 
-    qr_b64 = qr_image or generate_qr_base64(qr_token)
-    html_content = render_invitation_email_html(
-        recipient_name=recipient_name,
-        event_title=event_title,
-        event_date=event_date,
-        event_location=event_location,
-        ticket_type=ticket_type,
-        qr_token=qr_token,
-        event_url=event_url,
-        custom_message=custom_message,
-        role=role,
-        qr_base64=qr_b64,
-    )
+    if is_recap:
+        html_content = render_post_event_recap_email_html(
+            recipient_name=recipient_name,
+            event_title=event_title,
+            event_date=event_date,
+            event_location=event_location,
+            speakers=speakers or "Ban Chuyên Gia Đầu Ngành AI",
+            event_id=event_id,
+            user_id=user_id,
+            email=to_email,
+            event_url=event_url,
+            custom_message=custom_message,
+        )
+    else:
+        if not qr_token:
+            qr_token = f"QR-EVENTAI-{uuid.uuid4().hex[:8].upper()}"
+
+        qr_b64 = qr_image or generate_qr_base64(qr_token)
+        html_content = render_invitation_email_html(
+            recipient_name=recipient_name,
+            event_title=event_title,
+            event_date=event_date,
+            event_location=event_location,
+            ticket_type=ticket_type,
+            qr_token=qr_token,
+            event_url=event_url,
+            custom_message=custom_message,
+            role=role,
+            qr_base64=qr_b64,
+        )
 
     email_subject = subject or f"🎟️ [EventAI] Thư Mời Tham Dự Sự Kiện: {event_title}"
     cfg = get_smtp_config()
@@ -358,39 +512,43 @@ async def send_invitation_email(
 
     # 1. Fallback to Ethereal Auto-Test Transport if SMTP is not configured
     if not is_smtp_ready:
+        global _ethereal_failed, _cached_ethereal_account
         logger.info(f"[EmailService] SMTP unconfigured. Using Ethereal auto-test transport for {to_email}...")
-        ethereal = await get_or_create_ethereal_account()
-        if ethereal:
-            try:
-                eth_smtp = ethereal.get("smtp", {})
-                eth_host = eth_smtp.get("host", "smtp.ethereal.email")
-                eth_port = int(eth_smtp.get("port", 587))
-                eth_user = ethereal.get("user")
-                eth_pass = ethereal.get("pass")
+        if not _ethereal_failed:
+            ethereal = await get_or_create_ethereal_account()
+            if ethereal:
+                try:
+                    eth_smtp = ethereal.get("smtp", {})
+                    eth_host = eth_smtp.get("host", "smtp.ethereal.email")
+                    eth_port = int(eth_smtp.get("port", 587))
+                    eth_user = ethereal.get("user")
+                    eth_pass = ethereal.get("pass")
 
-                msg = MIMEMultipart("alternative")
-                msg["Subject"] = email_subject
-                msg["From"] = "EventAI Test Transport <test@ethereal.email>"
-                msg["To"] = to_email
-                msg.attach(MIMEText(html_content, "html", "utf-8"))
+                    msg = MIMEMultipart("alternative")
+                    msg["Subject"] = email_subject
+                    msg["From"] = "EventAI Test Transport <test@ethereal.email>"
+                    msg["To"] = to_email
+                    msg.attach(MIMEText(html_content, "html", "utf-8"))
 
-                with smtplib.SMTP(eth_host, eth_port, timeout=15) as server:
-                    server.starttls()
-                    server.login(eth_user, eth_pass)
-                    server.sendmail("test@ethereal.email", [to_email], msg.as_string())
+                    with smtplib.SMTP(eth_host, eth_port, timeout=2) as server:
+                        server.starttls()
+                        server.login(eth_user, eth_pass)
+                        server.sendmail("test@ethereal.email", [to_email], msg.as_string())
 
-                preview_url = f"https://ethereal.email/messages"
-                logger.info(f"[EmailService] Ethereal email sent to {to_email}. Preview: {preview_url}")
-                return {
-                    "success": True,
-                    "messageId": f"MSG-ETH-{uuid.uuid4().hex[:10].upper()}",
-                    "recipient": to_email,
-                    "sentAt": datetime.now(timezone.utc).isoformat(),
-                    "previewUrl": preview_url,
-                    "isTestMode": True,
-                }
-            except Exception as eth_err:
-                logger.warning(f"[EmailService] Ethereal dispatch failed, using simulated fallback: {eth_err}")
+                    preview_url = f"https://ethereal.email/messages"
+                    logger.info(f"[EmailService] Ethereal email sent to {to_email}. Preview: {preview_url}")
+                    return {
+                        "success": True,
+                        "messageId": f"MSG-ETH-{uuid.uuid4().hex[:10].upper()}",
+                        "recipient": to_email,
+                        "sentAt": datetime.now(timezone.utc).isoformat(),
+                        "previewUrl": preview_url,
+                        "isTestMode": True,
+                    }
+                except Exception as eth_err:
+                    _ethereal_failed = True
+                    _cached_ethereal_account = None
+                    logger.warning(f"[EmailService] Ethereal dispatch failed, marked unavailable: {eth_err}")
 
         # Simulated test fallback
         return {

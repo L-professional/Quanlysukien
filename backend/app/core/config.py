@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = True
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://localhost:8080"
+    TIMEZONE: str = "Asia/Ho_Chi_Minh"
+    TIMEZONE_LABEL: str = "Giờ Hà Nội, Việt Nam (UTC+7)"
 
     # PostgreSQL Database
     POSTGRES_SERVER: str = "localhost"

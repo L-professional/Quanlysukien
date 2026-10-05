@@ -10,6 +10,7 @@ export interface User {
   permissions?: string[];
   is_active?: boolean;
   avatar_url?: string;
+  provider?: string;
   job_title?: string;
   is_2fa_enabled?: boolean;
   preferences?: {
@@ -260,10 +261,13 @@ export interface ChatMessage {
   sources?: string[];
   isFallback?: boolean;
   actionLinks?: ActionLink[];
+  suggestedQuestions?: string[];
+  suggested_questions?: string[];
 }
 
 export interface AttendeeChatResponse {
   answer: string;
+  suggested_questions?: string[];
   sources: string[];
   is_fallback: boolean;
   ai_category?: string;

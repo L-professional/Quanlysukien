@@ -57,7 +57,7 @@ class GeminiService:
 
     async def generate_embedding(self, text: str, timeout_seconds: float = 8.0) -> List[float]:
         """
-        Generate 768-dimensional vector embedding for given text using text-embedding-004.
+        Generate 768-dimensional vector embedding for given text using Gemini Embeddings.
         Falls back to deterministic mock vector if API is unavailable.
         """
         if self._client is None:
@@ -67,15 +67,29 @@ class GeminiService:
         start_time = time.perf_counter()
         try:
             def _call_embed() -> List[float]:
-                response = self._client.models.embed_content(  # type: ignore[union-attr]
-                    model=f"models/{self.embedding_model}",
-                    contents=text,
-                    config=genai_types.EmbedContentConfig(task_type="RETRIEVAL_QUERY"),
-                )
-                # SDK v2: response.embeddings is a list of ContentEmbedding objects
-                if response.embeddings and len(response.embeddings) > 0:
-                    values = response.embeddings[0].values
-                    return list(values) if values else []
+                candidate_models = [
+                    "models/gemini-embedding-001",
+                    "gemini-embedding-001",
+                    f"models/{self.embedding_model}",
+                    self.embedding_model,
+                ]
+                for mod in candidate_models:
+                    try:
+                        cfg = genai_types.EmbedContentConfig(
+                            task_type="RETRIEVAL_QUERY",
+                            output_dimensionality=768
+                        )
+                        response = self._client.models.embed_content(
+                            model=mod,
+                            contents=text,
+                            config=cfg,
+                        )
+                        if response.embeddings and len(response.embeddings) > 0:
+                            values = response.embeddings[0].values
+                            if values and len(values) == 768:
+                                return list(values)
+                    except Exception:
+                        continue
                 return []
 
             embedding = await asyncio.wait_for(

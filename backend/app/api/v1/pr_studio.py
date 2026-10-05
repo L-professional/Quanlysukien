@@ -8,10 +8,11 @@ from typing import List, Optional, Union
 from fastapi import APIRouter, HTTPException, status, Depends, BackgroundTasks
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
+from app.models.event import Event
 from app.models.notification import Notification
 from app.models.registration import Registration
 from app.models.user import User
@@ -121,7 +122,8 @@ class TestDispatchResponse(BaseModel):
 class PublishCampaignRequest(BaseModel):
     event_id: Optional[int] = None
     event_name: str
-    target_audience: str = "ALL_REGISTERED"
+    campaign_type: Optional[str] = "PROMOTION"  # PROMOTION | RECAP_THANKYOU | NO_SHOW_RECAP
+    target_audience: str = "ALL_REGISTERED"  # MEMBERS_WITH_EMAIL | CHECKED_IN_ONLY | NO_SHOW_ONLY | ALL_REGISTERED | ALL_USERS | COMMUNITY
     schedule_type: str = "IMMEDIATE"  # IMMEDIATE | SCHEDULED
     scheduled_at: Optional[str] = None
     channels: List[str] = Field(default_factory=lambda: ["email", "facebook", "linkedin", "zalo_sms"])
@@ -129,6 +131,8 @@ class PublishCampaignRequest(BaseModel):
     content_summary: Optional[str] = None
     content: Optional[str] = None
     subject: Optional[str] = None
+    speakers: Optional[str] = None
+
 
 
 class PublishCampaignResponse(BaseModel):
@@ -154,6 +158,14 @@ Nhiệm vụ của bạn là kiến tạo Trung Tâm Truyền Thông Đa Kênh T
    - email_subject: Tiêu đề lôi cuốn, có từ khóa kích thích mở thư (dưới 65 ký tự).
    - email_preheader: Dòng tóm lược phụ hiển thị cạnh tiêu đề trong hòm thư (40-70 ký tự).
    - email_body: Thân thư chỉn chu, bố cục rõ ràng với lời chào, giá trị khác biệt, thời gian, địa điểm, phiên nổi bật.
+     * QUY TẮC BẮT BUỘC VỀ BIẾN CÁ NHÂN HÓA (PERSONALIZATION TOKENS):
+       - Mở đầu Email TUYỆT ĐỐI KHÔNG dùng "Kính gửi Quý Khách," hay "Kính gửi Quý vị,", mà BẮT BUỘC dùng thẻ cá nhân hóa `Kính gửi {{recipient_name}},` (hoặc `Kính gửi Anh/Chị {{full_name}},`).
+       - Trong thân bài, sử dụng linh hoạt và tự nhiên các thẻ cá nhân hóa bổ trợ như:
+         + `{{company}}`: Tên đơn vị / doanh nghiệp người nhận.
+         + `{{event_title}}`: Tên sự kiện.
+         + `{{ticket_code}}`: Mã vé định danh check-in của người nhận (VD: "Mã vé tham dự của Quý vị là: {{ticket_code}}").
+         + `{{event_date}}`: Ngày tổ chức sự kiện.
+       - Việc sử dụng thẻ cá nhân hóa là bắt buộc để cá nhân hóa 1-1 cho từng người nhận, tăng uy tín của hòm thư gửi và tránh bị bộ lọc thư rác (Spam Filter) đánh dấu spam.
    - email_cta: Nút kêu gọi hành động chuyển đổi cao (ví dụ: "👉 Đăng Ký Tham Dự Ngay - Nhận Vé & Mã QR Miễn Phí").
 
 2. TAB 2: BÀI ĐĂNG FACEBOOK & BÀI VIẾT LINKEDIN:
@@ -235,15 +247,15 @@ def _build_rich_fallback(
         email_pre = f"Ban Tổ Chức {event_name} xin chân thành cảm ơn Quý Đại biểu & Diễn giả!"
         email_cta = "👉 [Xem Thư Viện Ảnh Kỷ Niệm & Tải Slide Bài Giảng]"
         email_body = (
-            f"Kính gửi Quý Khách Tham Dự & Quý Diễn Giả,\n\n"
-            f"Sự kiện **{event_name}** với chủ đề *\"{main_topic}\"* đã chính thức khép lại thành công ngoài mong đợi. "
-            f"Sự hiện diện, những góc nhìn chuyên sâu cùng sự kết nối năng động của Quý vị đã tạo nên dấu ấn đặc biệt cho sự kiện.\n\n"
+            f"Kính gửi {{{{recipient_name}}}},\n\n"
+            f"Sự kiện **{{{{event_title}}}}** (mã vé của Quý vị: `{{{{ticket_code}}}}`) với chủ đề *\"{main_topic}\"* đã chính thức khép lại thành công ngoài mong đợi. "
+            f"Sự hiện diện của Quý vị từ đơn vị **{{{{company}}}}**, cùng những góc nhìn chuyên sâu và sự kết nối năng động đã tạo nên dấu ấn đặc biệt cho sự kiện.\n\n"
             f"🔑 **Những Dấu Ấn Nổi Bật Vừa Qua:**\n"
             f"- Hơn 1,200 đại biểu và chuyên gia kết nối trực tiếp tại {event_location}.\n"
-            f"- Hệ thống Check-in QR thông minh xử lý 100% lượt vào cổng mượt mà chỉ trong 1.5 giây.\n"
+            f"- Hệ thống Check-in QR thông minh xử lý 100% lượt vào cổng mượt mà chỉ trong 1.5 giây với mã định danh `{{{{ticket_code}}}}`.\n"
             f"- Các phiên tọa đàm chiến lược mang lại giá trị thực tiễn cho cộng đồng.\n\n"
             f"Toàn bộ tài liệu thuyết trình, video recap và bộ ảnh chất lượng cao đã được cập nhật đầy đủ.\n\n"
-            f"Trân trọng cảm ơn và hẹn gặp lại Quý vị ở mùa sự kiện tiếp theo!\n\n"
+            f"Trân trọng cảm ơn và hẹn gặp lại {{{{recipient_name}}}} ở mùa sự kiện tiếp theo!\n\n"
             f"Ban Tổ Chức {event_name}"
         )
 
@@ -301,15 +313,15 @@ def _build_rich_fallback(
         email_pre = f"Đăng ký ngay để nhận vé VIP và trải nghiệm AI Concierge tại {event_name}!"
         email_cta = "👉 [Đăng Ký Tham Dự Ngay - Nhận Vé & Mã QR Miễn Phí]"
         email_body = (
-            f"Kính gửi Quý Khách,\n\n"
-            f"Ban Tổ Chức trân trọng kính mời Quý vị tham dự sự kiện **{event_name}** — diễn đàn công nghệ và kết nối đột phá năm 2026.\n\n"
+            f"Kính gửi {{{{recipient_name}}}},\n\n"
+            f"Ban Tổ Chức trân trọng kính mời Quý vị và đại diện đơn vị **{{{{company}}}}** tham dự sự kiện **{{{{event_title}}}}** — diễn đàn công nghệ và kết nối đột phá năm 2026.\n\n"
             f"🌟 **Điểm Nhấn Đặc Quyền Tại Sự Kiện:**\n"
             f"- Tiếp cận bức tranh toàn cảnh về: *\"{main_topic}\"* từ các chuyên gia đầu ngành.\n"
-            f"- Trải nghiệm hệ thống AI Concierge tương tác thông minh và Soát vé QR siêu tốc.\n"
+            f"- Trải nghiệm hệ thống AI Concierge tương tác thông minh và Soát vé QR siêu tốc với mã vé `{{{{ticket_code}}}}` dành riêng cho Quý vị.\n"
             f"- Cơ hội kết nối giao thương VIP (B2B Networking) cùng hàng trăm doanh nghiệp và lãnh đạo cấp cao.\n\n"
             f"📅 **Thời gian:** {event_time}\n"
             f"📍 **Địa điểm:** {event_location}\n\n"
-            f"Số lượng vé tham dự có hạn để đảm bảo chất lượng tiếp đón. Kính mời Quý vị hoàn tất đăng ký sớm để nhận mã QR tham dự chính thức.\n\n"
+            f"Số lượng vé tham dự có hạn để đảm bảo chất lượng tiếp đón. Kính mời Quý vị hoàn tất đăng ký sớm để kích hoạt mã QR tham dự chính thức.\n\n"
             f"Trân trọng,\nBan Tổ Chức {event_name}"
         )
 
@@ -457,6 +469,14 @@ def _parse_gemini_output(
         email_subject = parsed.get("email_subject") or fallback.email_subject
         email_preheader = parsed.get("email_preheader") or fallback.email_preheader
         email_body = parsed.get("email_body") or fallback.email_body
+        if email_body:
+            # Auto-sanitize generic greeting to dynamic personalization token
+            email_body = re.sub(
+                r"^Kính gửi\s+(?:Quý\s*Khách(?:\s*Tham\s*Dự)?|Quý\s*vị|Quý\s*Đại\s*biểu)[,\s]*",
+                "Kính gửi {{recipient_name}},\n\n",
+                email_body.strip(),
+                flags=re.IGNORECASE,
+            )
         email_cta = parsed.get("email_cta") or fallback.email_cta
 
         fb_post = parsed.get("facebook_post") or parsed.get("social_body") or fallback.facebook_post
@@ -577,7 +597,8 @@ async def execute_pr_generation(payload: PRGenerateRequest) -> PRGenerateRespons
         f"- Từ khóa chính: {keywords_str}\n"
         f"- Diễn giả / Khách mời nổi bật: {speakers_str or 'Ban Chuyên Gia Đầu Ngành'}\n"
         f"- Trạng thái vòng đời: {lifecycle}\n\n"
-        f"Yêu cầu: Xuất ra định dạng JSON đầy đủ cho 4 tab: Email Campaign, Facebook & LinkedIn, Zalo OA & SMS (sms_reminder < 160 ký tự), Thông cáo báo chí (Press Release), điểm số AI và 3 biến thể A/B."
+        f"Yêu cầu: Xuất ra định dạng JSON đầy đủ cho 4 tab: Email Campaign, Facebook & LinkedIn, Zalo OA & SMS (sms_reminder < 160 ký tự), Thông cáo báo chí (Press Release), điểm số AI và 3 biến thể A/B.\n"
+        f"QUY TẮC BẮT BUỘC EMAIL CAMPAIGN: Mở đầu Email TUYỆT ĐỐI KHÔNG dùng 'Kính gửi Quý Khách' hay 'Quý vị', mà BẮT BUỘC phải mở đầu bằng 'Kính gửi {{{{recipient_name}}}},'. Lồng ghép linh hoạt các thẻ {{{{company}}}}, {{{{ticket_code}}}}, {{{{event_date}}}}, {{{{event_title}}}} trong thân bài để cá nhân hóa và tránh spam."
     )
 
     try:
@@ -635,14 +656,29 @@ async def dispatch_test_endpoint(payload: TestDispatchRequest):
 
         preview_url = None
         dispatch_msg = ""
+        recipient_display_name = payload.recipient.split("@")[0].title() if "@" in payload.recipient else "Nguyễn Văn Quản Trị"
+        test_content = payload.content or ""
+        test_content = test_content.replace("{{recipient_name}}", recipient_display_name)
+        test_content = test_content.replace("{{full_name}}", recipient_display_name)
+        test_content = test_content.replace("{{company}}", "Tập đoàn FPT")
+        test_content = test_content.replace("{{ticket_code}}", "VIP-EVT-2026-999")
+        test_content = test_content.replace("{{event_date}}", "15/10/2026")
+        test_content = test_content.replace("{{event_title}}", payload.event_name or "EventHub AI Summit 2026")
+
+        test_subject = payload.subject or f"[EventAI PR Studio] Thử Nghiệm: {payload.event_name or 'EventHub AI Summit 2026'}"
+        test_subject = test_subject.replace("{{recipient_name}}", recipient_display_name)
+        test_subject = test_subject.replace("{{full_name}}", recipient_display_name)
+        test_subject = test_subject.replace("{{event_title}}", payload.event_name or "EventHub AI Summit 2026")
+
         if payload.channel in ("email", "all"):
             try:
                 from app.services.email_service import send_invitation_email
                 mail_result = await send_invitation_email(
                     to_email=payload.recipient,
+                    recipient_name=recipient_display_name,
                     event_title=payload.event_name or "EventHub AI Summit 2026",
-                    subject=payload.subject or f"[EventAI PR Studio] Thử Nghiệm: {payload.event_name or 'EventHub AI Summit 2026'}",
-                    custom_message=payload.content,
+                    subject=test_subject,
+                    custom_message=test_content,
                 )
                 preview_url = mail_result.get("previewUrl")
                 dispatch_msg = f"Đã gửi email thử nghiệm thành công tới {payload.recipient}!"
@@ -693,16 +729,44 @@ async def dispatch_publish_endpoint(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
-    """Publish or schedule PR campaign across target audiences and channels."""
+    """
+    Task 100: Publish or schedule PR campaign with Audience Segmentation Engine
+    and strict Validation Guard for Post-Event Recap / Tri An campaigns.
+    """
     campaign_id = f"CMP-{uuid.uuid4().hex[:8].upper()}"
     is_scheduled = payload.schedule_type == "SCHEDULED" and bool(payload.scheduled_at)
 
-    # 1. Query real recipients from database (Registrations or Users)
+    # 0. VALIDATION GUARD (Task 100):
+    # Check event status if campaign is post-event recap/tri ân or audience is checked-in only / no-show.
+    event_obj = None
+    if payload.event_id:
+        stmt_evt = select(Event).where(Event.id == payload.event_id)
+        res_evt = await db.execute(stmt_evt)
+        event_obj = res_evt.scalars().first()
+
+    is_recap_campaign = (payload.campaign_type or "").upper() in ("RECAP_THANKYOU", "CONCLUDED", "THANKYOU")
+    is_post_event_audience = payload.target_audience in ("CHECKED_IN_ONLY", "NO_SHOW_ONLY")
+
+    if is_recap_campaign or is_post_event_audience:
+        if not event_obj:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Không tìm thấy thông tin sự kiện để phát hành thư Tổng kết & Tri ân!"
+            )
+        status_upper = (event_obj.status or "").upper()
+        # Finished statuses: COMPLETED, ENDED, FINISHED, CONCLUDED, ĐÃ KẾT THÚC
+        is_ended = status_upper in ("COMPLETED", "ENDED", "FINISHED", "CONCLUDED", "ĐÃ KẾT THÚC")
+        if not is_ended:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Sự kiện chưa kết thúc. Chỉ có thể phát hành thư Tổng kết & Tri ân sau khi sự kiện hoàn tất!"
+            )
+
+    # 1. Query recipients using Audience Segmentation Engine (Task 100)
     recipients = []
     seen_contacts = set()
     try:
-        # Case A: If target audience is MEMBERS_WITH_EMAIL, COMMUNITY, or ALL_USERS,
-        # fetch directly all active registered member accounts from users table with linked emails
+        # Trường hợp 1: Chiến dịch Mời đăng ký / Quảng bá tới thành viên hệ thống (MEMBERS_WITH_EMAIL, ALL_USERS, COMMUNITY)
         if payload.target_audience in ("MEMBERS_WITH_EMAIL", "COMMUNITY", "ALL_USERS"):
             stmt_users = select(User).where(User.is_active == True, User.email.isnot(None))
             res_users = await db.execute(stmt_users)
@@ -715,9 +779,58 @@ async def dispatch_publish_endpoint(
                         "email": em,
                         "phone": u.phone_number,
                         "name": u.full_name or "Thành Viên",
+                        "user_id": u.id,
+                        "company": getattr(u, "company", "") or getattr(u, "organization", "") or "",
+                        "ticket_code": f"MBR-{u.id:04d}",
                     })
 
-        # Case B: If targeting event registrations
+        # Trường hợp 2: Khách thực tế đã tham dự & check-in thành công (CHECKED_IN_ONLY)
+        elif payload.target_audience == "CHECKED_IN_ONLY" or (is_recap_campaign and payload.target_audience == "ALL_REGISTERED"):
+            if payload.event_id:
+                stmt = select(Registration).where(
+                    Registration.event_id == payload.event_id,
+                    Registration.is_checked_in == True,
+                )
+                result = await db.execute(stmt)
+                regs = result.scalars().all()
+                for r in regs:
+                    contact_key = (r.email or r.phone or "").strip().lower()
+                    if contact_key and contact_key not in seen_contacts:
+                        seen_contacts.add(contact_key)
+                        recipients.append({
+                            "email": r.email,
+                            "phone": r.phone or getattr(r, "phone_number", None),
+                            "name": r.full_name or "Khách Tham Dự",
+                            "user_id": r.participant_id,
+                            "company": getattr(r, "company", "") or getattr(r, "organization", "") or "",
+                            "ticket_code": r.ticket_type or f"VIP-{r.id:04d}",
+                            "is_checked_in": True,
+                        })
+
+        # Trường hợp 3: Luồng Chăm sóc Khách vắng mặt (NO_SHOW_ONLY)
+        elif payload.target_audience == "NO_SHOW_ONLY":
+            if payload.event_id:
+                stmt = select(Registration).where(
+                    Registration.event_id == payload.event_id,
+                    or_(Registration.is_checked_in == False, Registration.is_checked_in.is_(None)),
+                )
+                result = await db.execute(stmt)
+                regs = result.scalars().all()
+                for r in regs:
+                    contact_key = (r.email or r.phone or "").strip().lower()
+                    if contact_key and contact_key not in seen_contacts:
+                        seen_contacts.add(contact_key)
+                        recipients.append({
+                            "email": r.email,
+                            "phone": r.phone or getattr(r, "phone_number", None),
+                            "name": r.full_name or "Khách Tham Dự",
+                            "user_id": r.participant_id,
+                            "company": getattr(r, "company", "") or getattr(r, "organization", "") or "",
+                            "ticket_code": r.ticket_type or f"REG-{r.id:04d}",
+                            "is_checked_in": False,
+                        })
+
+        # Trường hợp 4: Toàn bộ danh sách đăng ký sự kiện (ALL_REGISTERED)
         elif payload.event_id:
             stmt = select(Registration).where(Registration.event_id == payload.event_id)
             result = await db.execute(stmt)
@@ -728,13 +841,17 @@ async def dispatch_publish_endpoint(
                     seen_contacts.add(contact_key)
                     recipients.append({
                         "email": r.email,
-                        "phone": r.phone,
+                        "phone": r.phone or getattr(r, "phone_number", None),
                         "name": r.full_name or "Quý Khách",
+                        "user_id": r.participant_id,
+                        "company": getattr(r, "company", "") or getattr(r, "organization", "") or "",
+                        "ticket_code": r.ticket_type or f"TKT-{r.id:04d}",
+                        "is_checked_in": bool(r.is_checked_in),
                     })
 
-        # Fallback if no recipients found: query all active registered users with linked email
+        # Fallback if no recipients found
         if not recipients:
-            stmt_users = select(User).where(User.is_active == True, User.email.isnot(None)).limit(200)
+            stmt_users = select(User).where(User.is_active == True, User.email.isnot(None)).limit(5)
             res_users = await db.execute(stmt_users)
             users = res_users.scalars().all()
             for u in users:
@@ -745,6 +862,9 @@ async def dispatch_publish_endpoint(
                         "email": em,
                         "phone": u.phone_number,
                         "name": u.full_name or "Thành Viên",
+                        "user_id": u.id,
+                        "company": getattr(u, "company", "") or "",
+                        "ticket_code": f"MBR-{u.id:04d}",
                     })
     except Exception as err:
         logger.warning(f"Error querying recipients for campaign: {err}")
@@ -795,6 +915,9 @@ async def dispatch_publish_endpoint(
                 subject=payload.subject or payload.title,
                 content=payload.content or payload.content_summary or payload.title,
                 event_title=payload.event_name,
+                campaign_type=payload.campaign_type,
+                event_id=payload.event_id,
+                speakers=payload.speakers or (getattr(event_obj, "speakers", None) if event_obj else None),
             )
         except Exception as e:
             logger.error(f"Error scheduling omnichannel broadcast: {e}")

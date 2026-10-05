@@ -38,6 +38,7 @@ import {
   ChevronRight,
   Code,
   Mic,
+  Plus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -228,10 +229,12 @@ export const AIPRStudio: React.FC = () => {
 
   // Publish / Dispatch Modal State
   const [showPublishModal, setShowPublishModal] = useState<boolean>(false);
-  const [publishAudience, setPublishAudience] = useState<string>('ALL_REGISTERED');
+  const [campaignType, setCampaignType] = useState<'PROMOTION' | 'RECAP_THANKYOU'>('PROMOTION');
+  const [publishAudience, setPublishAudience] = useState<string>('MEMBERS_WITH_EMAIL');
   const [publishScheduleType, setPublishScheduleType] = useState<'IMMEDIATE' | 'SCHEDULED'>('IMMEDIATE');
   const [publishScheduledAt, setPublishScheduledAt] = useState<string>('2026-10-15T09:00');
   const [publishChannels, setPublishChannels] = useState<string[]>(['email', 'facebook', 'linkedin', 'zalo_sms']);
+
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
   const [publishedStatus, setPublishedStatus] = useState<{
     campaignId: string;
@@ -244,6 +247,11 @@ export const AIPRStudio: React.FC = () => {
   // Banner Customizer Modal State
   const [showBannerModal, setShowBannerModal] = useState<boolean>(false);
   const [isGeneratingBanner, setIsGeneratingBanner] = useState<boolean>(false);
+
+  // Dynamic Personalization Tokens & Email Body Editor State (Task 99)
+  const [editableEmailBody, setEditableEmailBody] = useState<string>('');
+  const [showSamplePreview, setShowSamplePreview] = useState<boolean>(false);
+  const emailTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-fill form from selected real event from DB
   const bindEventToForm = useCallback((ev: Event, showToast: boolean = false, targetLifecycle?: 'UPCOMING' | 'CONCLUDED') => {
@@ -267,6 +275,8 @@ export const AIPRStudio: React.FC = () => {
     const eventTopic = cleanEventTitle(extractMainTopic(ev));
 
     if (lifecycleMode === 'CONCLUDED') {
+      setCampaignType('RECAP_THANKYOU');
+      setPublishAudience('CHECKED_IN_ONLY');
       setTargetAudience('Toàn thể đại biểu, khách tham dự, đối tác & diễn giả đã đồng hành');
       setMainTopic(`Tổng kết sự kiện ${cleanedTitle} — Tri ân diễn giả và gửi lời cảm ơn sâu sắc tới toàn thể khách tham dự: ${eventTopic}`);
       setKeywords('Tổng kết, Tri ân diễn giả, Khảo sát ý kiến, Khoảnh khắc đáng nhớ, Slide bài giảng');
@@ -274,6 +284,8 @@ export const AIPRStudio: React.FC = () => {
         toast.success(`Đã chọn sự kiện: "${cleanedTitle}" (Ngữ cảnh: Tổng kết / Tri ân & Khảo sát)`);
       }
     } else {
+      setCampaignType('PROMOTION');
+      setPublishAudience('MEMBERS_WITH_EMAIL');
       setTargetAudience('Lãnh đạo doanh nghiệp, Kỹ sư phần mềm & Cộng đồng công nghệ');
       setMainTopic(`Quảng bá sự kiện & Mời đăng ký tham dự ${cleanedTitle}: ${eventTopic}`);
       setKeywords(extractKeywords(ev));
@@ -503,6 +515,7 @@ export const AIPRStudio: React.FC = () => {
       });
 
       setGeneratedResults(res);
+      setEditableEmailBody(res.email_body || res.email || '');
       toast.success('Tạo thành công bộ truyền thông 4 nền tảng với AI Performance Score: ' + (res.ai_score || 92) + '/100!');
     } catch (err) {
       console.error('Error generating PR content:', err);
@@ -512,11 +525,182 @@ export const AIPRStudio: React.FC = () => {
     }
   };
 
+  // Synchronize editable email body with incoming generated results
+  useEffect(() => {
+    if (generatedResults) {
+      setEditableEmailBody(generatedResults.email_body || generatedResults.email || '');
+    }
+  }, [generatedResults?.email_body, generatedResults?.email]);
+
+  const handleEmailBodyChange = (newText: string) => {
+    setEditableEmailBody(newText);
+    if (generatedResults) {
+      setGeneratedResults((prev) => (prev ? { ...prev, email_body: newText } : null));
+    }
+  };
+
+  const insertTokenAtCursor = (token: string) => {
+    if (showSamplePreview) {
+      setShowSamplePreview(false);
+    }
+
+    const textarea = emailTextareaRef.current;
+    const currentText = editableEmailBody || generatedResults?.email_body || generatedResults?.email || '';
+
+    if (textarea) {
+      const startPos = textarea.selectionStart ?? currentText.length;
+      const endPos = textarea.selectionEnd ?? currentText.length;
+      const newText = currentText.substring(0, startPos) + token + currentText.substring(endPos);
+      handleEmailBodyChange(newText);
+
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(startPos + token.length, startPos + token.length);
+      }, 0);
+    } else {
+      const newText = currentText ? `${currentText} ${token}` : token;
+      handleEmailBodyChange(newText);
+    }
+
+    toast.success(`Đã chèn biến ${token} vào vị trí con trỏ!`);
+  };
+
+  const sampleDataValues: Record<string, { label: string; value: string; badgeColor: string }> = {
+    '{{recipient_name}}': {
+      label: 'Tên người nhận',
+      value: 'Nguyễn Văn Quản Trị',
+      badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
+    },
+    '{{full_name}}': {
+      label: 'Họ và tên',
+      value: 'Nguyễn Văn Quản Trị',
+      badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
+    },
+    '{{company}}': {
+      label: 'Đơn vị / Công ty',
+      value: 'Tập đoàn FPT',
+      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    },
+    '{{ticket_code}}': {
+      label: 'Mã vé',
+      value: 'VIP-EVT-2026-999',
+      badgeColor: 'bg-amber-100 text-amber-800 border-amber-200 font-mono',
+    },
+    '{{event_date}}': {
+      label: 'Ngày tổ chức',
+      value: eventTime || '15/10/2026',
+      badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+    },
+    '{{event_title}}': {
+      label: 'Tên sự kiện',
+      value: eventName || 'EventHub AI Summit 2026',
+      badgeColor: 'bg-rose-100 text-rose-800 border-rose-200 font-semibold',
+    },
+    '{{event_location}}': {
+      label: 'Địa điểm',
+      value: eventLocation || 'GEM Center, TP. Hồ Chí Minh',
+      badgeColor: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    },
+  };
+
+  const getRenderedSampleText = (text: string): string => {
+    let result = text;
+    Object.entries(sampleDataValues).forEach(([token, info]) => {
+      const escaped = token.replace(/[{}]/g, '\\$&');
+      result = result.replace(new RegExp(escaped, 'gi'), info.value);
+    });
+    return result;
+  };
+
+  const renderHighlightedSampleBody = (text: string) => {
+    const tokenRegex = /\{\{[a-zA-Z0-9_]+\}\}/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = tokenRegex.exec(text)) !== null) {
+      const token = match[0].toLowerCase();
+      const matchIndex = match.index;
+
+      if (matchIndex > lastIndex) {
+        parts.push(text.substring(lastIndex, matchIndex));
+      }
+
+      const sampleInfo = sampleDataValues[token];
+      if (sampleInfo) {
+        parts.push(
+          <span
+            key={`token-${matchIndex}`}
+            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-xs font-semibold ${sampleInfo.badgeColor} shadow-xs mx-0.5`}
+            title={`Biến gốc: ${token} (${sampleInfo.label})`}
+          >
+            <span>{sampleInfo.value}</span>
+          </span>
+        );
+      } else {
+        parts.push(
+          <span
+            key={`token-${matchIndex}`}
+            className="inline-flex items-center px-1.5 py-0.5 rounded-md border bg-slate-100 text-slate-700 border-slate-300 font-mono text-[11px] mx-0.5"
+          >
+            {match[0]}
+          </span>
+        );
+      }
+
+      lastIndex = tokenRegex.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+
+    return parts;
+  };
+
+  const PERSONALIZATION_TOKENS = [
+    {
+      token: '{{recipient_name}}',
+      label: 'Tên người nhận',
+      sample: 'Nguyễn Văn Quản Trị',
+      icon: '👤',
+      bgClass: 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300',
+    },
+    {
+      token: '{{company}}',
+      label: 'Đơn vị/Công ty',
+      sample: 'Tập đoàn FPT',
+      icon: '🏢',
+      bgClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300',
+    },
+    {
+      token: '{{ticket_code}}',
+      label: 'Mã vé',
+      sample: 'VIP-EVT-2026-999',
+      icon: '🎟️',
+      bgClass: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300',
+    },
+    {
+      token: '{{event_date}}',
+      label: 'Ngày tổ chức',
+      sample: '15/10/2026',
+      icon: '📅',
+      bgClass: 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 hover:border-purple-300',
+    },
+    {
+      token: '{{event_title}}',
+      label: 'Tên sự kiện',
+      sample: eventName || 'EventHub AI Summit',
+      icon: '⚡',
+      bgClass: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 hover:border-rose-300',
+    },
+  ];
+
   const getActiveTabRawContent = (): string => {
     if (!generatedResults) return '';
     switch (activeTab) {
       case 'email':
-        return generatedResults.email || '';
+        return editableEmailBody || generatedResults.email_body || generatedResults.email || '';
       case 'social':
         return socialSubTab === 'facebook'
           ? (generatedResults.facebook_post || generatedResults.social || '')
@@ -1203,14 +1387,143 @@ ${generatedResults.press_release || ''}
                         </button>
                       </div>
 
-                      {/* Body */}
-                      <div className="space-y-1.5">
-                        <span className="text-[11px] font-bold text-slate-700 block">
-                          Nội Dung Thư (Email Body):
-                        </span>
-                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 max-h-[300px] overflow-y-auto font-sans text-xs text-slate-800 leading-relaxed whitespace-pre-wrap shadow-inner">
-                          {generatedResults.email_body || generatedResults.email}
+                      {/* Body Header & Personalization Controls */}
+                      <div className="space-y-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-slate-800">
+                              Nội Dung Thư (Email Body):
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
+                              {(editableEmailBody || generatedResults.email_body || generatedResults.email || '').length} ký tự • {(editableEmailBody || generatedResults.email_body || generatedResults.email || '').trim().split(/\s+/).filter(Boolean).length} từ
+                            </span>
+                            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
+                              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                              <span>Tránh Spam: Cá nhân hóa 1-1</span>
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2.5">
+                            {/* Toggle Switch: Hiển thị dữ liệu mẫu */}
+                            <div className="flex items-center gap-2 bg-slate-100/90 px-2.5 py-1 rounded-xl border border-slate-200">
+                              <span className="text-[11px] font-semibold text-slate-700 flex items-center gap-1 select-none">
+                                <Eye className={`w-3.5 h-3.5 ${showSamplePreview ? 'text-emerald-600' : 'text-slate-400'}`} />
+                                <span>Hiển thị dữ liệu mẫu</span>
+                              </span>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={showSamplePreview}
+                                onClick={() => setShowSamplePreview(!showSamplePreview)}
+                                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1 ${
+                                  showSamplePreview ? 'bg-emerald-600' : 'bg-slate-300'
+                                }`}
+                                title={showSamplePreview ? 'Tắt chế độ xem trước dữ liệu mẫu (chuyển sang soạn thảo mã biến)' : 'Bật chế độ xem trước với dữ liệu mẫu sinh động'}
+                              >
+                                <span
+                                  aria-hidden="true"
+                                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                                    showSamplePreview ? 'translate-x-4' : 'translate-x-0'
+                                  }`}
+                                />
+                              </button>
+                            </div>
+
+                            {/* Copy button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentBody = editableEmailBody || generatedResults.email_body || generatedResults.email || '';
+                                const textToCopy = showSamplePreview ? getRenderedSampleText(currentBody) : currentBody;
+                                navigator.clipboard.writeText(textToCopy);
+                                toast.success(
+                                  showSamplePreview
+                                    ? 'Đã sao chép nội dung thư (với dữ liệu mẫu thực tế)!'
+                                    : 'Đã sao chép nội dung thư (văn bản gốc chứa mã biến động)!'
+                                );
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+                              title="Sao chép nội dung thư"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                              <span>Sao chép</span>
+                            </button>
+                          </div>
                         </div>
+
+                        {/* Tokens Helper Toolbar (Token Badges Helper) */}
+                        <div className="p-2.5 rounded-xl bg-gradient-to-r from-slate-50 via-indigo-50/40 to-slate-50 border border-slate-200 space-y-1.5">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                              <Tag className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>Thẻ cá nhân hóa (click badge để chèn nhanh vào vị trí con trỏ):</span>
+                            </span>
+                            <span className="text-[10px] text-slate-400 italic">
+                              Hệ thống sẽ thay thế tự động khi gửi
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            {PERSONALIZATION_TOKENS.map((tokenItem) => (
+                              <button
+                                key={tokenItem.token}
+                                type="button"
+                                onClick={() => insertTokenAtCursor(tokenItem.token)}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold shadow-2xs transition-all transform hover:-translate-y-0.5 cursor-pointer ${tokenItem.bgClass}`}
+                                title={`Chèn ${tokenItem.token} (${tokenItem.sample})`}
+                              >
+                                <span className="font-black text-slate-400">+</span>
+                                <span className="font-mono text-[11px]">{tokenItem.token}</span>
+                                <span className="text-[10px] font-normal opacity-85">({tokenItem.label})</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Editor or Sample Preview Content */}
+                        {showSamplePreview ? (
+                          <div className="space-y-2 animate-in fade-in duration-150">
+                            {/* Sample profile notice bar */}
+                            <div className="bg-emerald-50 border border-emerald-200/80 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 text-xs text-emerald-900">
+                              <div className="flex items-center gap-2">
+                                <Eye className="w-4 h-4 text-emerald-600 shrink-0" />
+                                <div>
+                                  <p className="font-bold">Chế độ Xem Trước Dữ Liệu Thực Tế (Real-Data Preview):</p>
+                                  <p className="text-[11px] text-emerald-700 mt-0.5">
+                                    Thư đang được mô phỏng gửi tới khách mời mẫu: <strong className="text-emerald-950">Nguyễn Văn Quản Trị</strong> (Đơn vị: <strong>Tập đoàn FPT</strong> • Mã vé: <code className="bg-emerald-100 px-1 py-0.2 rounded font-mono font-bold">VIP-EVT-2026-999</code>).
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setShowSamplePreview(false)}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-colors cursor-pointer shrink-0"
+                              >
+                                Quay lại khung soạn thảo
+                              </button>
+                            </div>
+
+                            {/* Rendered Preview Card */}
+                            <div className="bg-white border-2 border-emerald-200 rounded-2xl p-5 max-h-[340px] overflow-y-auto font-sans text-xs text-slate-800 leading-relaxed whitespace-pre-wrap shadow-inner relative">
+                              {renderHighlightedSampleBody(editableEmailBody || generatedResults.email_body || generatedResults.email || '')}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5 animate-in fade-in duration-150">
+                            <textarea
+                              ref={emailTextareaRef}
+                              value={editableEmailBody || generatedResults.email_body || generatedResults.email || ''}
+                              onChange={(e) => handleEmailBodyChange(e.target.value)}
+                              rows={11}
+                              placeholder="Nhập nội dung thư hoặc click các badge bên trên để chèn nhanh biến cá nhân hóa..."
+                              className="w-full rounded-2xl border border-slate-200 bg-white p-4 font-sans text-xs text-slate-900 leading-relaxed shadow-inner focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 resize-y min-h-[220px]"
+                            />
+                            <div className="flex items-center justify-between text-[10px] text-slate-500 px-1">
+                              <span>💡 Đặt con trỏ chuột vào vị trí bất kỳ trong văn bản rồi click badge phía trên để chèn thẻ.</span>
+                              <span className="text-emerald-700 font-medium">✓ Giữ nguyên mã biến để gửi hàng loạt qua hệ thống</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* HTML CTA Button Visual Preview */}
@@ -1279,6 +1592,85 @@ ${generatedResults.press_release || ''}
                           </div>
                         )}
                       </div>
+
+                      {/* Task 100: Interactive 5-Star Feedback Rating Widget & Post-Event Summary Card Preview */}
+                      {eventLifecycle === 'CONCLUDED' && (
+                        <div className="p-5 rounded-2xl bg-gradient-to-r from-indigo-50/80 via-purple-50/65 to-indigo-50/80 border-2 border-indigo-200/80 space-y-4 shadow-sm animate-in fade-in duration-150">
+                          <div className="flex items-center justify-between border-b border-indigo-100 pb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="p-1 rounded-lg bg-indigo-100 text-indigo-700">
+                                <Sparkles className="w-4 h-4" />
+                              </span>
+                              <div>
+                                <h4 className="text-xs font-black text-indigo-950 uppercase tracking-wider">
+                                  ⭐ Bộ Đánh Giá 5 Sao Trực Tiếp Trong Email (1-Click Direct Rating)
+                                </h4>
+                                <p className="text-[11px] text-indigo-700">
+                                  Khách tham dự chạm vào số sao trong hộp thư để gửi điểm hài lòng tức thì (không cần đăng nhập)
+                                </p>
+                              </div>
+                            </div>
+                            <span className="px-2.5 py-1 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+                              Task 100 Live
+                            </span>
+                          </div>
+
+                          {/* 5-Star Interactive Rating Visualizer */}
+                          <div className="bg-white rounded-xl p-4 border border-indigo-100 shadow-xs text-center space-y-3">
+                            <p className="text-xs font-bold text-slate-800">
+                              Bạn đánh giá trải nghiệm sự kiện hôm nay thế nào?
+                            </p>
+                            <div className="grid grid-cols-5 gap-2 max-w-md mx-auto">
+                              {[
+                                { star: 1, label: '1 Sao', desc: 'Rất tệ', emoji: '⭐' },
+                                { star: 2, label: '2 Sao', desc: 'Kém', emoji: '⭐⭐' },
+                                { star: 3, label: '3 Sao', desc: 'Bình thường', emoji: '⭐⭐⭐' },
+                                { star: 4, label: '4 Sao', desc: 'Hài lòng', emoji: '⭐⭐⭐⭐' },
+                                { star: 5, label: '5 Sao', desc: 'Tuyệt vời!', emoji: '⭐⭐⭐⭐⭐' },
+                              ].map((item) => (
+                                <a
+                                  key={item.star}
+                                  href={`http://localhost:8000/api/v1/feedback/quick-rate?eventId=${selectedEvent?.id || 1}&stars=${item.star}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex flex-col items-center justify-center p-2 rounded-xl border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/50 hover:shadow-xs transition-all group"
+                                  title={`Đánh giá nhanh ${item.star} sao`}
+                                >
+                                  <span className="text-base group-hover:scale-110 transition-transform">{item.emoji}</span>
+                                  <span className="text-[11px] font-bold text-slate-700 mt-1">{item.label}</span>
+                                  <span className="text-[9px] text-slate-500">{item.desc}</span>
+                                </a>
+                              ))}
+                            </div>
+                            <p className="text-[10px] text-slate-400 italic">
+                              Link API tự động đính kèm mã định danh vé và bảo mật 1-click không cần đăng nhập lại
+                            </p>
+                          </div>
+
+                          {/* Footer Info Card Preview */}
+                          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2 text-xs">
+                            <div className="font-bold text-slate-800 border-b border-slate-200 pb-1.5 flex items-center justify-between">
+                              <span>📌 Thẻ Tóm Tắt & Tài Liệu Sự Kiện:</span>
+                              <span className="text-[11px] text-indigo-600 font-semibold">{eventName}</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-600">
+                              <div><strong>Thời gian:</strong> {eventTime}</div>
+                              <div><strong>Địa điểm:</strong> {eventLocation}</div>
+                              <div className="sm:col-span-2"><strong>Diễn giả:</strong> {speakers || 'Ban Chuyên Gia Đầu Ngành AI'}</div>
+                            </div>
+                            <div className="pt-2 text-center">
+                              <a
+                                href="/events"
+                                target="_blank"
+                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-colors"
+                              >
+                                <span>📜 Tải Slide Bài Giảng & Nhận E-Certificate</span>
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1685,10 +2077,14 @@ ${generatedResults.press_release || ''}
       {/* =======================================================
           MODAL 1: A/B TESTING VARIANT SELECTOR (Requirement 2)
          ======================================================= */}
+      {/* =======================================================
+          MODAL 1: A/B TESTING VARIANT SELECTOR (Requirement 2)
+         ======================================================= */}
       {showABModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl max-w-xl w-full space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header: Sticky Top */}
+            <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
                   <Split className="w-5 h-5" />
@@ -1701,14 +2097,14 @@ ${generatedResults.press_release || ''}
               <button
                 type="button"
                 onClick={() => setShowABModal(false)}
-                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg transition-colors cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            {/* 3 Variant Cards */}
-            <div className="space-y-3">
+            {/* Body: Scrollable Content with Smooth Scrolling */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-3 scroll-smooth modal-scrollbar scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent min-h-0">
               {(generatedResults?.ab_variants || [
                 {
                   variant: 'A',
@@ -1770,11 +2166,12 @@ ${generatedResults.press_release || ''}
               ))}
             </div>
 
-            <div className="flex justify-end pt-2">
+            {/* Footer: Sticky Bottom */}
+            <div className="sticky bottom-0 z-10 bg-white border-t border-slate-100 p-4 px-6 flex justify-end shrink-0">
               <button
                 type="button"
                 onClick={() => setShowABModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 Đóng
               </button>
@@ -1787,9 +2184,10 @@ ${generatedResults.press_release || ''}
           MODAL 2: GỬI THỬ NGHIỆM THỰC TẾ (Requirement 3)
          ======================================================= */}
       {showTestSendModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl max-w-md w-full space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-md w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header: Sticky Top */}
+            <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
                   <Mail className="w-4 h-4" />
@@ -1799,104 +2197,108 @@ ${generatedResults.press_release || ''}
               <button
                 type="button"
                 onClick={() => setShowTestSendModal(false)}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg transition-colors cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <p className="text-xs text-slate-600">
-              Kiểm tra khả năng hiển thị thực tế của bản tin trên thiết bị và hộp thư cá nhân của bạn trước khi phê duyệt phát hành hàng loạt.
-            </p>
-
-            {/* Select Test Channel */}
-            <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700">Kênh Gửi Thử:</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: 'email' as const, label: 'Email', icon: Mail },
-                  { id: 'sms' as const, label: 'SMS', icon: Smartphone },
-                  { id: 'zalo' as const, label: 'Zalo OA', icon: MessageSquare },
-                ].map((ch) => {
-                  const Icon = ch.icon;
-                  const isSel = testChannel === ch.id;
-                  return (
-                    <button
-                      key={ch.id}
-                      type="button"
-                      onClick={() => setTestChannel(ch.id)}
-                      className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                        isSel
-                          ? 'border-red-500 bg-red-50 text-red-700 shadow-2xs'
-                          : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Icon className="w-3.5 h-3.5" />
-                      <span>{ch.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Recipient Input */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                {testChannel === 'email' ? 'Địa chỉ Email nhận thử:' : 'Số điện thoại nhận tin thử:'}
-              </label>
-              <input
-                type="text"
-                value={testRecipient}
-                onChange={(e) => setTestRecipient(e.target.value)}
-                placeholder={testChannel === 'email' ? 'admin@eventhub.ai' : '0912345678'}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-red-500 font-medium"
-              />
-            </div>
-
-            {/* Preview snippet */}
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 space-y-1">
-              <span className="font-bold text-slate-800 block">Nội dung sẽ gửi thử nghiệm:</span>
-              <p className="line-clamp-2 italic">
-                {testChannel === 'email'
-                  ? (generatedResults?.email_subject || 'Thư mời tham dự sự kiện')
-                  : (generatedResults?.sms_reminder || generatedResults?.reminder || 'Thông báo từ EventHub AI')}
+            {/* Body: Scrollable Content with Smooth Scrolling */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth modal-scrollbar scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent min-h-0">
+              <p className="text-xs text-slate-600">
+                Kiểm tra khả năng hiển thị thực tế của bản tin trên thiết bị và hộp thư cá nhân của bạn trước khi phê duyệt phát hành hàng loạt.
               </p>
-            </div>
 
-            {/* Ethereal Preview URL Banner if sent via test transport */}
-            {testPreviewUrl && (
-              <div className="p-3.5 bg-emerald-50/90 border border-emerald-200 rounded-2xl space-y-2 animate-in fade-in duration-200">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                    <span className="text-xs font-bold text-emerald-900">
-                      Đã gửi thành công qua hòm thư ảo Ethereal
-                    </span>
-                  </div>
-                  <a
-                    href={testPreviewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
-                  >
-                    <span>Xem trước thư test (Ethereal)</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+              {/* Select Test Channel */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">Kênh Gửi Thử:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { id: 'email' as const, label: 'Email', icon: Mail },
+                    { id: 'sms' as const, label: 'SMS', icon: Smartphone },
+                    { id: 'zalo' as const, label: 'Zalo OA', icon: MessageSquare },
+                  ].map((ch) => {
+                    const Icon = ch.icon;
+                    const isSel = testChannel === ch.id;
+                    return (
+                      <button
+                        key={ch.id}
+                        type="button"
+                        onClick={() => setTestChannel(ch.id)}
+                        className={`py-2 px-2 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          isSel
+                            ? 'border-red-500 bg-red-50 text-red-700 shadow-2xs'
+                            : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        <span>{ch.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-                <p className="text-[10px] text-emerald-700 font-mono break-all line-clamp-1">
-                  {testPreviewUrl}
+              </div>
+
+              {/* Recipient Input */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  {testChannel === 'email' ? 'Địa chỉ Email nhận thử:' : 'Số điện thoại nhận tin thử:'}
+                </label>
+                <input
+                  type="text"
+                  value={testRecipient}
+                  onChange={(e) => setTestRecipient(e.target.value)}
+                  placeholder={testChannel === 'email' ? 'admin@eventhub.ai' : '0912345678'}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-red-500 font-medium"
+                />
+              </div>
+
+              {/* Preview snippet */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 space-y-1">
+                <span className="font-bold text-slate-800 block">Nội dung sẽ gửi thử nghiệm:</span>
+                <p className="line-clamp-2 italic">
+                  {testChannel === 'email'
+                    ? (generatedResults?.email_subject || 'Thư mời tham dự sự kiện')
+                    : (generatedResults?.sms_reminder || generatedResults?.reminder || 'Thông báo từ EventHub AI')}
                 </p>
               </div>
-            )}
 
-            <div className="flex gap-2.5 pt-2">
+              {/* Ethereal Preview URL Banner if sent via test transport */}
+              {testPreviewUrl && (
+                <div className="p-3.5 bg-emerald-50/90 border border-emerald-200 rounded-2xl space-y-2 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                      <span className="text-xs font-bold text-emerald-900">
+                        Đã gửi thành công qua hòm thư ảo Ethereal
+                      </span>
+                    </div>
+                    <a
+                      href={testPreviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-xs transition-colors cursor-pointer"
+                    >
+                      <span>Xem trước thư test (Ethereal)</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                  <p className="text-[10px] text-emerald-700 font-mono break-all line-clamp-1">
+                    {testPreviewUrl}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer: Sticky Bottom */}
+            <div className="sticky bottom-0 z-10 bg-white border-t border-slate-100 p-4 px-6 flex justify-end gap-2.5 shrink-0">
               <button
                 type="button"
                 onClick={() => {
                   setTestPreviewUrl(null);
                   setShowTestSendModal(false);
                 }}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 {testPreviewUrl ? 'Hoàn tất' : 'Hủy bỏ'}
               </button>
@@ -1975,12 +2377,11 @@ ${generatedResults.press_release || ''}
                     }
                   }
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {isSendingTest ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                 <span>{testPreviewUrl ? 'Gửi Lại Thử Nghiệm' : 'Gửi Thử Ngay'}</span>
               </button>
-
             </div>
           </div>
         </div>
@@ -1990,9 +2391,10 @@ ${generatedResults.press_release || ''}
           MODAL 3: DUYỆT BÀI AI & PHÁT HÀNH ĐA KÊNH (Requirement 3)
          ======================================================= */}
       {showPublishModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl max-w-lg w-full space-y-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header: Sticky Top */}
+            <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
                   <ShieldCheck className="w-5 h-5" />
@@ -2005,161 +2407,292 @@ ${generatedResults.press_release || ''}
               <button
                 type="button"
                 onClick={() => setShowPublishModal(false)}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg transition-colors cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            {/* Target Audience Selector */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-800">
-                1. Xác Nhận Đối Tượng Nhận (Target Audience):
-              </label>
-              <div className="space-y-1.5">
-                {[
-                  { id: 'MEMBERS_WITH_EMAIL', label: 'Tài khoản thành viên đã đăng ký & liên kết Email', count: 'Toàn bộ thành viên', desc: 'Gửi trực tiếp đến hộp thư email của tất cả tài khoản người tham dự hệ thống' },
-                  { id: 'ALL_REGISTERED', label: 'Tất cả khách đã đăng ký sự kiện', count: '1,250 người', desc: 'Đã hoàn tất đăng ký vé trên hệ thống' },
-                  { id: 'VIP', label: 'Khách VIP & Đối tác chiến lược', count: '120 người', desc: 'Hạng vé VIP, nhà tài trợ & đại biểu danh dự' },
-                  { id: 'SPEAKERS', label: 'Diễn giả & Khách mời phát biểu', count: '25 người', desc: 'Chuyên gia chủ trì các phiên thuyết trình' },
-                  { id: 'PRESS', label: 'Cơ quan báo chí & Đơn vị truyền thông', count: '45 cơ quan', desc: 'Danh sách phóng viên & kênh báo đài' },
-                  { id: 'COMMUNITY', label: 'Cộng đồng công nghệ tiềm năng', count: '3,500 người', desc: 'Người theo dõi và thành viên cộng đồng AI' },
-                ].map((aud) => (
-                  <label
-                    key={aud.id}
-                    className={`flex items-center justify-between p-3 rounded-xl border text-xs cursor-pointer transition-all ${
-                      publishAudience === aud.id
-                        ? 'border-emerald-500 bg-emerald-50/50 text-slate-900 shadow-2xs font-bold'
-                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+            {/* Body: Scrollable Content with Smooth Scrolling */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth modal-scrollbar scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent min-h-0">
+              {/* 1. Campaign Type Selector (Task 100) */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-800">
+                  1. Loại Chiến Dịch Phát Hành:
+                </label>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCampaignType('PROMOTION');
+                      setPublishAudience('MEMBERS_WITH_EMAIL');
+                    }}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      campaignType === 'PROMOTION'
+                        ? 'border-indigo-500 bg-indigo-50/70 text-indigo-950 font-bold shadow-2xs'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <input
-                        type="radio"
-                        name="targetAudience"
-                        value={aud.id}
-                        checked={publishAudience === aud.id}
-                        onChange={(e) => setPublishAudience(e.target.value)}
-                        className="text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <div>
-                        <span>{aud.label}</span>
-                        <p className="text-[10px] text-slate-500 font-normal">{aud.desc}</p>
-                      </div>
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <span>📢</span>
+                      <span>Mời Đăng Ký / Quảng Bá</span>
                     </div>
-                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-mono font-bold">
-                      {aud.count}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
+                    <p className="text-[10px] text-slate-500 font-normal mt-0.5">
+                      Gửi thư mời sự kiện trước giờ G tới thành viên & cộng đồng
+                    </p>
+                  </button>
 
-            {/* Channels Selection */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-800">
-                2. Kênh Phát Hành Đồng Loạt:
-              </label>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {[
-                  { id: 'email', label: '✉️ Email Campaign' },
-                  { id: 'facebook', label: '📘 Facebook Fanpage' },
-                  { id: 'linkedin', label: '💼 LinkedIn Page' },
-                  { id: 'zalo_sms', label: '💬 Zalo OA & SMS' },
-                ].map((ch) => {
-                  const isChecked = publishChannels.includes(ch.id);
-                  return (
-                    <label
-                      key={ch.id}
-                      className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
-                        isChecked
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => {
-                          if (isChecked) {
-                            if (publishChannels.length > 1) {
-                              setPublishChannels(publishChannels.filter((c) => c !== ch.id));
-                            } else {
-                              toast.warning('Cần chọn ít nhất 1 kênh phát hành.');
-                            }
-                          } else {
-                            setPublishChannels([...publishChannels, ch.id]);
-                          }
-                        }}
-                        className="rounded text-emerald-600 focus:ring-emerald-500"
-                      />
-                      <span>{ch.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Timing: Send Immediately vs Schedule Publish */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-800">
-                3. Lịch Trình Phát Hành:
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPublishScheduleType('IMMEDIATE')}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    publishScheduleType === 'IMMEDIATE'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold shadow-2xs'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">⚡</span>
-                    <span className="text-xs">Gửi Ngay Lập Tức</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1">Phát hành ngay khi bấm xác nhận</p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPublishScheduleType('SCHEDULED')}
-                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                    publishScheduleType === 'SCHEDULED'
-                      ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold shadow-2xs'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">⏰</span>
-                    <span className="text-xs">Lên Lịch Phát Hành</span>
-                  </div>
-                  <p className="text-[10px] text-slate-500 mt-1">Hẹn giờ gửi tự động trong tương lai</p>
-                </button>
-              </div>
-
-              {publishScheduleType === 'SCHEDULED' && (
-                <div className="pt-1 animate-in fade-in duration-150">
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Chọn thời gian phát hành:
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={publishScheduledAt}
-                    onChange={(e) => setPublishScheduledAt(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-500"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCampaignType('RECAP_THANKYOU');
+                      setPublishAudience('CHECKED_IN_ONLY');
+                    }}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      campaignType === 'RECAP_THANKYOU'
+                        ? 'border-indigo-500 bg-indigo-50/70 text-indigo-950 font-bold shadow-2xs'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <span>🙏</span>
+                      <span>Tổng Kết & Tri Ân (Recap)</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-normal mt-0.5">
+                      Đính kèm bộ đánh giá 5 sao trực tiếp & link nhận E-Certificate
+                    </p>
+                  </button>
                 </div>
-              )}
+
+                {/* Validation Guard Alert in Modal if event is not ended when choosing recap */}
+                {campaignType === 'RECAP_THANKYOU' && !(selectedEvent?.status === 'ENDED' || selectedEvent?.status === 'COMPLETED' || (selectedEvent?.status || '').toUpperCase() === 'ĐÃ KẾT THÚC' || eventLifecycle === 'CONCLUDED') && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-start gap-2 animate-in fade-in duration-150">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="font-bold">Lưu ý kiểm duyệt:</strong> Sự kiện "<strong>{eventName || 'Đang chọn'}</strong>" hiện tại chưa kết thúc (Trạng thái: <span className="underline font-semibold">{selectedEvent?.status || 'UPCOMING'}</span>). Hệ thống sẽ chặn phát hành thư Tổng kết & Tri ân cho đến khi sự kiện hoàn tất.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Target Audience Selector (Audience Segmentation Engine - Task 100) */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-800">
+                  2. Xác Nhận Phân Khúc Đối Tượng Nhận (Audience Segmentation):
+                </label>
+                <div className="space-y-1.5">
+                  {campaignType === 'RECAP_THANKYOU' ? (
+                    [
+                      {
+                        id: 'CHECKED_IN_ONLY',
+                        label: 'Khách thực tế đã tham dự (Đã check-in thành công)',
+                        count: 'Khuyến nghị',
+                        desc: 'Tự động lọc registrations có is_checked_in = true, gửi email tri ân kèm bộ đánh giá 5 sao trực tiếp',
+                        badgeColor: 'bg-emerald-100 text-emerald-800',
+                      },
+                      {
+                        id: 'NO_SHOW_ONLY',
+                        label: 'Khách đăng ký nhưng vắng mặt (No-Show Flow)',
+                        count: 'Chăm sóc lại',
+                        desc: 'Lọc registrations có is_checked_in = false hoặc null, gửi thông điệp "Rất tiếc bạn đã bỏ lỡ" kèm slide tài liệu & recap',
+                        badgeColor: 'bg-amber-100 text-amber-800',
+                      },
+                      {
+                        id: 'ALL_REGISTERED',
+                        label: 'Toàn bộ danh sách đăng ký sự kiện',
+                        count: 'Tất cả đăng ký',
+                        desc: 'Gửi thư tổng kết chung tới toàn bộ danh sách đăng ký trong bảng registrations',
+                        badgeColor: 'bg-slate-100 text-slate-700',
+                      },
+                    ].map((aud) => (
+                      <label
+                        key={aud.id}
+                        className={`flex items-center justify-between p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                          publishAudience === aud.id
+                            ? 'border-emerald-500 bg-emerald-50/50 text-slate-900 shadow-2xs font-bold'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="radio"
+                            name="targetAudience"
+                            value={aud.id}
+                            checked={publishAudience === aud.id}
+                            onChange={(e) => setPublishAudience(e.target.value)}
+                            className="text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <div>
+                            <span>{aud.label}</span>
+                            <p className="text-[10px] text-slate-500 font-normal">{aud.desc}</p>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${aud.badgeColor}`}>
+                          {aud.count}
+                        </span>
+                      </label>
+                    ))
+                  ) : (
+                    [
+                      {
+                        id: 'MEMBERS_WITH_EMAIL',
+                        label: 'Tài khoản thành viên đã đăng ký & liên kết Email',
+                        count: 'Toàn bộ thành viên',
+                        desc: 'Truy vấn trực tiếp từ bảng users các tài khoản hợp lệ, gửi email hàng loạt có merge tags',
+                        badgeColor: 'bg-indigo-100 text-indigo-800',
+                      },
+                      {
+                        id: 'ALL_USERS',
+                        label: 'Toàn bộ người dùng hệ thống EventHub AI',
+                        count: 'Tất cả Users',
+                        desc: 'Bao gồm tất cả tài khoản người dùng đã kích hoạt trong CSDL',
+                        badgeColor: 'bg-slate-100 text-slate-700',
+                      },
+                      {
+                        id: 'COMMUNITY',
+                        label: 'Cộng đồng công nghệ & đối tác tiềm năng',
+                        count: '3,500+ đối tác',
+                        desc: 'Phân phối thư mời tới mạng lưới đối tác và người theo dõi hệ sinh thái',
+                        badgeColor: 'bg-purple-100 text-purple-800',
+                      },
+                    ].map((aud) => (
+                      <label
+                        key={aud.id}
+                        className={`flex items-center justify-between p-3 rounded-xl border text-xs cursor-pointer transition-all ${
+                          publishAudience === aud.id
+                            ? 'border-emerald-500 bg-emerald-50/50 text-slate-900 shadow-2xs font-bold'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="radio"
+                            name="targetAudience"
+                            value={aud.id}
+                            checked={publishAudience === aud.id}
+                            onChange={(e) => setPublishAudience(e.target.value)}
+                            className="text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <div>
+                            <span>{aud.label}</span>
+                            <p className="text-[10px] text-slate-500 font-normal">{aud.desc}</p>
+                          </div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${aud.badgeColor}`}>
+                          {aud.count}
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* 3. Channels Selection */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-800">
+                  3. Kênh Phát Hành Đồng Loạt:
+                </label>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {[
+                    { id: 'email', label: '✉️ Email Campaign' },
+                    { id: 'facebook', label: '📘 Facebook Fanpage' },
+                    { id: 'linkedin', label: '💼 LinkedIn Page' },
+                    { id: 'zalo_sms', label: '💬 Zalo OA & SMS' },
+                  ].map((ch) => {
+                    const isChecked = publishChannels.includes(ch.id);
+                    return (
+                      <label
+                        key={ch.id}
+                        className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                          isChecked
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold'
+                            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              if (publishChannels.length > 1) {
+                                setPublishChannels(publishChannels.filter((c) => c !== ch.id));
+                              } else {
+                                toast.warning('Cần chọn ít nhất 1 kênh phát hành.');
+                              }
+                            } else {
+                              setPublishChannels([...publishChannels, ch.id]);
+                            }
+                          }}
+                          className="rounded text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span>{ch.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 4. Timing: Send Immediately vs Schedule Publish */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-800">
+                  4. Lịch Trình Phát Hành:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPublishScheduleType('IMMEDIATE')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      publishScheduleType === 'IMMEDIATE'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold shadow-2xs'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">⚡</span>
+                      <span className="text-xs">Gửi Ngay Lập Tức</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">Phát hành ngay khi bấm xác nhận</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPublishScheduleType('SCHEDULED')}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                      publishScheduleType === 'SCHEDULED'
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold shadow-2xs'
+                        : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">⏰</span>
+                      <span className="text-xs">Lên Lịch Phát Hành</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">Hẹn giờ gửi tự động trong tương lai</p>
+                  </button>
+                </div>
+
+                {publishScheduleType === 'SCHEDULED' && (
+                  <div className="pt-1 animate-in fade-in duration-150">
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Chọn thời gian phát hành:
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={publishScheduledAt}
+                      onChange={(e) => setPublishScheduledAt(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Modal Actions */}
-            <div className="flex gap-2.5 pt-3 border-t border-slate-100">
+            {/* Footer: Sticky Bottom */}
+            <div className="sticky bottom-0 z-10 bg-white border-t border-slate-100 p-4 px-6 flex justify-end gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowPublishModal(false)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 Hủy Bỏ
               </button>
@@ -2167,11 +2700,18 @@ ${generatedResults.press_release || ''}
                 type="button"
                 disabled={isPublishing}
                 onClick={async () => {
+                  const isEnded = selectedEvent?.status === 'ENDED' || selectedEvent?.status === 'COMPLETED' || (selectedEvent?.status || '').toUpperCase() === 'ĐÃ KẾT THÚC' || eventLifecycle === 'CONCLUDED';
+                  if ((campaignType === 'RECAP_THANKYOU' || publishAudience === 'CHECKED_IN_ONLY' || publishAudience === 'NO_SHOW_ONLY') && !isEnded) {
+                    toast.error('Sự kiện chưa kết thúc. Chỉ có thể phát hành thư Tổng kết & Tri ân sau khi sự kiện hoàn tất!');
+                    return;
+                  }
+
                   setIsPublishing(true);
                   try {
                     const res = await apiService.publishPRCampaign({
                       event_id: selectedEventId ? Number(selectedEventId) : undefined,
                       event_name: eventName,
+                      campaign_type: campaignType,
                       target_audience: publishAudience,
                       schedule_type: publishScheduleType,
                       scheduled_at: publishScheduleType === 'SCHEDULED' ? publishScheduledAt : undefined,
@@ -2180,6 +2720,7 @@ ${generatedResults.press_release || ''}
                       content_summary: mainTopic,
                       content: generatedResults?.email_body || generatedResults?.facebook_post || generatedResults?.social || mainTopic,
                       subject: generatedResults?.email_subject || `[EventHub AI] ${eventName}`,
+                      speakers: speakers || undefined,
                     });
 
                     setIsPublishing(false);
@@ -2203,7 +2744,7 @@ ${generatedResults.press_release || ''}
                     toast.error(detail);
                   }
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/25 cursor-pointer flex items-center justify-center gap-1.5"
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/25 cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 {isPublishing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                 <span>
@@ -2219,9 +2760,10 @@ ${generatedResults.press_release || ''}
           MODAL 4: SINH BANNER MARKETING AI (Requirement 4)
          ======================================================= */}
       {showBannerModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl max-w-xl w-full space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl max-w-xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header: Sticky Top */}
+            <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
                   <Wand2 className="w-4 h-4" />
@@ -2234,75 +2776,89 @@ ${generatedResults.press_release || ''}
               <button
                 type="button"
                 onClick={() => setShowBannerModal(false)}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg transition-colors cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            {/* Presets Grid */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-700">Chọn mẫu phong cách thị giác:</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {BANNER_PRESETS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => {
-                      setBannerUrl(preset.url);
-                      setShowBannerModal(false);
-                      toast.success(`Đã chọn banner "${preset.title}" cho chiến dịch!`);
-                    }}
-                    className={`relative rounded-2xl overflow-hidden border border-slate-200 hover:border-red-500 p-1 group text-left transition-all cursor-pointer ${
-                      bannerUrl === preset.url ? 'ring-2 ring-red-500' : ''
-                    }`}
-                  >
-                    <div className="aspect-video rounded-xl overflow-hidden relative">
-                      <img
-                        src={preset.url}
-                        alt={preset.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-2.5">
-                        <div>
-                          <span className="text-[9px] font-bold text-white bg-red-600 px-1.5 py-0.5 rounded">
-                            {preset.category}
-                          </span>
-                          <p className="text-white text-xs font-bold line-clamp-1 mt-1">
-                            {preset.title}
-                          </p>
+            {/* Body: Scrollable Content with Smooth Scrolling */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 scroll-smooth modal-scrollbar scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent min-h-0">
+              {/* Presets Grid */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-700">Chọn mẫu phong cách thị giác:</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {BANNER_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setBannerUrl(preset.url);
+                        setShowBannerModal(false);
+                        toast.success(`Đã chọn banner "${preset.title}" cho chiến dịch!`);
+                      }}
+                      className={`relative rounded-2xl overflow-hidden border border-slate-200 hover:border-red-500 p-1 group text-left transition-all cursor-pointer ${
+                        bannerUrl === preset.url ? 'ring-2 ring-red-500' : ''
+                      }`}
+                    >
+                      <div className="aspect-video rounded-xl overflow-hidden relative">
+                        <img
+                          src={preset.url}
+                          alt={preset.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-2.5">
+                          <div>
+                            <span className="text-[9px] font-bold text-white bg-red-600 px-1.5 py-0.5 rounded">
+                              {preset.category}
+                            </span>
+                            <p className="text-white text-xs font-bold line-clamp-1 mt-1">
+                              {preset.title}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Or custom URL */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Hoặc nhập link ảnh banner tùy chỉnh:
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="https://..."
+                    value={bannerUrl}
+                    onChange={(e) => setBannerUrl(e.target.value)}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-red-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBannerModal(false);
+                      toast.success('Đã áp dụng link banner tùy chỉnh!');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Áp Dụng
                   </button>
-                ))}
+                </div>
               </div>
             </div>
 
-            {/* Or custom URL */}
-            <div className="pt-2 border-t border-slate-100">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Hoặc nhập link ảnh banner tùy chỉnh:
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="https://..."
-                  value={bannerUrl}
-                  onChange={(e) => setBannerUrl(e.target.value)}
-                  className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-red-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowBannerModal(false);
-                    toast.success('Đã áp dụng link banner tùy chỉnh!');
-                  }}
-                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer"
-                >
-                  Áp Dụng
-                </button>
-              </div>
+            {/* Footer: Sticky Bottom */}
+            <div className="sticky bottom-0 z-10 bg-white border-t border-slate-100 p-4 px-6 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowBannerModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
             </div>
           </div>
         </div>

@@ -103,3 +103,20 @@ class ShareReportRequest(BaseModel):
     permissions: str
     message: Optional[str] = None
     expires_in_days: Optional[int] = None
+
+class AIAnalyzeRequest(BaseModel):
+    tab: str
+    event_id: Optional[int] = None
+    date_range: Optional[str] = None
+    metrics: Optional[Dict[str, Any]] = None
+
+class AIAnalyzeResponse(BaseModel):
+    tab: str
+    summary: str
+    highlights: List[str]
+    bottlenecks: List[str]
+    recommendations: List[str]
+    score: int
+    confidence_score: float = 0.95
+    analyzed_at: str
+

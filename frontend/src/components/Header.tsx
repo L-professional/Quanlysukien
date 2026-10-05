@@ -9,6 +9,7 @@ import type { UserRole } from '../context/AuthContext';
 import { apiService } from '../services/api';
 import type { NotificationItem } from '../types';
 import { useEventSync } from '../services/eventSync';
+import { useRealTimeClock } from '../hooks/useRealTimeClock';
 import { toast } from 'sonner';
 
 export interface HeaderProps {
@@ -27,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, isAuthenticated, userRole, logout } = useAuth();
   const navigate = useNavigate();
+  const { timeString, dateString } = useRealTimeClock();
 
   const currentRoleLabel =
     userRole === 'SUPER_ADMIN' || userRole === 'ADMIN'
@@ -319,8 +321,26 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* RIGHT: Notifications & User Profile */}
-      <div className="flex items-center gap-5 sm:gap-6 shrink-0">
+      <div className="flex items-center gap-3 sm:gap-5 shrink-0">
         
+        {/* Real-Time Hanoi Clock Indicator */}
+        <div 
+          className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200/90 text-[12px] text-slate-700 shadow-xs hover:border-slate-300 transition-all select-none"
+          title="Thời gian thực hệ thống - Múi giờ Hà Nội, Việt Nam (UTC+7)"
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <Clock className="w-3.5 h-3.5 text-slate-500" />
+          <span className="font-semibold text-slate-800 tracking-tight font-mono">{timeString}</span>
+          <span className="text-slate-300">•</span>
+          <span className="text-slate-500 hidden xl:inline">{dateString}</span>
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+            Hà Nội (UTC+7)
+          </span>
+        </div>
+
         {/* In-App Notification Center */}
         {isAuthenticated && (
           <div className="relative" ref={notifRef}>

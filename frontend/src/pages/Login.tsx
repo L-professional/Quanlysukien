@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate, Link, useSearchParams } from "react-router-dom";
+import { useNavigate, Link, useSearchParams, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Mail, Lock, User, Eye, EyeOff, ArrowRight,
@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { GoogleAuthModal } from "../components/GoogleAuthModal";
+import { MicrosoftAuthModal } from "../components/MicrosoftAuthModal";
+import { AccountPickerModal } from "../components/auth/AccountPickerModal";
 
 const BG_IMG = "/assets/backgroud_login.webp";
 
@@ -91,6 +93,7 @@ const DEMO_CREDENTIALS_MAP: Record<string, { email: string; password: string; ro
 
 export const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { login, register: registerUser, isAuthenticated } = useAuth();
 
@@ -121,6 +124,9 @@ export const Login: React.FC = () => {
   }));
 
   const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
+  const [isMicrosoftModalOpen, setIsMicrosoftModalOpen] = useState(false);
+  const [isAccountPickerOpen, setIsAccountPickerOpen] = useState(false);
+  const [accountPickerProvider, setAccountPickerProvider] = useState<'google' | 'microsoft'>('google');
   const [demoRoleInfo, setDemoRoleInfo] = useState<{ role: string; email: string } | null>(() => {
     if (!urlEmail) return null;
     return {
@@ -478,8 +484,8 @@ export const Login: React.FC = () => {
                         <div className="flex-1 h-px bg-gray-200" />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <SocialBtn onClick={() => setIsGoogleModalOpen(true)}><GoogleIcon />Google</SocialBtn>
-                        <SocialBtn onClick={() => toast.info("Tính năng Microsoft đang phát triển.")}><MicrosoftIcon />Microsoft</SocialBtn>
+                        <SocialBtn onClick={() => { setAccountPickerProvider('google'); setIsAccountPickerOpen(true); }}><GoogleIcon />Google</SocialBtn>
+                        <SocialBtn onClick={() => { setAccountPickerProvider('microsoft'); setIsAccountPickerOpen(true); }}><MicrosoftIcon />Microsoft</SocialBtn>
                       </div>
                     </div>
 
@@ -498,7 +504,7 @@ export const Login: React.FC = () => {
                         { label:"Manager", email:"manager@eventhub.ai", color:"bg-purple-50 text-purple-600 border-purple-200" },
                         { label:"Staff", email:"staff@eventhub.ai",   color:"bg-indigo-50 text-indigo-600 border-indigo-200" },
                         { label:"Speaker", email:"speaker@eventhub.ai", color:"bg-emerald-50 text-emerald-600 border-emerald-200" },
-                        { label:"User",  email:"attendee@eventhub.ai",color:"bg-slate-50 text-slate-600 border-slate-200" },
+                        { label:"Attendee", email:"attendee@eventhub.ai",color:"bg-slate-50 text-slate-600 border-slate-200" },
                       ].map(d => (
                         <button
                           key={d.label} type="button"
@@ -546,8 +552,8 @@ export const Login: React.FC = () => {
                         <div className="flex-1 h-px bg-gray-200" />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <SocialBtn onClick={() => setIsGoogleModalOpen(true)}><GoogleIcon />Google</SocialBtn>
-                        <SocialBtn onClick={() => toast.info("Tính năng Microsoft đang phát triển.")}><MicrosoftIcon />Microsoft</SocialBtn>
+                        <SocialBtn onClick={() => { setAccountPickerProvider('google'); setIsAccountPickerOpen(true); }}><GoogleIcon />Google</SocialBtn>
+                        <SocialBtn onClick={() => { setAccountPickerProvider('microsoft'); setIsAccountPickerOpen(true); }}><MicrosoftIcon />Microsoft</SocialBtn>
                       </div>
                     </div>
 
@@ -572,8 +578,31 @@ export const Login: React.FC = () => {
         onClose={() => setIsGoogleModalOpen(false)}
         onSuccess={() => {
           setIsGoogleModalOpen(false);
-          toast.success("Chào mừng bạn đến với EventAI!");
-          navigate("/dashboard", { replace: true });
+          const redirectPath = (location.state as any)?.from?.pathname || "/dashboard";
+          navigate(redirectPath, { replace: true });
+        }}
+      />
+
+      {/* Microsoft Sign-in / Sign-up Modal */}
+      <MicrosoftAuthModal
+        isOpen={isMicrosoftModalOpen}
+        onClose={() => setIsMicrosoftModalOpen(false)}
+        onSuccess={() => {
+          setIsMicrosoftModalOpen(false);
+          const redirectPath = (location.state as any)?.from?.pathname || "/dashboard";
+          navigate(redirectPath, { replace: true });
+        }}
+      />
+
+      {/* Google / Microsoft Account Picker (Identity Verification & Account Chooser Split View) */}
+      <AccountPickerModal
+        isOpen={isAccountPickerOpen}
+        provider={accountPickerProvider}
+        onClose={() => setIsAccountPickerOpen(false)}
+        onSuccess={() => {
+          setIsAccountPickerOpen(false);
+          const redirectPath = (location.state as any)?.from?.pathname || "/dashboard";
+          navigate(redirectPath, { replace: true });
         }}
       />
     </div>

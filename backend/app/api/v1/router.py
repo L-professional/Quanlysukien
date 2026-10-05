@@ -17,8 +17,10 @@ from app.api.v1.ai_analytics import router as ai_analytics_router
 from app.api.v1.users import router as users_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.invitations import router as invitations_router
+from app.api.v1.system_time import router as system_time_router
 
 api_v1_router = APIRouter()
+api_v1_router.include_router(system_time_router)
 api_v1_router.include_router(auth_router)
 api_v1_router.include_router(users_router)
 api_v1_router.include_router(reports_router, prefix="/reports")

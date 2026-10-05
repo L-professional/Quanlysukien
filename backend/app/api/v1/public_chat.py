@@ -32,19 +32,23 @@ router = APIRouter(prefix="/chat", tags=["Attendee AI Chatbot"])
 
 class AttendeeChatRequest(BaseModel):
     event_id: Optional[int] = Field(default=None, description="ID của sự kiện cụ thể nếu đang ở trang chi tiết sự kiện")
-    question: str = Field(..., min_length=2, description="Câu hỏi ngôn ngữ tự nhiên từ người dùng")
+    question: Optional[str] = Field(default=None, description="Câu hỏi ngôn ngữ tự nhiên từ người dùng")
+    message: Optional[str] = Field(default=None, description="Alias cho question để tương thích đa giao thức")
     session_id: Optional[str] = Field(None, description="ID phiên chat của khách")
     user_id: Optional[int] = Field(None, description="ID người dùng gửi câu hỏi")
     role: Optional[str] = Field(None, description="Vai trò của người dùng: ADMIN, MANAGER, SPEAKER, STAFF, ATTENDEE")
     history: Optional[List[dict]] = Field(default=[], description="Lịch sử hội thoại đa lượt")
+    current_system_time: Optional[str] = Field(None, description="Mốc thời gian hệ thống được tiêm động (Asia/Ho_Chi_Minh)")
 
 
 class AttendeeChatResponse(BaseModel):
     answer: str
+    suggested_questions: List[str] = Field(default_factory=list, description="3 câu hỏi gợi ý thông minh chuẩn Gemini-style")
     sources: List[str] = []
     is_fallback: bool = False
     ai_category: str = "GENERAL"
     action_links: Optional[List[dict]] = None
+
 
 
 # ── Knowledge Base Seeding ──────────────────────────────────────────────────
@@ -217,19 +221,40 @@ def classify_inquiry_category(question: str) -> str:
 # ── Chatbot Endpoint ────────────────────────────────────────────────────────
 
 @router.post("/attendee", response_model=AttendeeChatResponse)
+@router.post("", response_model=AttendeeChatResponse)
+@router.post("/public", response_model=AttendeeChatResponse)
 async def chat_with_attendee_bot(
     payload: AttendeeChatRequest,
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
-    Autonomous AI Copilot Endpoint (Task 91):
+    Autonomous AI Copilot Endpoint (Task 91 & Task 101):
     - Hybrid Agent: PostgreSQL Real-Time Database Tools + pgvector RAG
+    - Redis Semantic Cache for sub-5ms responses on repeated/semantic queries
     - Strict AI-Level RBAC Guardrails (Admin, Manager, Speaker, Staff, Attendee)
     - Multi-turn conversation memory support
+    - Gemini-style Suggestion Chips (suggested_questions)
     - Smart Action Widgets for internal links and maps
     """
-    raw_question = payload.question.strip()
+    raw_question = (payload.question or payload.message or "").strip()
+    if len(raw_question) < 2:
+        return AttendeeChatResponse(
+            answer="Xin chào bạn! Tôi là Trợ Lý AI Toàn Năng EventHub. Bạn cần hỗ trợ thông tin gì về sự kiện hôm nay?",
+            suggested_questions=[
+                "🔴 Sự kiện nào đang diễn ra hôm nay?",
+                "📅 Xem danh mục sự kiện sắp diễn ra?",
+                "🎟️ Các phân hạng vé hiện có trong hệ thống?"
+            ],
+            sources=["EventHub AI Assistant"],
+            is_fallback=False,
+            ai_category="GENERAL",
+            action_links=[
+                {"label": "🔗 Danh mục sự kiện", "url": "/events"},
+                {"label": "🎟️ Vé của tôi", "url": "/registrations"},
+            ]
+        )
+
     event_id = payload.event_id
 
     # 1. PII Masking
@@ -261,10 +286,12 @@ async def chat_with_attendee_bot(
         event_id=event_id,
         user_id=user_id,
         user_role=role_name,
-        history=payload.history
+        history=payload.history,
+        current_system_time=payload.current_system_time
     )
 
     answer = copilot_result["answer"]
+    suggested_questions = copilot_result.get("suggested_questions", [])
     sources = copilot_result.get("sources", [])
     is_fallback = copilot_result.get("is_fallback", False)
     ai_category = copilot_result.get("ai_category", category)
@@ -286,9 +313,42 @@ async def chat_with_attendee_bot(
 
     return AttendeeChatResponse(
         answer=answer,
+        suggested_questions=suggested_questions,
         sources=sources,
         is_fallback=is_fallback,
         ai_category=ai_category,
         action_links=action_links
     )
+
+
+# ── AI Route Alias Router (Task 101) ─────────────────────────────────────────
+
+ai_chat_router = APIRouter(prefix="/ai", tags=["AI Copilot Chat"])
+
+
+@ai_chat_router.post("/chat", response_model=AttendeeChatResponse)
+async def ai_chat_post_endpoint(
+    payload: AttendeeChatRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    """Alias for /app/api/ai/chat and /api/ai/chat endpoint."""
+    return await chat_with_attendee_bot(payload=payload, db=db, current_user=current_user)
+
+
+@ai_chat_router.get("/chat")
+async def ai_chat_get_endpoint():
+    """Health & Capability Discovery for AI Chat Endpoint."""
+    return {
+        "status": "online",
+        "service": "EventHub AI Copilot & Hybrid RAG Engine",
+        "version": "2.0.0",
+        "features": [
+            "Dense+Sparse pgvector Hybrid Search",
+            "Redis Semantic Cache (<5ms)",
+            "Gemini-style Suggestion Chips",
+            "Anti-Hallucination Guardrails"
+        ]
+    }
+
 

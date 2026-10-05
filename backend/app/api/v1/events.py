@@ -6,6 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import require_roles, get_current_user_optional, get_user_role_name
+from app.core.timezone import (
+    get_vn_now,
+    to_vn_datetime,
+    parse_event_datetime_vn,
+    calculate_realtime_event_status,
+)
 from app.models.event import Event, EventSchedule
 from app.models.knowledge import KnowledgeBase
 from app.models.user import User
@@ -197,6 +203,9 @@ async def list_events(
     response_items = []
     for e in events:
         reg_info = user_reg_details.get(e.id)
+        start_dt = e.start_time or parse_event_datetime_vn(e.start_date)
+        end_dt = e.end_time or parse_event_datetime_vn(e.end_date)
+        realtime_status = calculate_realtime_event_status(start_dt, end_dt, e.status)
         response_items.append(
             EventResponse(
                 id=e.id,
@@ -212,7 +221,7 @@ async def list_events(
                 end_time=e.end_time,
                 start_date=e.start_date,
                 end_date=e.end_date,
-                status=e.status,
+                status=realtime_status,
                 capacity=e.capacity if e.capacity is not None else 500,
                 registered_count=e.registered_count if e.registered_count is not None else 0,
                 cover_image=e.cover_image,
@@ -285,6 +294,10 @@ async def get_event(
         if fb_res.scalar_one_or_none():
             has_reviewed = True
 
+    start_dt = event.start_time or parse_event_datetime_vn(event.start_date)
+    end_dt = event.end_time or parse_event_datetime_vn(event.end_date)
+    realtime_status = calculate_realtime_event_status(start_dt, end_dt, event.status)
+
     return EventResponse(
         id=event.id,
         title=event.title,
@@ -299,7 +312,7 @@ async def get_event(
         end_time=event.end_time,
         start_date=event.start_date,
         end_date=event.end_date,
-        status=event.status,
+        status=realtime_status,
         capacity=event.capacity if event.capacity is not None else 500,
         registered_count=event.registered_count if event.registered_count is not None else 0,
         cover_image=event.cover_image,
@@ -318,46 +331,18 @@ async def get_event(
 
 
 def parse_event_datetime(val: Any) -> Optional[datetime]:
-    if not val:
-        return None
-    if isinstance(val, datetime):
-        return val
-    if isinstance(val, str):
-        val_str = val.strip()
-        if not val_str:
-            return None
-        try:
-            return datetime.fromisoformat(val_str.replace("Z", "+00:00"))
-        except Exception:
-            pass
-        formats = [
-            "%d/%m/%Y %H:%M",
-            "%d/%m/%Y %H:%M:%S",
-            "%d/%m/%Y",
-            "%Y-%m-%d %H:%M",
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%d",
-            "%Y-%m-%dT%H:%M",
-            "%Y-%m-%dT%H:%M:%S",
-        ]
-        for fmt in formats:
-            try:
-                return datetime.strptime(val_str, fmt)
-            except Exception:
-                pass
-    return None
+    return parse_event_datetime_vn(val)
 
 
 def to_comparable_utc(dt: Optional[datetime]) -> Optional[datetime]:
     if dt is None:
         return None
     if isinstance(dt, str):
-        dt = parse_event_datetime(dt)
+        dt = parse_event_datetime_vn(dt)
         if dt is None:
             return None
-    if dt.tzinfo is None:
-        return dt.astimezone().astimezone(timezone.utc)
-    return dt.astimezone(timezone.utc)
+    vn_dt = to_vn_datetime(dt)
+    return vn_dt.astimezone(timezone.utc)
 
 
 async def check_event_time_location_overlap(
@@ -472,7 +457,7 @@ async def create_event(
         if role_name not in ["ADMIN", "EVENT_MANAGER"]:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền tạo sự kiện")
 
-    now = datetime.now()
+    now = get_vn_now()
     raw_start = parse_event_datetime(payload.start_time) or parse_event_datetime(payload.start_date) or now
     raw_end = parse_event_datetime(payload.end_time) or parse_event_datetime(payload.end_date) or (raw_start + timedelta(hours=3))
     start_dt = to_comparable_utc(raw_start)

@@ -3,6 +3,7 @@ import { User, UserRole } from '../types';
 export type { UserRole };
 import { apiService } from '../services/api';
 import { toast } from 'sonner';
+import { saveAccountToHistory } from '../utils/accountHistory';
 
 // Simple JWT payload decoder
 function decodeJWTPayload(token: string): Record<string, unknown> | null {
@@ -117,6 +118,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   register: (email: string, password: string, fullName: string, phoneNumber?: string) => Promise<boolean>;
   googleLogin: (payload: { credential?: string; email?: string; full_name?: string; avatar_url?: string }) => Promise<boolean>;
+  microsoftLogin: (payload: { access_token?: string; credential?: string; email?: string; full_name?: string; avatar_url?: string }) => Promise<boolean>;
   logout: (options?: { silent?: boolean; redirect?: boolean | string }) => void;
   switchDemoAccount: (role: UserRole) => void;
   updateUser: (updatedData: Partial<User>) => void;
@@ -225,6 +227,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           : role === 'STAFF'
           ? '🎫 Nhân Viên (Staff)'
           : '👤 Khách Tham Dự (Attendee)';
+      saveAccountToHistory({
+        email: response.user.email,
+        name: response.user.full_name,
+        avatar: response.user.avatar_url || undefined,
+        provider: (response.user.provider as any) || 'local',
+        lastUsed: Date.now(),
+      });
       toast.success(`Đăng nhập thành công! Chào ${roleDisplay}: ${response.user.full_name}`);
       return true;
     } catch (err: unknown) {
@@ -264,6 +273,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.setItem('eventhub_token', response.access_token);
       localStorage.setItem('eventhub_user', JSON.stringify(response.user));
       document.cookie = `eventhub_token=${response.access_token}; path=/; max-age=86400; SameSite=Lax`;
+      saveAccountToHistory({
+        email: response.user.email,
+        name: response.user.full_name,
+        avatar: response.user.avatar_url || undefined,
+        provider: 'local',
+        lastUsed: Date.now(),
+      });
       toast.success(`Đăng ký tài khoản thành công! Chào mừng ${response.user.full_name}`);
       return true;
     } catch (err: unknown) {
@@ -296,20 +312,58 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStorage.setItem('eventhub_token', response.access_token);
       localStorage.setItem('eventhub_user', JSON.stringify(response.user));
       document.cookie = `eventhub_token=${response.access_token}; path=/; max-age=86400; SameSite=Lax`;
-      const role = normalizeRole(response.user.role_name);
-      const roleDisplay =
-        role === 'ADMIN'
-          ? '👑 Admin'
-          : role === 'EVENT_MANAGER'
-          ? '🎯 Quản Lý Sự Kiện'
-          : role === 'STAFF'
-          ? '🎫 Nhân Viên'
-          : '👤 Khách Tham Dự';
-      toast.success(`Đăng nhập Google thành công! (${roleDisplay}: ${response.user.full_name})`);
+      saveAccountToHistory({
+        email: response.user.email,
+        name: response.user.full_name,
+        avatar: response.user.avatar_url || undefined,
+        provider: 'google',
+        lastUsed: Date.now(),
+      });
+      toast.success(`Đăng nhập thành công! Chào mừng ${response.user.full_name}`);
       return true;
     } catch (err: unknown) {
       console.error('Google login failed:', err);
       let errorMsg = 'Đăng nhập Google không thành công!';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axErr = err as { response?: { data?: { detail?: string } } };
+        if (axErr.response?.data?.detail) {
+          errorMsg = axErr.response.data.detail;
+        }
+      }
+      toast.error(errorMsg);
+      throw new Error(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const microsoftLogin = async (payload: {
+    access_token?: string;
+    credential?: string;
+    email?: string;
+    full_name?: string;
+    avatar_url?: string;
+  }): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const response = await apiService.microsoftAuth(payload);
+      setToken(response.access_token);
+      setUser(response.user);
+      localStorage.setItem('eventhub_token', response.access_token);
+      localStorage.setItem('eventhub_user', JSON.stringify(response.user));
+      document.cookie = `eventhub_token=${response.access_token}; path=/; max-age=86400; SameSite=Lax`;
+      saveAccountToHistory({
+        email: response.user.email,
+        name: response.user.full_name,
+        avatar: response.user.avatar_url || undefined,
+        provider: 'microsoft',
+        lastUsed: Date.now(),
+      });
+      toast.success(`Đăng nhập thành công! Chào mừng ${response.user.full_name}`);
+      return true;
+    } catch (err: unknown) {
+      console.error('Microsoft login failed:', err);
+      let errorMsg = 'Đăng nhập Microsoft không thành công!';
       if (err && typeof err === 'object' && 'response' in err) {
         const axErr = err as { response?: { data?: { detail?: string } } };
         if (axErr.response?.data?.detail) {
@@ -388,6 +442,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         register,
         googleLogin,
+        microsoftLogin,
         logout,
         switchDemoAccount,
         updateUser,

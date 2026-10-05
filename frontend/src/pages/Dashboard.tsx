@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Calendar, Clock, CloudRain, Users, Mic, QrCode, ArrowUpRight, ArrowDownRight,
+  Calendar, Clock, CloudRain, Sun, CloudSun, Users, Mic, QrCode, ArrowUpRight, ArrowDownRight,
   Plus, ScanLine, Sparkles, UserPlus, FileText, CheckCircle2, XCircle, AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useRealTimeClock } from '../hooks/useRealTimeClock';
 import { apiService } from '../services/api';
 import { useEventSync } from '../services/eventSync';
 import { cleanEventTitle } from '../components/EventCard';
@@ -86,6 +87,7 @@ export interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
   const { user } = useAuth();
+  const { dateFormatted, timeString12, weather } = useRealTimeClock();
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'quarter' | 'year'>('year');
   const [events, setEvents] = useState<Event[]>([]);
   const [, setLoadingEvents] = useState<boolean>(true);
@@ -216,20 +218,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
           <p className="text-[#64748B] mt-1 font-medium">Quản trị viên hệ thống</p>
         </div>
         
-        <div className="flex items-center gap-4 bg-white px-4 py-2.5 rounded-xl border border-[#E5EAF2] shadow-sm">
+        <div className="flex items-center gap-4 bg-white px-4 py-2.5 rounded-xl border border-[#E5EAF2] shadow-sm select-none">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-[#DC2626]" />
-            <span className="text-[13px] font-bold text-[#12213A]">25/11/2026</span>
+            <span className="text-[13px] font-bold text-[#12213A]">{dateFormatted}</span>
           </div>
           <div className="w-px h-4 bg-[#E5EAF2]"></div>
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-slate-400" />
-            <span className="text-[13px] font-bold text-[#12213A]">08:30 AM</span>
+            <span className="text-[13px] font-bold text-[#12213A] font-mono">{timeString12}</span>
           </div>
           <div className="w-px h-4 bg-[#E5EAF2]"></div>
           <div className="flex items-center gap-2">
-            <CloudRain className="w-4 h-4 text-blue-500" />
-            <span className="text-[13px] font-bold text-[#12213A]">24°C Hà Nội</span>
+            {weather.condition === 'sunny' ? (
+              <Sun className="w-4 h-4 text-amber-500 animate-spin-slow" />
+            ) : weather.condition === 'rain' ? (
+              <CloudRain className="w-4 h-4 text-blue-500" />
+            ) : (
+              <CloudSun className="w-4 h-4 text-sky-500" />
+            )}
+            <span className="text-[13px] font-bold text-[#12213A]">{weather.tempText}</span>
           </div>
         </div>
       </div>

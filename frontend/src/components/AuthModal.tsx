@@ -4,6 +4,8 @@ import { X, Mail, Lock, User, Phone, Sparkles, LogIn, UserPlus, Crown, Briefcase
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
 import { GoogleAuthModal, GoogleIcon } from './GoogleAuthModal';
+import { MicrosoftAuthModal, MicrosoftIcon } from './MicrosoftAuthModal';
+import { AccountPickerModal } from './auth/AccountPickerModal';
 import { useTranslation } from 'react-i18next';
 
 interface AuthModalProps {
@@ -73,6 +75,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
   const [phoneNumber, setPhoneNumber] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [showMicrosoftModal, setShowMicrosoftModal] = useState(false);
+  const [isAccountPickerOpen, setIsAccountPickerOpen] = useState(false);
+  const [accountPickerProvider, setAccountPickerProvider] = useState<'google' | 'microsoft'>('google');
 
   const { login, register, isLoading } = useAuth();
   const isDemoLoginEnabled = import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
@@ -192,18 +197,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
 
         {/* Scrollable Content */}
         <div className="p-6 overflow-y-auto space-y-5 flex-1 min-h-0">
-          {/* Google OAuth Button */}
-          <div>
+          {/* Google & Microsoft SSO Buttons */}
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               disabled={isLoading}
-              onClick={() => setShowGoogleModal(true)}
-              className="w-full py-2.5 px-4 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 border border-slate-200"
+              onClick={() => {
+                setAccountPickerProvider('google');
+                setIsAccountPickerOpen(true);
+              }}
+              className="py-2.5 px-3 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 border border-slate-200"
             >
               <GoogleIcon className="w-4 h-4" />
-              <span>
-                {mode === 'login' ? t('auth.googleLogin') : t('auth.googleRegister')}
-              </span>
+              <span>Google</span>
+            </button>
+            <button
+              type="button"
+              disabled={isLoading}
+              onClick={() => {
+                setAccountPickerProvider('microsoft');
+                setIsAccountPickerOpen(true);
+              }}
+              className="py-2.5 px-3 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 border border-slate-200"
+            >
+              <MicrosoftIcon className="w-4 h-4" />
+              <span>Microsoft</span>
             </button>
           </div>
 
@@ -366,6 +384,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, defaultMo
         onClose={() => setShowGoogleModal(false)}
         onSuccess={() => {
           setShowGoogleModal(false);
+          onClose();
+        }}
+      />
+
+      <MicrosoftAuthModal
+        isOpen={showMicrosoftModal}
+        onClose={() => setShowMicrosoftModal(false)}
+        onSuccess={() => {
+          setShowMicrosoftModal(false);
+          onClose();
+        }}
+      />
+
+      <AccountPickerModal
+        isOpen={isAccountPickerOpen}
+        provider={accountPickerProvider}
+        onClose={() => setIsAccountPickerOpen(false)}
+        onSuccess={() => {
+          setIsAccountPickerOpen(false);
           onClose();
         }}
       />

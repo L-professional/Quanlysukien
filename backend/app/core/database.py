@@ -1,3 +1,4 @@
+import logging
 from typing import AsyncGenerator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -6,12 +7,16 @@ from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
 # Create Async SQLAlchemy Engine with NullPool to prevent event loop connection reuse issues on Windows
+# Force PostgreSQL session timezone to Asia/Ho_Chi_Minh (UTC+7)
 engine = create_async_engine(
     settings.async_database_url,
     echo=False,
     future=True,
     poolclass=NullPool,
+    connect_args={"server_settings": {"timezone": "Asia/Ho_Chi_Minh"}},
 )
 
 # Async Session Factory
@@ -184,5 +189,11 @@ async def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS ix_user_sessions_user_id ON user_sessions(user_id);",
         ]
         for migration in migrations:
-            await conn.execute(text(migration))
+            try:
+                async with conn.begin_nested():
+                    await conn.execute(text(migration))
+            except Exception as e:
+                # Log and safely continue past duplicate index errors
+                logger.debug(f"Migration statement skipped: {e}")
+
 

@@ -29,6 +29,7 @@ from app.schemas.auth import (
     Token,
     UserResponse,
     GoogleAuthRequest,
+    MicrosoftAuthRequest,
     ChangePasswordRequest,
     TwoFactorGenerateResponse,
     TwoFactorVerifyRequest,
@@ -368,6 +369,126 @@ async def google_auth(
             user.avatar_url = avatar_url
         if hasattr(user, "provider"):
             user.provider = "google"
+
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    role_name = await get_user_role_name(user, db)
+    access_token = create_access_token(data={
+        "sub": str(user.id),
+        "email": user.email,
+        "role": role_name,
+    })
+
+    user_resp = await _build_user_response(user, db)
+    return Token(access_token=access_token, token_type="bearer", user=user_resp)
+
+
+@router.post("/microsoft", response_model=Token)
+async def microsoft_auth(
+    payload: MicrosoftAuthRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Authenticate user with Microsoft OAuth 2.0 (Azure AD / Entra ID) credential or profile.
+    - If email does not exist: Automatically register in PostgreSQL with role PARTICIPANT and provider="microsoft".
+    - If email exists: Log in, update last_active_at / avatar_url, and return JWT token.
+    """
+    await ensure_default_roles(db)
+
+    email = None
+    full_name = None
+    avatar_url = None
+
+    # 1. If access_token is provided, verify with Microsoft Graph API
+    if payload.access_token:
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                res = await client.get(
+                    "https://graph.microsoft.com/v1.0/me",
+                    headers={"Authorization": f"Bearer {payload.access_token}"}
+                )
+                if res.status_code == 200:
+                    info = res.json()
+                    email = info.get("mail") or info.get("userPrincipalName")
+                    full_name = info.get("displayName") or info.get("givenName")
+        except Exception:
+            pass
+
+    # 2. If credential (JWT id_token) is provided, decode payload
+    if not email and payload.credential:
+        try:
+            import json, base64
+            parts = payload.credential.split(".")
+            if len(parts) >= 2:
+                padding = 4 - len(parts[1]) % 4
+                padded = parts[1] + ("=" * (padding % 4))
+                decoded_bytes = base64.urlsafe_b64decode(padded)
+                jwt_data = json.loads(decoded_bytes.decode("utf-8"))
+                email = jwt_data.get("email") or jwt_data.get("preferred_username") or jwt_data.get("upn")
+                full_name = jwt_data.get("name") or jwt_data.get("preferred_username")
+        except Exception:
+            pass
+
+    # 3. Use direct payload fields if present
+    if not email and payload.email:
+        email = str(payload.email)
+        full_name = payload.full_name or email.split("@")[0]
+        avatar_url = payload.avatar_url
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không thể xác thực danh tính Microsoft. Token hoặc email không hợp lệ!"
+        )
+
+    email_clean = email.lower().strip()
+    full_name_clean = (full_name or email_clean.split("@")[0]).strip()
+    if not avatar_url:
+        avatar_url = f"https://api.dicebear.com/7.x/initials/svg?seed={email_clean}"
+
+    # Check if user already exists
+    stmt = select(User).where(User.email == email_clean)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+
+    if user:
+        # Trường hợp: Email Microsoft ĐÃ tồn tại -> Đăng nhập
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin.",
+            )
+        user.last_active_at = datetime.now(timezone.utc)
+        if avatar_url and hasattr(user, "avatar_url"):
+            user.avatar_url = avatar_url  # Auto sync avatar
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    else:
+        # Trường hợp: Email Microsoft CHƯA tồn tại -> Tự động đăng ký mới với role PARTICIPANT
+        res_role = await db.execute(select(Role).where(Role.role_name == RoleEnum.PARTICIPANT.value))
+        role = res_role.scalars().first()
+        if not role:
+            role = await db.get(Role, 4)
+        role_id = role.id if role else 4
+
+        random_pwd = secrets.token_urlsafe(16)
+        hashed_pwd = get_password_hash(random_pwd)
+
+        user = User(
+            email=email_clean,
+            full_name=full_name_clean,
+            hashed_password=hashed_pwd,
+            role_id=role_id,
+            is_active=True,
+            last_active_at=datetime.now(timezone.utc),
+        )
+        if hasattr(user, "avatar_url"):
+            user.avatar_url = avatar_url
+        if hasattr(user, "provider"):
+            user.provider = "microsoft"
 
         db.add(user)
         await db.commit()

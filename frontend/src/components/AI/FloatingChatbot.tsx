@@ -21,6 +21,7 @@ import { ChatMessage, EventScheduleItem, ActionLink } from '../../types';
 import { apiService } from '../../services/api';
 import { useEvent } from '../../context/EventContext';
 import { useAuth } from '../../context/AuthContext';
+import { executeClientAutonomousCopilot } from '../../utils/aiCopilotClient';
 
 export const FloatingChatbot: React.FC = () => {
   const { activeEvent } = useEvent();
@@ -97,6 +98,18 @@ export const FloatingChatbot: React.FC = () => {
       welcomeDesc = `Kính chào Diễn giả ${user?.full_name || 'Speaker'}! Em là AI Copilot hỗ trợ kiểm tra phòng thuyết trình, lịch trình cá nhân và feedback từ khán giả.`;
     }
 
+    const initialSuggestions = role === 'ADMIN' || role === 'EVENT_MANAGER'
+      ? [
+          '📊 Báo cáo tỷ lệ check-in và số lượng sự kiện?',
+          '🎟️ Thống kê tổng số vé đã đăng ký?',
+          '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+        ]
+      : [
+          '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
+          '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+          '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+        ];
+
     setMessages([
       {
         id: `welcome-${Date.now()}`,
@@ -112,7 +125,8 @@ export const FloatingChatbot: React.FC = () => {
           : [
               { label: '🔗 Danh mục sự kiện', url: '/events' },
               { label: '🎟️ Vé của tôi', url: '/registrations' },
-            ]
+            ],
+        suggestedQuestions: initialSuggestions,
       },
     ]);
   };
@@ -148,17 +162,17 @@ export const FloatingChatbot: React.FC = () => {
     setInputQuery('');
     setLoading(true);
 
+    const historyPayload = messages.slice(-6).map((m) => ({
+      sender: m.sender,
+      text: m.text,
+    }));
+
+    // Task 93: Remove event context lock - only pass specific eventId if explicitly on an event page
+    const pathname = window.location.pathname;
+    const eventDetailMatch = pathname.match(/^\/events\/(\d+)$/);
+    const contextualEventId = eventDetailMatch ? parseInt(eventDetailMatch[1], 10) : undefined;
+
     try {
-      const historyPayload = messages.slice(-6).map((m) => ({
-        sender: m.sender,
-        text: m.text,
-      }));
-
-      // Task 93: Remove event context lock - only pass specific eventId if explicitly on an event page
-      const pathname = window.location.pathname;
-      const eventDetailMatch = pathname.match(/^\/events\/(\d+)$/);
-      const contextualEventId = eventDetailMatch ? parseInt(eventDetailMatch[1], 10) : undefined;
-
       const response = await apiService.sendAttendeeChat(query, contextualEventId, {
         history: historyPayload,
         user_id: user?.id,
@@ -173,6 +187,12 @@ export const FloatingChatbot: React.FC = () => {
         sourcesList = ['CSDL PostgreSQL Events'];
       }
 
+      const suggestedQuestions = response.suggested_questions || (response as any).suggestedQuestions || [
+        '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
+        '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+        '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+      ];
+
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
         sender: 'ai',
@@ -181,22 +201,56 @@ export const FloatingChatbot: React.FC = () => {
         sources: sourcesList,
         isFallback: response.is_fallback,
         actionLinks: response.action_links,
+        suggestedQuestions,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
-    } catch {
-      const fallbackAiMsg: ChatMessage = {
-        id: `ai-hybrid-${Date.now()}`,
-        sender: 'ai',
-        text: `Hệ thống AI Copilot đang kết nối CSDL PostgreSQL. Bạn có thể hỏi tôi về bất kỳ sự kiện nào trong danh mục hoặc sự kiện đang diễn ra hôm nay!\n\n[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events)`,
-        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        sources: ['PostgreSQL Events (Global)'],
-        isFallback: false,
-        actionLinks: [
-          { label: '🔗 Danh mục sự kiện', url: '/events' },
-        ],
-      };
-      setMessages((prev) => [...prev, fallbackAiMsg]);
+    } catch (err) {
+      console.warn('Chat request fallback error:', err);
+      try {
+        const liveEvents = await apiService.getEvents();
+        const clientRes = executeClientAutonomousCopilot({
+          question: query,
+          events: liveEvents,
+          eventId: contextualEventId,
+          userId: user?.id,
+          role: userRole,
+          history: historyPayload,
+        });
+        const fallbackAiMsg: ChatMessage = {
+          id: `ai-hybrid-${Date.now()}`,
+          sender: 'ai',
+          text: clientRes.answer,
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          sources: clientRes.sources && clientRes.sources.length > 0 ? clientRes.sources : ['CSDL Live Events (Zero-Cache)'],
+          isFallback: false,
+          actionLinks: clientRes.action_links,
+          suggestedQuestions: clientRes.suggested_questions || [
+            '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
+            '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+            '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+          ],
+        };
+        setMessages((prev) => [...prev, fallbackAiMsg]);
+      } catch {
+        const fallbackAiMsg: ChatMessage = {
+          id: `ai-hybrid-${Date.now()}`,
+          sender: 'ai',
+          text: `Hệ thống AI Copilot đang kết nối CSDL EventHub. Bạn có thể hỏi tôi về bất kỳ sự kiện nào trong danh mục hoặc sự kiện đang diễn ra hôm nay!\n\n[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events)`,
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          sources: ['EventHub Events (Global)'],
+          isFallback: false,
+          actionLinks: [
+            { label: '🔗 Danh mục sự kiện', url: '/events' },
+          ],
+          suggestedQuestions: [
+            '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
+            '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+            '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+          ],
+        };
+        setMessages((prev) => [...prev, fallbackAiMsg]);
+      }
     } finally {
       setLoading(false);
     }
@@ -444,6 +498,30 @@ export const FloatingChatbot: React.FC = () => {
                       <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-950 border border-red-800/70 text-red-300 shrink-0">
                         AI Copilot
                       </span>
+                    </div>
+                  )}
+
+                  {/* Gemini-style Dynamic Pill Suggestion Chips */}
+                  {msg.sender === 'ai' && (msg.suggestedQuestions || msg.suggested_questions) && (msg.suggestedQuestions || msg.suggested_questions)!.length > 0 && (
+                    <div className="pt-2.5 flex flex-col gap-1.5 border-t border-slate-700/50">
+                      <div className="text-[10px] font-semibold text-slate-400 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-cyan-400" />
+                        <span>Gợi ý câu hỏi tiếp theo:</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(msg.suggestedQuestions || msg.suggested_questions)!.slice(0, 3).map((chip, cIdx) => (
+                          <button
+                            key={cIdx}
+                            type="button"
+                            disabled={loading}
+                            onClick={() => handleSendMessage(chip)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-700/90 border border-slate-600/70 hover:border-cyan-500/60 text-slate-200 hover:text-cyan-200 text-[11px] font-medium transition-all shadow-sm cursor-pointer disabled:opacity-50 text-left active:scale-95"
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0"></span>
+                            <span>{chip}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 

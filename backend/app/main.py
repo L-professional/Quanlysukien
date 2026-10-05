@@ -127,8 +127,9 @@ async def lifespan(app: FastAPI):
             await conn.execute(text("UPDATE event_schedules SET capacity = 500, registered_count = 340 WHERE id = 2 AND registered_count = 0;"))
             await conn.execute(text("UPDATE event_schedules SET capacity = 300, registered_count = 215 WHERE id = 3 AND registered_count = 0;"))
             await conn.execute(text("UPDATE event_schedules SET capacity = 200, registered_count = 136 WHERE id = 4 AND registered_count = 0;"))
-            await conn.execute(text("UPDATE event_schedules SET capacity = 450, registered_count = 306 WHERE id = 5 AND registered_count = 0;"))
-        print("User, Registration & Event columns ensured.")
+            # Ensure event_knowledge_base view for 100% backward compatibility (Task 101)
+            await conn.execute(text("CREATE OR REPLACE VIEW event_knowledge_base AS SELECT * FROM knowledge_base;"))
+        print("User, Registration, Event columns & event_knowledge_base view ensured.")
     except Exception as e:
         print(f"Warning: Column migration skipped: {e}")
 
@@ -155,6 +156,15 @@ async def lifespan(app: FastAPI):
                 print(f"Database already has {event_count} events. Skipping seed.")
     except Exception as e:
         print(f"Warning: Auto-seed skipped: {e}")
+
+    # Synchronize all event statuses with real-time Hanoi clock (UTC+7)
+    try:
+        from app.core.timezone import sync_all_events_with_realtime, get_vn_now
+        async with AsyncSessionLocal() as sync_session:
+            sync_res = await sync_all_events_with_realtime(sync_session)
+            print(f"Event statuses synchronized with Hanoi real-time ({get_vn_now().strftime('%d/%m/%Y %H:%M:%S')}): {sync_res['updated_events']} updated.")
+    except Exception as e:
+        print(f"Warning: Event real-time synchronization skipped: {e}")
 
     yield
 
@@ -185,7 +195,13 @@ app.add_middleware(
 
 # Include API Routers
 from app.api.v1.router import api_v1_router
+from app.api.v1.feedback import router as feedback_router
+from app.api.v1.public_chat import ai_chat_router, router as chat_router
 app.include_router(api_v1_router, prefix=settings.API_V1_STR)
+app.include_router(feedback_router, prefix="/api")
+app.include_router(ai_chat_router, prefix="/api")
+app.include_router(chat_router, prefix="/api")
+
 
 # Mount Static Files for Uploads & Slides
 import os
