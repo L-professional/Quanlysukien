@@ -2142,4 +2142,21 @@
     - Chạy `npm run build` (`tsc && vite build`) trong `frontend`: **1836 modules transformed, 0 lỗi TypeScript, build thành công 100% trong 6.27s**.
     - Đã commit và push toàn bộ bản vá lên nhánh `feature/fix` để Vercel tự động re-deploy.
 
+---
+
+### [x] Task 104: Diagnostic & Fix - Đồng Bộ Code Git Remote, Sửa Lỗi Build Monorepo & Trigger Vercel Deploy
+  - **1. Kiểm Tra Git Remote & Trạng Thái Nhánh main:**
+    - Đã kiểm tra `git remote -v`: Khớp chính xác `git@github.com:L-professional/Quanlysukien.git` (Fetch & Push).
+    - Đã xác nhận `git log -n 5` trên nhánh `main`: Commit merge gần nhất (`ca07820 Merge branch 'feature/fix' into main`) đã nằm trên đỉnh nhánh `main` và đồng bộ với `origin/main`.
+  - **2. Kiểm Tra Lỗi Biên Dịch Local (Build Failure Check):**
+    - Chạy thử câu lệnh `npm run build` tại thư mục `/frontend`: Biên dịch thành công 100% không phát sinh bất kỳ lỗi TypeScript, Linting hay Import sai đường dẫn nào (`tsc && vite build` built thành công 2205 modules transformed).
+    - Chạy thử `npm run build` tại thư mục gốc Monorepo (`cd frontend && npm install && npm run build`): Đạt kết quả exit code 0 thành công rực rỡ.
+  - **3. Chuẩn Hóa Cấu Hình Root Directory / Monorepo Cho Vercel:**
+    - Đã cập nhật file `vercel.json` ở thư mục gốc: Bổ sung tường minh `"framework": "vite"` bên cạnh `"buildCommand": "cd frontend && npm run build"`, `"outputDirectory": "frontend/dist"` và rules `rewrites` (/api/* bypass trước SPA fallback).
+    - Đảm bảo đồng bộ với `frontend/vercel.json` khi Vercel được cấu hình chạy ở root hoặc chạy trực tiếp từ thư mục `frontend`.
+  - **4. Tạo Commit Kích Hoạt (Trigger Re-deploy):**
+    - Đã commit thay đổi cấu hình `vercel.json` và cập nhật `TASKS.md`.
+    - Push trực tiếp lên nhánh `main` (`origin main`) để kích hoạt webhook Vercel tự động build & deploy phiên bản mới nhất cho Production.
+
+
 
