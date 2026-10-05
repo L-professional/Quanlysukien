@@ -2183,3 +2183,16 @@
     - Biên dịch Frontend (`tsc && vite build`): **2205 modules transformed, 0 lỗi TypeScript, build thành công 100%**.
     - Biên dịch Monorepo root (`npm run build`): **Exit code 0, hoàn toàn tương thích Monorepo Vercel**.
     - Commit và push trực tiếp lên `origin/main` để kích hoạt Vercel tự động build và deploy bản mới nhất.
+
+---
+
+### [x] Task 106: Chuẩn Bị & Tối Ưu Hóa Backend FastAPI Cho Render.com (Cloud Deployment Readiness)
+  - **1. Chuẩn Hóa Chuỗi Kết Nối Database Trên Cloud (AsyncPG URL Adaptation):**
+    - Cập nhật `backend/app/core/config.py`: Tự động nhận diện và chuyển đổi cả 2 định dạng connection string phổ biến trên Render (`postgres://` và `postgresql://`) thành `postgresql+asyncpg://`, ngăn chặn hoàn toàn lỗi crash `NoSuchModuleError: Can't load plugin: sqlalchemy.dialects:postgres` khi chạy trên Render Managed PostgreSQL.
+  - **2. Bọc An Toàn Khởi Tạo CSDL & Extension Pgvector:**
+    - Cập nhật `backend/app/core/database.py`: Bọc lệnh `CREATE EXTENSION IF NOT EXISTS vector;` trong khối `try-except` an toàn, đảm bảo `Base.metadata.create_all` luôn được thực thi trơn tru để tạo toàn bộ bảng CSDL ngay cả khi instance PostgreSQL ban đầu chưa kích hoạt quyền superuser hoặc extension vector.
+  - **3. Cấu Hình CORS Mở Rộng Cho Vercel Domains:**
+    - Cập nhật `backend/app/main.py`: Bổ sung `allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:.*|https://.*\.onrender\.com"` hỗ trợ toàn bộ domain Vercel Production và các link preview ngẫu nhiên của Vercel (`quanlysukien-*.vercel.app`) không bị chặn bởi trình duyệt.
+  - **4. Cập Nhật Cấu Hình Render Blueprint (`render.yaml`):**
+    - Chuẩn hóa `render.yaml`: Bổ sung `healthCheckPath: /health`, `autoDeploy: true`, hỗ trợ deploy song song Web Service FastAPI và Database PostgreSQL chỉ với 1 cú click.
+

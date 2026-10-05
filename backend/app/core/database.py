@@ -47,8 +47,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """Initialize database extensions and create tables."""
     async with engine.begin() as conn:
-        # Enable pgvector extension for PostgreSQL
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        # Enable pgvector extension for PostgreSQL if available
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        except Exception as e:
+            logger.warning(f"Could not enable vector extension (may not be supported on this instance): {e}")
         # Create all tables registered with Base metadata
         await conn.run_sync(Base.metadata.create_all)
         # Ensure schema migrations for newly added columns

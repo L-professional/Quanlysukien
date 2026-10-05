@@ -6,6 +6,8 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -22,13 +24,12 @@ services:
       - key: RESEND_API_KEY
         sync: false
       - key: CORS_ORIGINS
-        value: "https://quanlysukien.vercel.app,http://localhost:5173,http://localhost:3000"
+        value: "https://quanlysukien.vercel.app,http://localhost:5173,http://localhost:3000,http://localhost:3001"
       - key: PYTHON_VERSION
         value: "3.11.0"
-    healthCheckPath: /health
 
 databases:
-  # PostgreSQL Database (Free tier on Render)
+  # PostgreSQL Database (Render Database)
   - name: eventhub-db
     databaseName: eventhub
     user: eventhub_user

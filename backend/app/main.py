@@ -183,10 +183,17 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS Middleware Configuration (Task 21)
+# CORS Middleware Configuration (Task 21 & Production Cloud Support)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:5173",
+        "http://localhost:8080",
+        "https://quanlysukien.vercel.app",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app|http://localhost:.*|https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
