@@ -290,9 +290,10 @@ export const UserManagement: React.FC = () => {
     setLoading(true);
     try {
       const data = await apiService.getAdminUsers();
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : []);
     } catch {
       toast.error(t('users.loadUsersFailed', { defaultValue: 'Không thể tải danh sách người dùng' }));
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -301,9 +302,10 @@ export const UserManagement: React.FC = () => {
   const loadLogs = useCallback(async () => {
     try {
       const data = await apiService.getSecurityLogs();
-      setLogs(data);
+      setLogs(Array.isArray(data) ? data : []);
     } catch {
       toast.error(t('users.loadLogsFailed', { defaultValue: 'Không thể tải nhật ký bảo mật' }));
+      setLogs([]);
     }
   }, [t]);
 
@@ -339,7 +341,7 @@ export const UserManagement: React.FC = () => {
     if (!deleteTarget) return;
     try {
       await apiService.deleteUser(deleteTarget.id);
-      setUsers((prev) => prev.filter((u) => u.id !== deleteTarget.id));
+      setUsers((prev) => (Array.isArray(prev) ? prev : []).filter((u) => u.id !== deleteTarget.id));
       toast.success(`${t('users.deletedSuccess', { defaultValue: 'Đã xóa tài khoản' })} ${deleteTarget.full_name}`);
     } catch {
       toast.error(t('users.deleteFailed', { defaultValue: 'Không thể xóa tài khoản. Vui lòng thử lại.' }));
@@ -387,17 +389,18 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  const filteredUsers = users.filter(
+  const safeUsers = Array.isArray(users) ? users : [];
+  const filteredUsers = safeUsers.filter(
     (u) =>
-      u.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
+      (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const stats = {
-    total: users.length,
-    online: users.filter((u) => u.is_online).length,
-    admins: users.filter((u) => u.role_name.toUpperCase() === 'ADMIN').length,
-    locked: users.filter((u) => !u.is_active).length,
+    total: safeUsers.length,
+    online: safeUsers.filter((u) => u.is_online).length,
+    admins: safeUsers.filter((u) => (u.role_name || '').toUpperCase() === 'ADMIN').length,
+    locked: safeUsers.filter((u) => !u.is_active).length,
   };
 
   return (

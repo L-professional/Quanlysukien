@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Calendar,
   Clock,
@@ -268,6 +268,7 @@ export const EventSchedule: React.FC = () => {
     }
   };
   const [schedules, setSchedules] = useState<EventScheduleItem[]>([]);
+  const safeSchedules: EventScheduleItem[] = useMemo(() => (Array.isArray(schedules) ? schedules : []), [schedules]);
   const [loading, setLoading] = useState<boolean>(true);
   const [now, setNow] = useState<Date>(new Date());
 
@@ -364,7 +365,7 @@ export const EventSchedule: React.FC = () => {
       setSubmittedFeedbackIds([]);
       return;
     }
-    const reviewedFromSchedule = schedules
+    const reviewedFromSchedule = safeSchedules
       .filter((s) => s.has_reviewed)
       .map((s) => s.id);
 
@@ -377,7 +378,7 @@ export const EventSchedule: React.FC = () => {
     }
     const merged = Array.from(new Set([...reviewedFromSchedule, ...savedUserFeedback]));
     setSubmittedFeedbackIds(merged);
-  }, [user?.id, schedules]);
+  }, [user?.id, safeSchedules]);
 
   // Card Level Action Menu & Edit/Delete States
   const [openCardMenuId, setOpenCardMenuId] = useState<number | null>(null);
@@ -466,7 +467,7 @@ export const EventSchedule: React.FC = () => {
     setIsDeletingSchedule(true);
     try {
       await apiService.deleteEventSchedule(deletingScheduleItem.id, activeEvent.id);
-      setSchedules((prev) => prev.filter((s) => s.id !== deletingScheduleItem.id));
+      setSchedules((prev) => (Array.isArray(prev) ? prev : []).filter((s) => s.id !== deletingScheduleItem.id));
       toast.success(`Đã xóa phiên "${deletingScheduleItem.title}" khỏi danh sách!`);
       setDeletingScheduleItem(null);
     } catch (err: unknown) {
@@ -660,9 +661,10 @@ export const EventSchedule: React.FC = () => {
     setLoading(true);
     try {
       const items = await apiService.getEventSchedule(targetId);
-      setSchedules(items);
+      setSchedules(Array.isArray(items) ? items : []);
     } catch (err) {
       console.error('Failed to fetch event schedule:', err);
+      setSchedules([]);
     } finally {
       setLoading(false);
     }
@@ -678,7 +680,8 @@ export const EventSchedule: React.FC = () => {
       apiService.getMySessionReminders().then((res) => {
         if (res && res.session_ids && Array.isArray(res.session_ids)) {
           setBookmarkedIds((prev) => {
-            const combined = Array.from(new Set([...prev, ...res.session_ids]));
+            const safePrev = Array.isArray(prev) ? prev : [];
+            const combined = Array.from(new Set([...safePrev, ...res.session_ids]));
             try {
               localStorage.setItem('eventhub_my_agenda', JSON.stringify(combined));
             } catch (e) {
@@ -694,12 +697,13 @@ export const EventSchedule: React.FC = () => {
   // Personal Agenda & Bookmark Toggle with localStorage Persistence & Email Reminders (Task 34)
   const toggleBookmark = (id: number, title: string) => {
     setBookmarkedIds((prev) => {
+      const safePrev = Array.isArray(prev) ? prev : [];
       let updated: number[];
-      if (prev.includes(id)) {
-        updated = prev.filter((i) => i !== id);
+      if (safePrev.includes(id)) {
+        updated = safePrev.filter((i) => i !== id);
         toast.info(`Đã bỏ đặt lịch: "${title}"`);
       } else {
-        updated = [...prev, id];
+        updated = [...safePrev, id];
         toast.success(`Đã thêm vào lịch cá nhân: "${title}" (Hệ thống sẽ gửi email nhắc trước 24h và 1h)`);
       }
       try {
@@ -812,8 +816,8 @@ export const EventSchedule: React.FC = () => {
 
   const handleExportAllICS = () => {
     const targets = bookmarkedIds.length > 0
-      ? schedules.filter((s) => bookmarkedIds.includes(s.id))
-      : schedules;
+      ? safeSchedules.filter((s) => bookmarkedIds.includes(s.id))
+      : safeSchedules;
 
     if (targets.length === 0) {
       toast.info('Chưa có ca diễn thuyết nào để xuất file lịch!');
@@ -1064,7 +1068,7 @@ export const EventSchedule: React.FC = () => {
   const handleDeleteMaterial = async (materialId: number) => {
     try {
       await apiService.deleteSessionMaterial(materialId);
-      setSessionMaterials((prev) => prev.filter((m) => m.id !== materialId));
+      setSessionMaterials((prev) => (Array.isArray(prev) ? prev : []).filter((m) => m.id !== materialId));
       toast.success('Đã xóa tài liệu!');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Không thể xóa tài liệu';
@@ -1329,7 +1333,7 @@ export const EventSchedule: React.FC = () => {
   };
 
   // Filtered schedules
-  const filteredSchedules = schedules.filter((item) => {
+  const filteredSchedules: EventScheduleItem[] = safeSchedules.filter((item: EventScheduleItem) => {
     if (showMyAgendaOnly && !bookmarkedIds.includes(item.id)) {
       return false;
     }
@@ -1350,7 +1354,7 @@ export const EventSchedule: React.FC = () => {
     return true;
   });
 
-  const roomsList = Array.from(new Set(schedules.map((s) => s.room_location)));
+  const roomsList: string[] = Array.from(new Set<string>(safeSchedules.map((s: EventScheduleItem) => s.room_location)));
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in text-slate-900">
@@ -1623,23 +1627,23 @@ export const EventSchedule: React.FC = () => {
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white'
             }`}
           >
-            Tất cả các ngày ({schedules.length})
+            Tất cả các ngày ({safeSchedules.length})
           </button>
 
           {/* Các tab ngày thực tế được trích xuất động từ danh sách sự kiện hiện có */}
           {Array.from(
-            new Set(schedules.map((s) => extractItemDate(s, activeEvent.start_date)))
+            new Set<string>(safeSchedules.map((s: EventScheduleItem) => extractItemDate(s, activeEvent.start_date)))
           )
-            .sort((a, b) => {
+            .sort((a: string, b: string) => {
               const parseDmy = (dStr: string) => {
                 const [d, m, y] = dStr.split('/').map(Number);
                 return new Date(y, m - 1, d).getTime();
               };
               return parseDmy(a) - parseDmy(b);
             })
-            .map((dateStr) => {
-              const count = schedules.filter(
-                (s) => extractItemDate(s, activeEvent.start_date) === dateStr
+            .map((dateStr: string) => {
+              const count = safeSchedules.filter(
+                (s: EventScheduleItem) => extractItemDate(s, activeEvent.start_date) === dateStr
               ).length;
               const isSelected = !showMyAgendaOnly && selectedDate === dateStr;
               return (

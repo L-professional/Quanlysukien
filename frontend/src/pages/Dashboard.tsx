@@ -95,9 +95,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
   const fetchDashboardEvents = useCallback(async () => {
     try {
       const data = await apiService.getEvents();
-      setEvents(data);
+      setEvents(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to load dashboard events', err);
+      setEvents([]);
     } finally {
       setLoadingEvents(false);
     }
@@ -110,37 +111,39 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
   // Real-time synchronization whenever events are updated, created, or deleted across the system
   useEventSync(fetchDashboardEvents);
 
+  const safeEvents = useMemo(() => (Array.isArray(events) ? events : []), [events]);
+
   const upcomingCount = useMemo(
-    () => events.filter((e) => ['UPCOMING', 'upcoming', 'PUBLISHED', 'published'].includes(e.status)).length,
-    [events]
+    () => safeEvents.filter((e) => ['UPCOMING', 'upcoming', 'PUBLISHED', 'published'].includes(e.status)).length,
+    [safeEvents]
   );
   const ongoingCount = useMemo(
-    () => events.filter((e) => ['ONGOING', 'ongoing', 'LIVE', 'live'].includes(e.status)).length,
-    [events]
+    () => safeEvents.filter((e) => ['ONGOING', 'ongoing', 'LIVE', 'live'].includes(e.status)).length,
+    [safeEvents]
   );
   const completedCount = useMemo(
-    () => events.filter((e) => ['COMPLETED', 'completed', 'ended'].includes(e.status)).length,
-    [events]
+    () => safeEvents.filter((e) => ['COMPLETED', 'completed', 'ended'].includes(e.status)).length,
+    [safeEvents]
   );
   const draftCount = useMemo(
-    () => events.filter((e) => ['DRAFT', 'draft'].includes(e.status)).length,
-    [events]
+    () => safeEvents.filter((e) => ['DRAFT', 'draft'].includes(e.status)).length,
+    [safeEvents]
   );
-  const totalEventsCount = events.length;
+  const totalEventsCount = safeEvents.length;
 
   const totalAttendeesCount = useMemo(() => {
-    const sum = events.reduce((acc, e) => acc + (e.registered_count ?? (e as any).attendees_count ?? 0), 0);
+    const sum = safeEvents.reduce((acc, e) => acc + (e.registered_count ?? (e as any).attendees_count ?? 0), 0);
     return sum.toLocaleString('vi-VN');
-  }, [events]);
+  }, [safeEvents]);
 
   const dynamicDonutData = useMemo(() => {
-    if (events.length === 0) return donutData;
+    if (safeEvents.length === 0) return donutData;
     const catCounts: Record<string, number> = {};
-    events.forEach(e => {
+    safeEvents.forEach(e => {
       const cat = (e.category || e.event_type || 'Công nghệ & AI').trim();
       catCounts[cat] = (catCounts[cat] || 0) + 1;
     });
-    const total = events.length;
+    const total = safeEvents.length;
     const sorted = Object.entries(catCounts).sort((a, b) => b[1] - a[1]);
     const top4 = sorted.slice(0, 4);
     const others = sorted.slice(4);
@@ -158,17 +161,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
       });
     }
     return result;
-  }, [events]);
+  }, [safeEvents]);
 
   const displayRecentEvents = useMemo(() => {
-    if (events.length === 0) return [];
-    const activeTracked = events.filter((e) =>
+    if (safeEvents.length === 0) return [];
+    const activeTracked = safeEvents.filter((e) =>
       ['UPCOMING', 'ONGOING', 'COMPLETED', 'DRAFT', 'LIVE', 'PUBLISHED', 'upcoming', 'ongoing', 'completed', 'draft', 'live', 'published'].includes(
         e.status
       )
     );
-    const source = activeTracked.length > 0 ? activeTracked : events;
-    return source.slice(0, 5).map(evt => {
+    const source = activeTracked.length > 0 ? activeTracked : safeEvents;
+    return (Array.isArray(source) ? source : []).slice(0, 5).map(evt => {
       const formattedDate = evt.start_date || (evt.start_time
         ? new Date(evt.start_time).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
         : 'Chưa xếp ngày');
@@ -448,7 +451,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5EAF2]">
-                {displayRecentEvents.map(event => (
+                {(Array.isArray(displayRecentEvents) ? displayRecentEvents : []).map(event => (
                   <tr 
                     key={event.id} 
                     onClick={() => onNavigateTab?.('events')}
@@ -483,7 +486,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
             <button className="text-[12px] font-bold text-[#DC2626] hover:underline">Chi tiết</button>
           </div>
           <div className="space-y-4">
-            {topSpeakers.map(speaker => (
+            {(Array.isArray(topSpeakers) ? topSpeakers : []).map(speaker => (
               <div key={speaker.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-slate-200 shrink-0 border border-slate-100 overflow-hidden">
@@ -508,7 +511,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
             <h3 className="text-[15px] font-bold text-[#12213A]">Thông báo hệ thống</h3>
           </div>
           <div className="space-y-4">
-            {notifications.map(notif => (
+            {(Array.isArray(notifications) ? notifications : []).map(notif => (
               <div key={notif.id} className="flex items-start gap-3">
                 <div className="mt-0.5 shrink-0">
                   {notif.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}

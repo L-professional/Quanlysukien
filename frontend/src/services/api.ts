@@ -106,9 +106,22 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor: handle 401 Unauthorized globally
+// Response interceptor: handle HTML fallback and 401 Unauthorized globally
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // If response data is an HTML string (e.g. from Vercel SPA rewrite fallback /index.html)
+    if (
+      typeof response.data === 'string' &&
+      (response.data.includes('<!DOCTYPE html') ||
+        response.data.includes('<!doctype html>') ||
+        response.data.includes('<html'))
+    ) {
+      const err = new Error('Received HTML response instead of JSON (likely SPA rewrite)');
+      (err as any).isHtmlFallback = true;
+      return Promise.reject(err);
+    }
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401) {
       // Token expired or invalid — clear local state
@@ -409,10 +422,13 @@ export const apiService = {
   async getInquiries(params?: { event_id?: number; status?: string }): Promise<Inquiry[]> {
     try {
       const response = await apiClient.get<Inquiry[]>('/inquiries', { params });
-      return response.data;
+      if (response && response.data && Array.isArray(response.data)) {
+        return response.data;
+      }
     } catch (error) {
       console.warn('Backend unavailable, returning fallback inquiry data:', error);
-      return [
+    }
+    return [
         {
           id: 101,
           event_id: 1,
@@ -489,7 +505,6 @@ export const apiService = {
           ],
         },
       ];
-    }
   },
 
   async getInquiryDetail(inquiryId: number): Promise<Inquiry> {
@@ -1190,7 +1205,7 @@ export const apiService = {
 
     try {
       const speakers = await this.getSpeakers();
-      const updated = [newSpeaker, ...speakers.filter((s) => s.email !== payload.email)];
+      const updated = [newSpeaker, ...(Array.isArray(speakers) ? speakers : []).filter((s) => s.email !== payload.email)];
       localStorage.setItem('eventhub_speakers', JSON.stringify(updated));
     } catch {}
 
@@ -1292,7 +1307,7 @@ export const apiService = {
         if (Array.isArray(events)) {
           const activeEventIds = new Set(events.map((e: any) => e.id));
           // If custom events exist, make sure deleted custom event sessions are purged
-          sessions = sessions.filter((s: any) => !s.event_id || s.event_id < 1000000 || activeEventIds.has(s.event_id));
+          sessions = (Array.isArray(sessions) ? sessions : []).filter((s: any) => !s.event_id || s.event_id < 1000000 || activeEventIds.has(s.event_id));
         }
       }
     } catch {}
@@ -1491,10 +1506,13 @@ export const apiService = {
   async getEventSchedule(eventId: number = 1): Promise<EventScheduleItem[]> {
     try {
       const response = await apiClient.get<EventScheduleItem[]>(`/events/${eventId}/schedule`);
-      return response.data;
+      if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
+        return response.data;
+      }
     } catch (error) {
       console.warn('Backend schedule endpoint unavailable, returning fallback schedules:', error);
-      return [
+    }
+    return [
         {
           id: 1,
           event_id: eventId,
@@ -1591,7 +1609,6 @@ export const apiService = {
           wifiPassword: 'GalaLounge@2026',
         },
       ];
-    }
   },
 
   async getEvents(params?: {
@@ -1604,7 +1621,7 @@ export const apiService = {
     let baseEvents: Event[] = [];
     try {
       const response = await apiClient.get<Event[]>('/events', { params });
-      if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+      if (response && response.data && Array.isArray(response.data) && response.data.length > 0) {
         baseEvents = response.data;
       }
     } catch (err) {
@@ -1612,7 +1629,7 @@ export const apiService = {
     }
 
     // If backend returns nothing or is unreachable, load all 37 realistic events
-    if (baseEvents.length === 0) {
+    if (!Array.isArray(baseEvents) || baseEvents.length === 0) {
       baseEvents = [...FALLBACK_EVENTS];
     }
 
@@ -1620,14 +1637,15 @@ export const apiService = {
     try {
       const cached = localStorage.getItem('eventhub_custom_events');
       if (cached) {
-        const parsed: Event[] = JSON.parse(cached);
+        const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(baseEvents.map((e) => e.id));
-          const existingTitles = new Set(baseEvents.map((e) => (e.title || '').trim().toLowerCase()));
+          const safeBase = Array.isArray(baseEvents) ? baseEvents : [];
+          const existingIds = new Set(safeBase.map((e) => e.id));
+          const existingTitles = new Set(safeBase.map((e) => (e.title || '').trim().toLowerCase()));
           const customNew = parsed.filter(
             (e) => !existingIds.has(e.id) && !existingTitles.has((e.title || '').trim().toLowerCase())
           );
-          baseEvents = [...customNew, ...baseEvents];
+          baseEvents = [...customNew, ...safeBase];
         }
       }
     } catch {
@@ -1638,13 +1656,16 @@ export const apiService = {
     try {
       const deletedStr = localStorage.getItem('eventhub_deleted_ids');
       if (deletedStr) {
-        const deletedIds = new Set<number>(JSON.parse(deletedStr));
-        baseEvents = baseEvents.filter((e) => !deletedIds.has(e.id));
+        const parsedIds = JSON.parse(deletedStr);
+        if (Array.isArray(parsedIds)) {
+          const deletedIds = new Set<number>(parsedIds);
+          baseEvents = (Array.isArray(baseEvents) ? baseEvents : []).filter((e) => !deletedIds.has(e.id));
+        }
       }
     } catch {}
 
     // Apply filtering
-    let result = baseEvents;
+    let result: Event[] = Array.isArray(baseEvents) ? baseEvents : [];
     if (params?.status) {
       result = result.filter((e) => matchesStatusFilter(e, params.status));
     }
@@ -1668,7 +1689,7 @@ export const apiService = {
     if (params?.limit) {
       result = result.slice(0, params.limit);
     }
-    return result;
+    return Array.isArray(result) ? result : [];
   },
 
   async createEvent(payload: Partial<Event>): Promise<Event> {
@@ -2050,37 +2071,53 @@ export const apiService = {
   async getDashboardStats(): Promise<any> {
     try {
       const response = await apiClient.get('/ai/dashboard-stats');
-      return response.data;
+      if (response && response.data && typeof response.data === 'object' && !('error' in response.data)) {
+        return {
+          ...response.data,
+          revenue_by_tier: Array.isArray(response.data.revenue_by_tier) ? response.data.revenue_by_tier : [],
+          upcoming_events: Array.isArray(response.data.upcoming_events) ? response.data.upcoming_events : [],
+          recent_activities: Array.isArray(response.data.recent_activities) ? response.data.recent_activities : [],
+          timeline_chart: Array.isArray(response.data.timeline_chart) ? response.data.timeline_chart : [],
+        };
+      }
     } catch (error) {
       console.warn('Failed to fetch dynamic dashboard stats, falling back to local computation:', error);
-      return {
-        total_users: 15,
-        total_events: 5,
-        active_events: 3,
-        total_attendees: 120,
-        actual_checked_in: 88,
-        total_revenue: 64000000,
-        total_revenue_formatted: '64,000,000đ',
-        satisfaction_rate: 96.5,
-        uptime_rate: 99.9,
-        user_roles: { ATTENDEE: 10, STAFF: 3, EVENT_MANAGER: 1, ADMIN: 1 },
-        revenue_by_tier: [
-          { name: 'Vé VIP All-Access', revenue: 45000000, count: 18, percentage: 70.3 },
-          { name: 'Vé Tiêu Chuẩn', revenue: 15000000, count: 15, percentage: 23.4 },
-          { name: 'Vé Tham Dự', revenue: 4000000, count: 8, percentage: 6.3 },
-        ],
-        upcoming_events: [],
-        recent_activities: [],
-        timeline_chart: [
-          { month: 'T1', registered: 20, actual: 15 },
-          { month: 'T2', registered: 35, actual: 28 },
-          { month: 'T3', registered: 55, actual: 42 },
-          { month: 'T4', registered: 78, actual: 60 },
-          { month: 'T5', registered: 95, actual: 72 },
-          { month: 'T6', registered: 120, actual: 88 },
-        ],
-      };
     }
+    return {
+      total_users: 15,
+      total_events: 5,
+      active_events: 3,
+      total_attendees: 120,
+      actual_checked_in: 88,
+      total_revenue: 64000000,
+      total_revenue_formatted: '64,000,000đ',
+      satisfaction_rate: 96.5,
+      uptime_rate: 99.9,
+      user_roles: { ATTENDEE: 10, STAFF: 3, EVENT_MANAGER: 1, ADMIN: 1 },
+      revenue_by_tier: [
+        { name: 'Vé VIP All-Access', revenue: 45000000, count: 18, percentage: 70.3 },
+        { name: 'Vé Tiêu Chuẩn', revenue: 15000000, count: 15, percentage: 23.4 },
+        { name: 'Vé Tham Dự', revenue: 4000000, count: 8, percentage: 6.3 },
+      ],
+      upcoming_events: [],
+      recent_activities: [],
+      timeline_chart: [
+        { month: 'T1', registered: 20, actual: 15 },
+        { month: 'T2', registered: 35, actual: 28 },
+        { month: 'T3', registered: 55, actual: 42 },
+        { month: 'T4', registered: 78, actual: 60 },
+        { month: 'T5', registered: 95, actual: 72 },
+        { month: 'T6', registered: 120, actual: 88 },
+      ],
+    };
+  },
+
+  async getStats(): Promise<any> {
+    return this.getDashboardStats();
+  },
+
+  async getUsers(): Promise<AdminUser[]> {
+    return this.getAdminUsers();
   },
 
   async getHourlyCheckIns(): Promise<HourlyCheckInStat[]> {
@@ -2196,18 +2233,20 @@ export const apiService = {
   async getAdminUsers(): Promise<AdminUser[]> {
     try {
       const response = await apiClient.get<AdminUser[]>('/admin/users');
-      return response.data;
+      if (response && response.data && Array.isArray(response.data)) {
+        return response.data;
+      }
     } catch (error) {
       console.warn('Admin users endpoint unavailable, returning demo data:', error);
-      // Demo fallback users
-      return [
-        { id: 1, full_name: 'Admin Hệ Thống', email: 'admin@eventhub.ai', role_id: 1, role_name: 'ADMIN', is_active: true, is_online: true, last_active_at: new Date().toISOString(), created_at: '2026-01-01T00:00:00Z' },
-        { id: 2, full_name: 'Staff Duyệt Viên', email: 'staff@eventhub.ai', role_id: 2, role_name: 'STAFF', is_active: true, is_online: true, last_active_at: new Date(Date.now() - 120000).toISOString(), created_at: '2026-01-15T00:00:00Z' },
-        { id: 3, full_name: 'Nguyễn Hoàng Long', email: 'long.nh@gmail.com', role_id: 3, role_name: 'PARTICIPANT', is_active: true, is_online: false, last_active_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(), created_at: '2026-03-10T00:00:00Z' },
-        { id: 4, full_name: 'Trần Minh Thư', email: 'thu.tm@vnpay.vn', role_id: 3, role_name: 'PARTICIPANT', is_active: true, is_online: false, last_active_at: new Date(Date.now() - 1000 * 60 * 60).toISOString(), created_at: '2026-04-20T00:00:00Z' },
-        { id: 5, full_name: 'Lê Quốc Bảo', email: 'bao.lq@techcorp.io', role_id: 3, role_name: 'PARTICIPANT', is_active: false, is_online: false, created_at: '2026-05-05T00:00:00Z' },
-      ];
     }
+    // Demo fallback users
+    return [
+      { id: 1, full_name: 'Admin Hệ Thống', email: 'admin@eventhub.ai', role_id: 1, role_name: 'ADMIN', is_active: true, is_online: true, last_active_at: new Date().toISOString(), created_at: '2026-01-01T00:00:00Z' },
+      { id: 2, full_name: 'Staff Duyệt Viên', email: 'staff@eventhub.ai', role_id: 2, role_name: 'STAFF', is_active: true, is_online: true, last_active_at: new Date(Date.now() - 120000).toISOString(), created_at: '2026-01-15T00:00:00Z' },
+      { id: 3, full_name: 'Nguyễn Hoàng Long', email: 'long.nh@gmail.com', role_id: 3, role_name: 'PARTICIPANT', is_active: true, is_online: false, last_active_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(), created_at: '2026-03-10T00:00:00Z' },
+      { id: 4, full_name: 'Trần Minh Thư', email: 'thu.tm@vnpay.vn', role_id: 3, role_name: 'PARTICIPANT', is_active: true, is_online: false, last_active_at: new Date(Date.now() - 1000 * 60 * 60).toISOString(), created_at: '2026-04-20T00:00:00Z' },
+      { id: 5, full_name: 'Lê Quốc Bảo', email: 'bao.lq@techcorp.io', role_id: 3, role_name: 'PARTICIPANT', is_active: false, is_online: false, created_at: '2026-05-05T00:00:00Z' },
+    ];
   },
 
   async updateUserRole(userId: number, roleName: string): Promise<AdminUser> {
@@ -2234,17 +2273,19 @@ export const apiService = {
   async getSecurityLogs(): Promise<SecurityLog[]> {
     try {
       const response = await apiClient.get<SecurityLog[]>('/admin/security-logs');
-      return response.data;
+      if (response && response.data && Array.isArray(response.data)) {
+        return response.data;
+      }
     } catch (error) {
       console.warn('Security logs endpoint unavailable, returning demo data:', error);
-      return [
-        { id: 1001, task_type: 'ROLE_CHANGE', staff_action: 'ADMIN→STAFF', prompt_tokens: 0, completion_tokens: 0, latency_ms: 12.0, created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString() },
-        { id: 1002, task_type: 'ACCOUNT_LOCK', staff_action: 'LOCK', prompt_tokens: 0, completion_tokens: 0, latency_ms: 8.0, created_at: new Date(Date.now() - 1000 * 60 * 20).toISOString() },
-        { id: 1003, task_type: 'HITL_REVIEW', staff_action: 'ACCEPT', prompt_tokens: 0, completion_tokens: 150, latency_ms: 42.0, created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString() },
+    }
+    return [
+      { id: 1001, task_type: 'ROLE_CHANGE', staff_action: 'ADMIN→STAFF', prompt_tokens: 0, completion_tokens: 0, latency_ms: 12.0, created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString() },
+      { id: 1002, task_type: 'ACCOUNT_LOCK', staff_action: 'LOCK', prompt_tokens: 0, completion_tokens: 0, latency_ms: 8.0, created_at: new Date(Date.now() - 1000 * 60 * 20).toISOString() },
+      { id: 1003, task_type: 'HITL_REVIEW', staff_action: 'ACCEPT', prompt_tokens: 0, completion_tokens: 150, latency_ms: 42.0, created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString() },
         { id: 1004, task_type: 'RAG_QUERY', staff_action: 'AI_SUGGESTED', prompt_tokens: 420, completion_tokens: 180, latency_ms: 850.0, created_at: new Date(Date.now() - 1000 * 60 * 60).toISOString() },
         { id: 1005, task_type: 'QR_CHECK_IN', staff_action: 'SUCCESS', prompt_tokens: 0, completion_tokens: 0, latency_ms: 45.0, created_at: new Date(Date.now() - 1000 * 60 * 90).toISOString() },
       ];
-    }
   },
 
   async manualIssueTicket(payload: { event_id: number; full_name: string; email: string; ticket_type?: string }): Promise<ManualIssueResponse> {
@@ -2279,7 +2320,10 @@ export const apiService = {
     try {
       const url = email ? `/registrations/my-registrations?email=${encodeURIComponent(email)}` : '/registrations/my-registrations';
       const response = await apiClient.get<Registration[]>(url);
-      return response.data;
+      if (response && response.data && Array.isArray(response.data)) {
+        return response.data;
+      }
+      return [];
     } catch (error) {
       console.warn('Failed to fetch my-registrations from backend:', error);
       return [];
@@ -2301,14 +2345,16 @@ export const apiService = {
   async getKnowledgeBaseItems(eventId: number): Promise<KnowledgeItem[]> {
     try {
       const response = await apiClient.get<KnowledgeItem[]>(`/knowledge/${eventId}`);
-      return response.data;
+      if (response && response.data && Array.isArray(response.data)) {
+        return response.data;
+      }
     } catch (error) {
       console.warn('Backend knowledge base endpoint unavailable, returning mock:', error);
-      return [
-        { id: 1, event_id: 1, title: 'Lịch trình sự kiện', content: 'Sự kiện diễn ra từ 08:00 AM đến 17:30 PM trong 2 ngày.', created_at: '2026-09-01T00:00:00Z' },
-        { id: 2, event_id: 1, title: 'Địa điểm', content: 'GEM Center, TP. Hồ Chí Minh.', created_at: '2026-09-01T00:00:00Z' },
-      ];
     }
+    return [
+      { id: 1, event_id: 1, title: 'Lịch trình sự kiện', content: 'Sự kiện diễn ra từ 08:00 AM đến 17:30 PM trong 2 ngày.', created_at: '2026-09-01T00:00:00Z' },
+      { id: 2, event_id: 1, title: 'Địa điểm', content: 'GEM Center, TP. Hồ Chí Minh.', created_at: '2026-09-01T00:00:00Z' },
+    ];
   },
 
   async getKnowledgeDocs(eventId: number = 1): Promise<KnowledgeItem[]> {
@@ -2667,82 +2713,95 @@ export const apiService = {
   async getNotifications(): Promise<NotificationItem[]> {
     try {
       const response = await apiClient.get<NotificationItem[]>('/notifications');
-      localStorage.setItem('eventhub_notifications', JSON.stringify(response.data));
-      return response.data;
+      if (response && response.data && Array.isArray(response.data)) {
+        localStorage.setItem('eventhub_notifications', JSON.stringify(response.data));
+        return response.data;
+      }
     } catch (error) {
       console.warn('Backend notifications endpoint unavailable, using local cache/fallback:', error);
-      const cached = localStorage.getItem('eventhub_notifications');
-      if (cached) {
-        try {
-          return JSON.parse(cached);
-        } catch {
-          // ignore error
-        }
-      }
-      const initialMock: NotificationItem[] = [
-        {
-          id: 1,
-          title: 'Chào mừng đến với EventHub AI! 👋',
-          message: 'Hệ thống quản lý sự kiện thông minh tích hợp AI Concierge sẵn sàng phục vụ.',
-          type: 'INFO',
-          link: '/events',
-          is_read: false,
-          created_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-        },
-        {
-          id: 2,
-          title: 'Câu hỏi mới từ khách tham dự (HITL) 🤖',
-          message: 'Khách tham dự Nguyễn Hoàng Long đã gửi thắc mắc về bãi đỗ xe VIP.',
-          type: 'INQUIRY_PENDING',
-          link: '/inquiries',
-          is_read: false,
-          created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-        },
-        {
-          id: 3,
-          title: 'Check-in thành công tại Cổng A 🎟️',
-          message: 'Đại biểu Trần Minh Tuấn vừa hoàn tất quét mã QR và xác thực vào hội trường.',
-          type: 'CHECK_IN',
-          link: '/check-in',
-          is_read: false,
-          created_at: new Date(Date.now() - 1000 * 60 * 75).toISOString(),
-        },
-        {
-          id: 4,
-          title: 'Cảnh báo bảo mật PII Masking 🛡️',
-          message: 'Hệ thống đã tự động lọc 3 số điện thoại và email khỏi dữ liệu gửi sang LLM.',
-          type: 'SECURITY_ALERT',
-          link: '/logs',
-          is_read: true,
-          created_at: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-        },
-      ];
-      localStorage.setItem('eventhub_notifications', JSON.stringify(initialMock));
-      return initialMock;
     }
+
+    const cached = localStorage.getItem('eventhub_notifications');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch {
+        // ignore error
+      }
+    }
+    const initialMock: NotificationItem[] = [
+      {
+        id: 1,
+        title: 'Chào mừng đến với EventHub AI! 👋',
+        message: 'Hệ thống quản lý sự kiện thông minh tích hợp AI Concierge sẵn sàng phục vụ.',
+        type: 'INFO',
+        link: '/events',
+        is_read: false,
+        created_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+      },
+      {
+        id: 2,
+        title: 'Câu hỏi mới từ khách tham dự (HITL) 🤖',
+        message: 'Khách tham dự Nguyễn Hoàng Long đã gửi thắc mắc về bãi đỗ xe VIP.',
+        type: 'INQUIRY_PENDING',
+        link: '/inquiries',
+        is_read: false,
+        created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+      },
+      {
+        id: 3,
+        title: 'Check-in thành công tại Cổng A 🎟️',
+        message: 'Đại biểu Trần Minh Tuấn vừa hoàn tất quét mã QR và xác thực vào hội trường.',
+        type: 'CHECK_IN',
+        link: '/check-in',
+        is_read: false,
+        created_at: new Date(Date.now() - 1000 * 60 * 75).toISOString(),
+      },
+      {
+        id: 4,
+        title: 'Cảnh báo bảo mật PII Masking 🛡️',
+        message: 'Hệ thống đã tự động lọc 3 số điện thoại và email khỏi dữ liệu gửi sang LLM.',
+        type: 'SECURITY_ALERT',
+        link: '/logs',
+        is_read: true,
+        created_at: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
+      },
+    ];
+    localStorage.setItem('eventhub_notifications', JSON.stringify(initialMock));
+    return initialMock;
   },
 
   async markNotificationRead(id: number): Promise<NotificationItem> {
     try {
       const response = await apiClient.patch<NotificationItem>(`/notifications/${id}/read`);
-      return response.data;
+      if (response && response.data) return response.data;
     } catch {
-      const cached = localStorage.getItem('eventhub_notifications');
-      let items: NotificationItem[] = cached ? JSON.parse(cached) : [];
-      items = items.map((item) => (item.id === id ? { ...item, is_read: true } : item));
-      localStorage.setItem('eventhub_notifications', JSON.stringify(items));
-      const updated = items.find((item) => item.id === id);
-      return (
-        updated || {
-          id,
-          title: '',
-          message: '',
-          type: 'INFO',
-          is_read: true,
-          created_at: new Date().toISOString(),
-        }
-      );
+      // fallback
     }
+    const cached = localStorage.getItem('eventhub_notifications');
+    let items: NotificationItem[] = [];
+    try {
+      const parsed = cached ? JSON.parse(cached) : [];
+      items = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      items = [];
+    }
+    items = items.map((item) => (item.id === id ? { ...item, is_read: true } : item));
+    localStorage.setItem('eventhub_notifications', JSON.stringify(items));
+    const updated = items.find((item) => item.id === id);
+    return (
+      updated || {
+        id,
+        title: '',
+        message: '',
+        type: 'INFO',
+        is_read: true,
+        created_at: new Date().toISOString(),
+      }
+    );
   },
 
   async markAllNotificationsRead(): Promise<void> {
@@ -2751,9 +2810,12 @@ export const apiService = {
     } catch {
       const cached = localStorage.getItem('eventhub_notifications');
       if (cached) {
-        const items: NotificationItem[] = JSON.parse(cached);
-        const updated = items.map((item) => ({ ...item, is_read: true }));
-        localStorage.setItem('eventhub_notifications', JSON.stringify(updated));
+        try {
+          const parsed = JSON.parse(cached);
+          const items: NotificationItem[] = Array.isArray(parsed) ? parsed : [];
+          const updated = items.map((item) => ({ ...item, is_read: true }));
+          localStorage.setItem('eventhub_notifications', JSON.stringify(updated));
+        } catch {}
       }
     }
   },
@@ -2764,9 +2826,12 @@ export const apiService = {
     } catch {
       const cached = localStorage.getItem('eventhub_notifications');
       if (cached) {
-        const items: NotificationItem[] = JSON.parse(cached);
-        const updated = items.filter((item) => item.id !== id);
-        localStorage.setItem('eventhub_notifications', JSON.stringify(updated));
+        try {
+          const parsed = JSON.parse(cached);
+          const items: NotificationItem[] = Array.isArray(parsed) ? parsed : [];
+          const updated = items.filter((item) => item.id !== id);
+          localStorage.setItem('eventhub_notifications', JSON.stringify(updated));
+        } catch {}
       }
     }
   },

@@ -1104,7 +1104,7 @@ export const Settings: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleRevokeOthers}
-                  disabled={isRevokingSessions || sessions.filter((s) => !s.is_current).length === 0}
+                  disabled={isRevokingSessions || (Array.isArray(sessions) ? sessions : []).filter((s) => !s.is_current).length === 0}
                   className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <LogOut className="w-3.5 h-3.5" />

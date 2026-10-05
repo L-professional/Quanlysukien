@@ -54,8 +54,9 @@ export const getSavedAccounts = (): DeviceSavedAccount[] => {
 export const saveAccountToHistory = (account: DeviceSavedAccount): void => {
   if (typeof window === 'undefined') return;
   try {
-    const list = getSavedAccounts().filter(
-      (a) => a.email.toLowerCase() !== account.email.toLowerCase()
+    const saved = getSavedAccounts();
+    const list = (Array.isArray(saved) ? saved : []).filter(
+      (a) => (a.email || '').toLowerCase() !== (account.email || '').toLowerCase()
     );
     const updated: DeviceSavedAccount[] = [
       {
@@ -75,8 +76,9 @@ export const saveAccountToHistory = (account: DeviceSavedAccount): void => {
 export const removeAccountFromHistory = (email: string): DeviceSavedAccount[] => {
   if (typeof window === 'undefined') return [];
   try {
-    const list = getSavedAccounts().filter(
-      (a) => a.email.toLowerCase() !== email.toLowerCase()
+    const saved = getSavedAccounts();
+    const list = (Array.isArray(saved) ? saved : []).filter(
+      (a) => (a.email || '').toLowerCase() !== email.toLowerCase()
     );
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
     return list;

@@ -97,7 +97,8 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const selectEventById = (id: number) => {
-    const found = events.find((e) => e.id === id);
+    const safeEvents = Array.isArray(events) ? events : [];
+    const found = safeEvents.find((e) => e.id === id);
     if (found) {
       setActiveEvent(found);
     }
@@ -107,16 +108,18 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setActiveEventState((prev) => {
       const merged = { ...prev, ...updated };
       // Also update in events array
-      setEvents((currentEvents) =>
-        currentEvents.map((e) => (e.id === merged.id ? { ...e, ...merged } : e))
-      );
+      setEvents((currentEvents) => {
+        const safeCurrent = Array.isArray(currentEvents) ? currentEvents : [];
+        return safeCurrent.map((e) => (e.id === merged.id ? { ...e, ...merged } : e));
+      });
       return merged;
     });
   };
 
   const removeEvent = (id: number) => {
     setEvents((prev) => {
-      const filtered = prev.filter((e) => e.id !== id);
+      const safePrev = Array.isArray(prev) ? prev : [];
+      const filtered = safePrev.filter((e) => e.id !== id);
       if (activeEvent.id === id) {
         if (filtered.length > 0) {
           setActiveEvent(filtered[0]);
@@ -129,7 +132,10 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addEvent = (newEvent: Event) => {
-    setEvents((prev) => [newEvent, ...prev.filter((e) => e.id !== newEvent.id)]);
+    setEvents((prev) => {
+      const safePrev = Array.isArray(prev) ? prev : [];
+      return [newEvent, ...safePrev.filter((e) => e.id !== newEvent.id)];
+    });
     setActiveEvent(newEvent);
   };
 

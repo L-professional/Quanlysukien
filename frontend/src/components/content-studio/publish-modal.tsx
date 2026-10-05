@@ -342,13 +342,15 @@ export const PublishModal: React.FC<PublishModalProps> = ({
                       checked={isChecked}
                       onChange={() => {
                         if (isChecked) {
-                          if (publishChannels.length > 1) {
-                            setPublishChannels(publishChannels.filter((c) => c !== ch.id));
+                          const safeChannels = Array.isArray(publishChannels) ? publishChannels : [];
+                          if (safeChannels.length > 1) {
+                            setPublishChannels(safeChannels.filter((c) => c !== ch.id));
                           } else {
                             toast.warning('Cần chọn ít nhất 1 kênh phát hành.');
                           }
                         } else {
-                          setPublishChannels([...publishChannels, ch.id]);
+                          const safeChannels = Array.isArray(publishChannels) ? publishChannels : [];
+                          setPublishChannels([...safeChannels, ch.id]);
                         }
                       }}
                       className="rounded text-emerald-600 focus:ring-emerald-500"

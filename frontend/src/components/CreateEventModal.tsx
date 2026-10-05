@@ -175,7 +175,7 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
       toast.error('Sự kiện phải có ít nhất một hạng vé!');
       return;
     }
-    setTicketTiers((prev) => prev.filter((t) => t.id !== id));
+    setTicketTiers((prev) => (Array.isArray(prev) ? prev : []).filter((t) => t.id !== id));
   };
 
   const handleAddSession = () => {
@@ -186,11 +186,11 @@ export const CreateEventModal: React.FC<CreateEventModalProps> = ({
       speakerName: 'Chuyên gia Khách mời',
       speakerRole: 'Diễn giả',
     };
-    setSessionsList((prev) => [...prev, newSession]);
+    setSessionsList((prev) => [...(Array.isArray(prev) ? prev : []), newSession]);
   };
 
   const handleRemoveSession = (id: string) => {
-    setSessionsList((prev) => prev.filter((s) => s.id !== id));
+    setSessionsList((prev) => (Array.isArray(prev) ? prev : []).filter((s) => s.id !== id));
   };
 
   useEffect(() => {

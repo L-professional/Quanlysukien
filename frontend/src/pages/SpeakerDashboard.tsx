@@ -43,10 +43,11 @@ export const SpeakerDashboard: React.FC = () => {
     setLoading(true);
     try {
       const data = await apiService.getSpeakerMySessions();
-      setSessions(data);
+      setSessions(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error fetching speaker sessions:', err);
       toast.error('Không thể tải danh sách phiên của Diễn Giả');
+      setSessions([]);
     } finally {
       setLoading(false);
     }
@@ -59,16 +60,17 @@ export const SpeakerDashboard: React.FC = () => {
   // Sync speaker sessions whenever any event or schedule changes
   useEventSync(fetchSessions);
 
-  const filteredSessions = sessions.filter((s) => {
+  const safeSessions = Array.isArray(sessions) ? sessions : [];
+  const filteredSessions = safeSessions.filter((s) => {
     if (filterStatus === 'ALL') return true;
     return s.status === filterStatus;
   });
 
-  const totalAssigned = sessions.length;
-  const liveCount = sessions.filter((s) => s.status === 'live').length;
-  const totalCheckedIn = sessions.reduce((acc, s) => acc + (s.checked_in_count || 0), 0);
-  const totalQuestions = sessions.reduce((acc, s) => acc + (s.total_questions || 0), 0);
-  const pendingQuestions = sessions.reduce((acc, s) => acc + (s.pending_questions || 0), 0);
+  const totalAssigned = safeSessions.length;
+  const liveCount = safeSessions.filter((s) => s.status === 'live').length;
+  const totalCheckedIn = safeSessions.reduce((acc, s) => acc + (s.checked_in_count || 0), 0);
+  const totalQuestions = safeSessions.reduce((acc, s) => acc + (s.total_questions || 0), 0);
+  const pendingQuestions = safeSessions.reduce((acc, s) => acc + (s.pending_questions || 0), 0);
 
   return (
     <div className="space-y-6 pb-12 animate-in fade-in duration-300 max-w-7xl mx-auto">

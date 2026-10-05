@@ -209,20 +209,21 @@ export const KnowledgeBase: React.FC = () => {
   const handleDelete = async (id: number) => {
     try {
       await apiService.deleteKnowledgeItem(id);
-      setItems((prev) => prev.filter((i) => i.id !== id));
+      setItems((prev) => (Array.isArray(prev) ? prev : []).filter((i) => i.id !== id));
       toast.success(t('common.success'));
     } catch {
       toast.error(t('common.error'));
     }
   };
 
-  const filteredItems = items.filter((i) => {
+  const safeItems = Array.isArray(items) ? items : [];
+  const filteredItems = safeItems.filter((i) => {
     const matchesCat =
       selectedCategory === 'ALL' ||
-      i.category.toLowerCase() === selectedCategory.toLowerCase();
+      (i.category || '').toLowerCase() === selectedCategory.toLowerCase();
     const matchesSearch =
-      i.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      i.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (i.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (i.content || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       i.category.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesCat && matchesSearch;
   });

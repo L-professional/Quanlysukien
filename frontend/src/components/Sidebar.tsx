@@ -127,7 +127,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Filter based on allowedRoles: items with insufficient permissions are completely removed
   const visibleMenuItems = useMemo(() => {
-    return menuItems.filter((item) => {
+    const list = Array.isArray(menuItems) ? menuItems : [];
+    return list.filter((item) => {
       const allowed = item.allowedRoles || (item.requiresRole as UserRole[]);
       if (!allowed || allowed.length === 0) return true;
       // ADMIN & SUPER_ADMIN have full 100% access to all menus
@@ -187,7 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation items */}
         <nav className="flex-1 px-4 space-y-1.5 mt-2 overflow-y-auto pb-4">
-          {visibleMenuItems.map((item) => {
+          {(Array.isArray(visibleMenuItems) ? visibleMenuItems : []).map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
