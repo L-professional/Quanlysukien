@@ -4,49 +4,38 @@ import { useEventSync } from '../services/eventSync';
  
 import { Link } from 'react-router-dom';
 
-const formatDateDots = (dateVal?: any): string => {
-  if (!dateVal) return 'Sắp diễn ra';
-  try {
-    const dateStr = String(dateVal);
-    const match = dateStr.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
-    if (match) {
-      const d = match[1].padStart(2, '0');
-      const m = match[2].padStart(2, '0');
-      const y = match[3];
-      return `${d}.${m}.${y}`;
-    }
-    const d = new Date(dateVal);
-    if (!isNaN(d.getTime())) {
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear();
-      return `${day}.${month}.${year}`;
-    }
-    return dateStr;
-  } catch (_) {
-    return 'Sắp diễn ra';
+const formatDateDots = (dateStr?: string) => {
+  if (!dateStr) return 'Sắp diễn ra';
+  const match = dateStr.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
+  if (match) {
+    const d = match[1].padStart(2, '0');
+    const m = match[2].padStart(2, '0');
+    const y = match[3];
+    return `${d}.${m}.${y}`;
   }
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}.${month}.${year}`;
+  }
+  return dateStr;
 };
 
-const formatLocationCity = (locVal?: any): string => {
-  if (!locVal) return 'Việt Nam';
-  try {
-    const locStr = String(locVal);
-    const parts = locStr.split(',');
-    if (parts.length > 1) {
-      return parts[parts.length - 1].trim();
-    }
-    return locStr.trim();
-  } catch (_) {
-    return 'Việt Nam';
+const formatLocationCity = (loc?: string) => {
+  if (!loc) return 'Việt Nam';
+  const parts = loc.split(',');
+  if (parts.length > 1) {
+    return parts[parts.length - 1].trim();
   }
+  return loc.trim();
 };
 
 const LandingPage: React.FC = () => {
 
   const [featuredEvents, setFeaturedEvents] = useState<any[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const fetchHomepageEvents = useCallback(async () => {
     try {
@@ -80,7 +69,7 @@ const LandingPage: React.FC = () => {
         const orderB = b.homepage_order ?? 999;
         if (orderA !== orderB) return orderA - orderB;
         // Finally by start_time ascending
-        return String(a.start_time || a.start_date || '').localeCompare(String(b.start_time || b.start_date || ''));
+        return (a.start_time || a.start_date || '').localeCompare(b.start_time || b.start_date || '');
       });
       setFeaturedEvents(sorted);
     } catch (err) {
@@ -102,74 +91,92 @@ const LandingPage: React.FC = () => {
     const header = document.getElementById('header');
     
     const handleScroll = () => {
-      try {
         if (header) {
-          if (typeof window !== 'undefined' && window.scrollY > 20) {
-            header.classList.add('glass-header');
-            header.classList.replace('border-transparent', 'border-event-border');
-          } else {
-            header.classList.remove('glass-header');
-            header.classList.replace('border-event-border', 'border-transparent');
-          }
+            if (window.scrollY > 20) {
+                header.classList.add('glass-header');
+                header.classList.replace('border-transparent', 'border-event-border');
+            } else {
+                header.classList.remove('glass-header');
+                header.classList.replace('border-event-border', 'border-transparent');
+            }
         }
-      } catch (_) {}
     };
     
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scroll', handleScroll);
     handleScroll();
+
+    // Mobile menu toggle
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileLinks = document.querySelectorAll('.mobile-link');
+    
+    if (mobileMenuBtn && mobileMenu) {
+        mobileMenuBtn.addEventListener('click', () => {
+            mobileMenu.classList.toggle('hidden');
+            const icon = mobileMenuBtn.querySelector('i');
+            if(icon) {
+                if(mobileMenu.classList.contains('hidden')) {
+                    icon.classList.replace('ph-x', 'ph-list');
+                } else {
+                    icon.classList.replace('ph-list', 'ph-x');
+                }
+            }
+        });
+
+        mobileLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                mobileMenu.classList.add('hidden');
+                const icon = mobileMenuBtn.querySelector('i');
+                if(icon) icon.classList.replace('ph-x', 'ph-list');
+            });
+        });
+    }
 
     // Active Navigation Highlighting
     const sections = document.querySelectorAll('section[id]');
     const navLinks = document.querySelectorAll('.nav-link');
 
     const handleNavScroll = () => {
-      try {
         let current = '';
-        const currentScrollY = typeof window !== 'undefined' ? (window.scrollY || 0) : 0;
         sections.forEach(section => {
-          const sectionTop = (section as HTMLElement).offsetTop;
-          if (currentScrollY >= (sectionTop - 150)) {
-            current = section.getAttribute('id') || '';
-          }
+            const sectionTop = (section as HTMLElement).offsetTop;
+            if (scrollY >= (sectionTop - 150)) {
+                current = section.getAttribute('id') || '';
+            }
         });
 
         navLinks.forEach(link => {
-          link.classList.remove('active-nav');
-          if (current && link.getAttribute('href')?.includes(current)) {
-            link.classList.add('active-nav');
-          }
+            link.classList.remove('active-nav');
+            if (link.getAttribute('href')?.includes(current)) {
+                link.classList.add('active-nav');
+            }
         });
-      } catch (_) {}
     };
-    window.addEventListener('scroll', handleNavScroll, { passive: true });
+    window.addEventListener('scroll', handleNavScroll);
 
     // Scroll Animation Observer (Fade up)
     const fadeElements = document.querySelectorAll('.fade-up');
     
-    let observer: IntersectionObserver | null = null;
-    try {
-      if (typeof IntersectionObserver !== 'undefined') {
-        observer = new IntersectionObserver((entries, obs) => {
-          entries.forEach(entry => {
+    const observerOptions = {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.1
+    };
+    
+    const observer = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
             if (entry.isIntersecting) {
-              entry.target.classList.add('visible');
-              obs.unobserve(entry.target);
+                entry.target.classList.add('visible');
+                observer.unobserve(entry.target);
             }
-          });
-        }, { root: null, rootMargin: '0px', threshold: 0.1 });
-        
-        fadeElements.forEach(el => observer?.observe(el));
-      } else {
-        fadeElements.forEach(el => el.classList.add('visible'));
-      }
-    } catch (_) {
-      fadeElements.forEach(el => el.classList.add('visible'));
-    }
+        });
+    }, observerOptions);
+    
+    fadeElements.forEach(el => observer.observe(el));
     
     return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('scroll', handleNavScroll);
-      observer?.disconnect();
+        window.removeEventListener('scroll', handleScroll);
+        window.removeEventListener('scroll', handleNavScroll);
     };
   }, []);
 
@@ -243,59 +250,42 @@ const LandingPage: React.FC = () => {
                 <a href="#contact" className="nav-link h-full flex items-center">Liên hệ</a>
             </nav>
 
-            <div className="flex items-center gap-3">
-                <div className="hidden lg:flex items-center gap-5 shrink-0">
-                    <button className="text-event-text hover:text-event-red transition-colors" aria-label="Search">
-                        <i className="ph ph-magnifying-glass text-xl"></i>
-                    </button>
-                    <div className="h-4 w-px bg-event-border"></div>
-                    <Link to="/login" className="text-[14px] font-semibold text-event-text hover:text-event-red transition-colors flex items-center gap-2">
-                        <i className="ph ph-user text-lg"></i>
-                        Đăng nhập
-                    </Link>
-                    <Link to="/login?mode=register" className="btn-primary px-6 py-2.5 rounded-md text-[14px] font-semibold flex items-center gap-2">
-                        Bắt đầu
-                    </Link>
-                </div>
-
-                {/* Mobile quick login button - ALWAYS VISIBLE ON MOBILE & TABLET */}
-                <Link
-                    to="/login"
-                    className="lg:hidden px-3.5 py-1.5 rounded-md text-xs sm:text-sm font-semibold text-white bg-event-red hover:bg-[#A80722] flex items-center gap-1.5 transition-colors shadow-sm"
-                >
-                    <i className="ph ph-user text-sm"></i>
-                    <span>Đăng nhập</span>
-                </Link>
-
-                <button
-                    className="xl:hidden text-2xl text-event-navy p-1 focus:outline-none"
-                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    aria-label="Toggle menu"
-                >
-                    <i className={`ph ${mobileMenuOpen ? 'ph-x' : 'ph-list'}`}></i>
+            <div className="hidden lg:flex items-center gap-5 shrink-0">
+                <button className="text-event-text hover:text-event-red transition-colors" aria-label="Search">
+                    <i className="ph ph-magnifying-glass text-xl"></i>
                 </button>
+                <div className="h-4 w-px bg-event-border"></div>
+                <Link to="/login" className="text-[14px] font-semibold text-event-text hover:text-event-red transition-colors flex items-center gap-2">
+                    <i className="ph ph-user text-lg"></i>
+                    Đăng nhập
+                </Link>
+                <Link to="/login?mode=register" className="btn-primary px-6 py-2.5 rounded-md text-[14px] font-semibold flex items-center gap-2">
+                    Bắt đầu
+                </Link>
             </div>
+
+            <button className="xl:hidden text-2xl text-event-navy" id="mobile-menu-btn">
+                <i className="ph ph-list"></i>
+            </button>
         </div>
     </header>
 
     {/* Mobile Menu Overlay */}
-    <div className={`fixed inset-0 bg-white z-40 ${mobileMenuOpen ? 'flex' : 'hidden'} flex-col pt-[72px] px-6`}>
-        <div className="flex flex-col gap-5 pt-6 pb-12 overflow-y-auto h-full text-base font-semibold">
-            <a href="#home" onClick={() => setMobileMenuOpen(false)} className="mobile-link text-event-red">Trang chủ</a>
-            <a href="#featured-events" onClick={() => setMobileMenuOpen(false)} className="mobile-link text-event-text">Sự kiện</a>
-            <a href="#services" onClick={() => setMobileMenuOpen(false)} className="mobile-link text-event-text">Dịch vụ</a>
-            <a href="#features" onClick={() => setMobileMenuOpen(false)} className="mobile-link text-event-text">Tính năng</a>
-            <a href="#about" onClick={() => setMobileMenuOpen(false)} className="mobile-link text-event-text">Về chúng tôi</a>
-            <a href="#news" onClick={() => setMobileMenuOpen(false)} className="mobile-link text-event-text">Tin tức</a>
-            <a href="#reviews" onClick={() => setMobileMenuOpen(false)} className="mobile-link text-event-text">Đánh giá</a>
-            <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="mobile-link text-event-text">Liên hệ</a>
+    <div id="mobile-menu" className="fixed inset-0 bg-white z-40 hidden pt-[72px] px-6">
+        <div className="flex flex-col gap-6 pt-8 pb-12 overflow-y-auto h-full text-lg font-semibold">
+            <a href="#home" className="mobile-link text-event-red">Trang chủ</a>
+            <a href="#featured-events" className="mobile-link text-event-text">Sự kiện</a>
+            <a href="#services" className="mobile-link text-event-text">Dịch vụ</a>
+            <a href="#features" className="mobile-link text-event-text">Tính năng</a>
+            <a href="#about" className="mobile-link text-event-text">Về chúng tôi</a>
+            <a href="#news" className="mobile-link text-event-text">Tin tức</a>
+            <a href="#reviews" className="mobile-link text-event-text">Đánh giá</a>
+            <a href="#contact" className="mobile-link text-event-text">Liên hệ</a>
             <div className="h-px bg-event-border w-full my-2"></div>
-            <Link to="/login" onClick={() => setMobileMenuOpen(false)} className="text-event-text hover:text-event-red flex items-center gap-2 py-2">
-                <i className="ph ph-user text-lg"></i> Đăng nhập hệ thống
-            </Link>
-            <Link to="/login?mode=register" onClick={() => setMobileMenuOpen(false)} className="bg-event-red text-white py-3 rounded-md text-center shadow-sm">
-                Bắt đầu ngay
-            </Link>
+            <a href="#home" className="text-event-text flex items-center gap-2">
+                <i className="ph ph-user"></i> Đăng nhập
+            </a>
+            <a href="#home" className="bg-event-red text-white py-3 rounded-md text-center">Bắt đầu</a>
         </div>
     </div>
 
@@ -335,28 +325,10 @@ const LandingPage: React.FC = () => {
                         <span className="text-event-red">sự kiện đẳng cấp</span>
                     </h1>
                     
-                    <p className="text-event-text-sec text-[16px] sm:text-[18px] leading-relaxed mb-8 max-w-lg">
+                    <p className="text-event-text-sec text-[16px] sm:text-[18px] leading-relaxed mb-10 max-w-lg">
                         Từ ý tưởng, tổ chức đến vận hành và phân tích hiệu quả – EventAI mang đến nền tảng quản lý sự kiện thông minh, tích hợp AI trong một hệ sinh thái thống nhất.
                     </p>
                     
-                    {/* Direct Quick Action CTAs */}
-                    <div className="flex flex-wrap items-center gap-3 mb-8">
-                        <Link
-                            to="/login"
-                            className="btn-primary py-3.5 px-7 rounded-md font-semibold flex items-center gap-2.5 shadow-md hover:shadow-lg transition-all text-[15px]"
-                        >
-                            <i className="ph ph-sign-in text-lg"></i>
-                            Đăng nhập hệ thống
-                        </Link>
-                        <Link
-                            to="/events"
-                            className="btn-secondary py-3.5 px-6 rounded-md font-semibold flex items-center gap-2 transition-all text-[15px] bg-white/90 hover:bg-red-50"
-                        >
-                            <i className="ph ph-calendar text-lg"></i>
-                            Xem danh mục sự kiện
-                        </Link>
-                    </div>
-
                     <div className="bg-white p-2 rounded-lg shadow-premium border border-event-border flex flex-col sm:flex-row gap-2 max-w-xl">
                         <div className="flex-1 flex items-center px-4 py-2 text-event-text-sec">
                             <i className="ph ph-magnifying-glass text-xl mr-3 text-event-red"></i>
