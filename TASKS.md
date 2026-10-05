@@ -2206,4 +2206,18 @@
     - Cập nhật `backend/requirements.txt`: Bổ sung `greenlet>=3.0.3` ngay sau `sqlalchemy>=2.0.28`.
     - Đã commit và push trực tiếp lên nhánh `main` để Render kích hoạt tự động rebuild bản mới.
 
+---
+
+### [x] Task 108: Rà Soát Toàn Diện Dependencies Backend - Bổ Sung 'redis' & 'psycopg2-binary'
+  - **1. Nguyên nhân lỗi (Root Cause):**
+    - Module `backend/app/services/redis_cache_service.py` sử dụng `import redis.asyncio as aioredis` cho Semantic Cache (Task 101). Do thiếu gói `redis` trong `requirements.txt`, Render gặp lỗi `ModuleNotFoundError: No module named 'redis'` khi import service.
+  - **2. Quét toàn bộ import trong `backend/app`:**
+    - Đã quét tự động 100% tất cả các file Python trong `backend/app`.
+    - Xác nhận toàn bộ dependencies: `fastapi`, `uvicorn`, `pydantic`, `pydantic-settings`, `sqlalchemy`, `greenlet`, `asyncpg`, `psycopg2-binary`, `redis`, `pgvector`, `alembic`, `google-generativeai`, `google-genai`, `google-auth`, `python-dotenv`, `python-multipart`, `python-jose`, `passlib`, `bcrypt`, `httpx`, `apscheduler`, `email-validator`, `pyotp`, `qrcode`, `pillow`, `aiofiles`.
+  - **3. Khắc phục & Tối ưu hóa:**
+    - Đã bổ sung `redis>=5.0.0` và `psycopg2-binary>=2.9.9` vào `backend/requirements.txt`.
+    - Bọc an toàn `try-except` cho import `redis.asyncio` trong `redis_cache_service.py` để đảm bảo hệ thống không bao giờ bị sập ngay cả khi Redis không khả dụng.
+    - Đã commit và push trực tiếp lên nhánh `main`.
+
+
 

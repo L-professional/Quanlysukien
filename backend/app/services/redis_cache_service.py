@@ -6,7 +6,11 @@ import time
 import unicodedata
 from typing import Optional, Dict, Any, List, Tuple
 
-import redis.asyncio as aioredis
+try:
+    import redis.asyncio as aioredis
+except ImportError:
+    aioredis = None
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -63,8 +67,10 @@ class RedisSemanticCacheService:
         self.default_ttl = 3600  # 1 hour
         self.similarity_threshold = 0.92  # 92% semantic similarity threshold
 
-    async def get_client(self) -> Optional[aioredis.Redis]:
+    async def get_client(self) -> Optional[Any]:
         """Get or initialize async Redis client with safety check and loop recovery."""
+        if aioredis is None:
+            return None
         if self._client is not None:
             try:
                 await self._client.ping()
