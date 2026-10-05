@@ -8,11 +8,6 @@
 
 **EventHub AI** là nền tảng quản lý và điều phối sự kiện thông minh ứng dụng trí tuệ nhân tạo thế hệ mới (Google Gemini AI), hỗ trợ toàn diện vòng đời sự kiện từ khâu lập kế hoạch, truyền thông tiếp thị, check-in vé QR, tương tác diễn giả - khán giả, đến phân tích đánh giá sau sự kiện.
 
-> 🔗 **TRẢI NGHIỆM TRỰC TUYẾN NGAY (LIVE DEMO):**
-> - 🌐 **Trang chủ EventAI:** [https://quanlysukien.vercel.app](https://quanlysukien.vercel.app)
-> - 🔐 **Trang Đăng nhập hệ thống:** [https://quanlysukien.vercel.app/login](https://quanlysukien.vercel.app/login) *(Tích hợp sẵn các tài khoản demo: Admin, Manager, Staff, Speaker, Attendee)*
-> - 📅 **Danh mục sự kiện:** [https://quanlysukien.vercel.app/events](https://quanlysukien.vercel.app/events)
-
 ---
 
 ## ✨ Tính Năng Nổi Bật
