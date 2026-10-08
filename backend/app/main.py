@@ -31,6 +31,7 @@ async def lifespan(app: FastAPI):
     try:
         from app.core.database import engine
         async with engine.begin() as conn:
+            await conn.execute(text("SET timezone = 'Asia/Ho_Chi_Minh';"))
             await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;"
             ))
