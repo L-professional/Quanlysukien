@@ -1,3 +1,11 @@
+import os
+import time
+
+# Enforce Hanoi, Vietnam Timezone (UTC+7) across server processes and C-runtime
+os.environ["TZ"] = "Asia/Ho_Chi_Minh"
+if hasattr(time, "tzset"):
+    time.tzset()
+
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware

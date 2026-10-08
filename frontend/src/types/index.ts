@@ -260,6 +260,8 @@ export interface ChatMessage {
   timestamp: string;
   sources?: string[];
   isFallback?: boolean;
+  isEscalatedToStaff?: boolean;
+  aiCategory?: string;
   actionLinks?: ActionLink[];
   suggestedQuestions?: string[];
   suggested_questions?: string[];
@@ -271,6 +273,7 @@ export interface AttendeeChatResponse {
   sources: string[];
   is_fallback: boolean;
   ai_category?: string;
+  is_escalated_to_staff?: boolean;
   action_links?: ActionLink[];
 }
 

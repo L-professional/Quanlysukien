@@ -48,6 +48,7 @@ class AttendeeChatResponse(BaseModel):
     is_fallback: bool = False
     ai_category: str = "GENERAL"
     action_links: Optional[List[dict]] = None
+    is_escalated_to_staff: Optional[bool] = False
 
 
 
@@ -296,6 +297,7 @@ async def chat_with_attendee_bot(
     is_fallback = copilot_result.get("is_fallback", False)
     ai_category = copilot_result.get("ai_category", category)
     action_links = copilot_result.get("action_links", [])
+    is_escalated_to_staff = copilot_result.get("is_escalated_to_staff", False)
 
     # 4. Audit Log
     try:
@@ -317,7 +319,8 @@ async def chat_with_attendee_bot(
         sources=sources,
         is_fallback=is_fallback,
         ai_category=ai_category,
-        action_links=action_links
+        action_links=action_links,
+        is_escalated_to_staff=is_escalated_to_staff
     )
 
 

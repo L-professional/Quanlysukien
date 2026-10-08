@@ -7,7 +7,7 @@ import json
 import logging
 import zoneinfo
 import unicodedata
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, time
 from typing import List, Dict, Any, Optional, Tuple
 
 from sqlalchemy import select, func, or_, and_, text
@@ -193,11 +193,9 @@ def parse_event_time_range_vn(e: Event) -> Dict[str, Any]:
     et_vn: Optional[datetime] = None
 
     if e.start_time:
-        st = e.start_time if e.start_time.tzinfo else e.start_time.replace(tzinfo=timezone.utc)
-        st_vn = st.astimezone(vn_tz)
+        st_vn = to_vn_datetime(e.start_time)
     if e.end_time:
-        et = e.end_time if e.end_time.tzinfo else e.end_time.replace(tzinfo=timezone.utc)
-        et_vn = et.astimezone(vn_tz)
+        et_vn = to_vn_datetime(e.end_time)
 
     # Fallback to string start_date / end_date (e.g., "28/09/2026 17:37" or "15/10/2026 08:30")
     if not st_vn and e.start_date:
@@ -230,11 +228,12 @@ def parse_event_time_range_vn(e: Event) -> Dict[str, Any]:
         is_ongoing = True
 
     is_today = False
+    effective_et_date = (et_vn - timedelta(seconds=1)).date() if (et_vn and et_vn.time() == time(0, 0) and st_vn and et_vn > st_vn) else (et_vn.date() if et_vn else None)
     if st_vn and st_vn.date() == now_vn.date():
         is_today = True
-    elif et_vn and et_vn.date() == now_vn.date():
+    elif effective_et_date and effective_et_date == now_vn.date():
         is_today = True
-    elif st_vn and et_vn and st_vn.date() <= now_vn.date() <= et_vn.date():
+    elif st_vn and effective_et_date and st_vn.date() <= now_vn.date() <= effective_et_date:
         is_today = True
 
     time_range_str = (st_vn.strftime('%H:%M') + ' - ' + et_vn.strftime('%H:%M')) if (st_vn and et_vn) else (st_vn.strftime('%H:%M') if st_vn else "Cả ngày")
@@ -511,6 +510,100 @@ def detect_temporal_intent(question: str, now_vn: Optional[datetime] = None) -> 
     return None
 
 
+def is_capability_or_identity_query(question: str) -> bool:
+    """Detect if user is asking about AI identity or capabilities (Task Requirement: No RAG search)."""
+    q_low = question.lower().strip()
+    q_norm = remove_vietnamese_diacritics(q_low)
+
+    # Exclude queries with specific event keywords
+    if any(w in q_low for w in ["giá vé", "mua vé", "hôm nay có", "ngày mai có", "diễn ra ở đâu", "mấy giờ"]):
+        return False
+
+    capability_keywords = [
+        "bạn làm được gì", "ban lam duoc gi",
+        "bạn có thể làm gì", "ban co the lam gi",
+        "bạn giúp được gì", "ban giup duoc gi",
+        "em làm được gì", "em lam duoc gi",
+        "bot làm được gì", "bot lam duoc gi",
+        "ai làm được gì", "ai lam duoc gi",
+        "what can you do", "what do you do",
+        "năng lực của bạn", "nang luc cua ban",
+        "tính năng của bạn", "tinh nang cua ban",
+        "chức năng của bạn", "chuc nang cua ban",
+        "bạn hỗ trợ được gì", "ban ho tro duoc gi",
+        "bạn có những tính năng gì", "ban co nhung tinh nang gi",
+        "bạn biết làm gì", "ban biet lam gi",
+        "hướng dẫn sử dụng bot", "huong dan su dung bot",
+        "bạn là ai", "ban la ai",
+        "bạn tên là gì", "ban ten la gi",
+        "em là ai", "em la ai",
+        "bot là ai", "bot la ai",
+        "ai là ai", "ai la ai",
+        "who are you", "who r u",
+        "what are you",
+        "giới thiệu về bạn", "gioi thieu ve ban",
+        "giới thiệu bản thân", "gioi thieu ban than",
+    ]
+    return any(kw in q_low or kw in q_norm for kw in capability_keywords)
+
+
+def get_capability_response() -> Dict[str, Any]:
+    """Return comprehensive system capability list without performing RAG/event search."""
+    ans = (
+        "Xin chào! Tôi là **Trợ Lý AI Toàn Năng (EventHub AI Copilot)** của hệ thống quản lý sự kiện thông minh.\n\n"
+        "Tôi có thể hỗ trợ bạn nhanh chóng và chính xác các tính năng sau:\n\n"
+        "1. 📅 **Tra cứu sự kiện theo thời gian thực:**\n"
+        "   - Kiểm tra các sự kiện đang diễn ra hôm nay, ngày mai, tuần này hoặc sắp diễn ra.\n"
+        "   - Tìm kiếm sự kiện theo tên, chủ đề công nghệ, diễn giả và địa điểm tổ chức.\n\n"
+        "2. ⏰ **Lịch trình & Ca diễn thuyết (Schedules):**\n"
+        "   - Tra cứu timeline chi tiết từng phiên Keynote, tọa đàm bàn tròn, workshop chuyên đề.\n"
+        "   - Cung cấp thời gian bắt đầu, kết thúc và phòng hội trường của từng phiên.\n\n"
+        "3. 🎟️ **Quản lý vé & Soát vé Check-in QR:**\n"
+        "   - Cung cấp chính sách các phân hạng vé (Standard Pass, VIP Access Pass, Early Bird, Student Pass).\n"
+        "   - Hướng dẫn soát vé bằng mã QR Code tự động tại cổng sảnh.\n"
+        "   - Tra cứu vé tham dự cá nhân đã đăng ký trên hệ thống.\n\n"
+        "4. 📍 **Địa điểm, Sơ đồ bãi xe & Tiện ích hội nghị:**\n"
+        "   - Cung cấp địa chỉ chi tiết và liên kết mở Google Maps chỉ đường.\n"
+        "   - Hướng dẫn vị trí bãi đỗ xe ô tô, xe máy và sơ đồ hội trường.\n"
+        "   - Thông tin kết nối WiFi sự kiện tốc độ cao và khung giờ tiệc Teabreak / Buffet.\n\n"
+        "5. 📊 **Số liệu & Báo cáo quản trị (Dành cho Ban Tổ Chức & Staff):**\n"
+        "   - Thống kê tỷ lệ check-in trực tiếp, số lượng vé đã đăng ký và điều phối sự kiện.\n\n"
+        "6. 💬 **Hỗ trợ đại biểu & Kết nối Staff Dashboard:**\n"
+        "   - Giải đáp thắc mắc và tự động chuyển tiếp yêu cầu tới Ban Tổ Chức khi bạn cần hỗ trợ từ người thật.\n\n"
+        "[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events) · [ 🎟️ Xem Vé của tôi ](/registrations)"
+    )
+    chips = [
+        "🔴 Hôm nay có sự kiện nào đang diễn ra không?",
+        "📅 Các sự kiện sắp diễn ra là gì?",
+        "🎟️ Các phân hạng vé hiện có trong hệ thống?"
+    ]
+    return {
+        "answer": ans,
+        "suggested_questions": chips,
+        "sources": ["Hệ thống Tính năng EventHub AI Copilot"],
+        "is_fallback": False,
+        "ai_category": "SYSTEM_CAPABILITY",
+        "action_links": [
+            {"label": "🔗 Danh mục sự kiện", "url": "/events"},
+            {"label": "🎟️ Vé của tôi", "url": "/registrations"},
+        ]
+    }
+
+
+def is_human_support_requested(question: str) -> bool:
+    """Detect if user explicitly asks for human staff or reports an error."""
+    q_low = question.lower().strip()
+    human_keywords = [
+        "gặp nhân viên", "người thật", "tư vấn viên", "liên hệ btc",
+        "ban tổ chức", "hỗ trợ trực tiếp", "kết nối nhân viên",
+        "chuyển nhân viên", "gặp admin", "báo lỗi", "gặp lỗi",
+        "lỗi hệ thống", "khiếu nại", "human support", "contact staff",
+        "nói chuyện với nhân viên", "cần người hỗ trợ", "cần gặp người",
+        "gặp hỗ trợ viên", "liên hệ trực tiếp", "nhân viên hỗ trợ"
+    ]
+    return any(kw in q_low for kw in human_keywords)
+
+
 def parse_structured_copilot_output(raw_text: str) -> Tuple[str, List[str]]:
     """Parse JSON structured output or fallback to text with smart suggestion generation."""
     answer = ""
@@ -765,9 +858,9 @@ class AICopilotService:
                 )
             ).order_by(Event.start_time.asc())
         elif temporal.intent_type == "TODAY":
-            # Events happening today
+            # Events happening today (active/ongoing/upcoming, not completed)
             stmt = select(Event).where(
-                Event.status != "CANCELLED",
+                Event.status.notin_(["CANCELLED", "COMPLETED"]),
                 or_(
                     and_(
                         func.date(func.timezone('Asia/Ho_Chi_Minh', Event.start_time)) <= temporal.start_date,
@@ -826,7 +919,7 @@ class AICopilotService:
             if temporal.intent_type == "ONGOING_NOW":
                 matches_temporal = tr["is_ongoing"] or (st_vn and et_vn and st_vn <= now_vn <= et_vn)
             elif temporal.intent_type == "TODAY":
-                matches_temporal = tr["is_today"] or tr["is_ongoing"] or (st_vn and st_vn.date() == temporal.start_date) or (et_vn and et_vn.date() >= temporal.start_date and st_vn and st_vn.date() <= temporal.start_date)
+                matches_temporal = (tr["is_today"] or tr["is_ongoing"]) and tr["effective_status"] != "ENDED" and (ev.status or "").upper() not in ("COMPLETED", "CANCELLED")
             elif temporal.intent_type == "TOMORROW":
                 matches_temporal = (st_vn and st_vn.date() == temporal.start_date) or (st_vn and et_vn and st_vn.date() <= temporal.start_date <= et_vn.date())
             elif temporal.intent_type == "DAY_AFTER_TOMORROW":
@@ -1323,6 +1416,64 @@ class AICopilotService:
         raw_question = question.strip()
         norm_role = normalize_copilot_role(user_role)
 
+        # Step 0.5: Direct AI Capability & Identity Intent Fast-Path (Task requirement: NO RAG, Standard list)
+        if is_capability_or_identity_query(raw_question):
+            return get_capability_response()
+
+        # Step 0.6: Direct Human Support / Staff Escalation Fast-Path (Only trigger staff for human requests/errors)
+        if is_human_support_requested(raw_question):
+            try:
+                p_id = user_id
+                if not p_id:
+                    u_stmt = select(User.id).where(User.email.in_(["guest.attendee@eventhub.ai", "attendee@eventhub.ai"]))
+                    u_res = await db.execute(u_stmt)
+                    p_id = u_res.scalars().first()
+                    if not p_id:
+                        p_res = await db.execute(select(User.id).limit(1))
+                        p_id = p_res.scalars().first()
+
+                e_id = event_id
+                if not e_id:
+                    ev_res = await db.execute(select(Event.id).limit(1))
+                    e_id = ev_res.scalars().first()
+
+                if e_id and p_id:
+                    inq = EventInquiry(
+                        event_id=e_id,
+                        participant_id=p_id,
+                        question=raw_question,
+                        ai_category="HUMAN_STAFF_ESCALATION",
+                        status="PENDING"
+                    )
+                    db.add(inq)
+                    await db.commit()
+                    logger.info(f"Created staff escalation ticket #{inq.id} for inquiry: {raw_question}")
+            except Exception as e_err:
+                logger.warning(f"Failed to record staff escalation ticket: {e_err}")
+                await db.rollback()
+
+            return {
+                "answer": (
+                    "Yêu cầu hỗ trợ của bạn đã được tiếp nhận và chuyển tiếp thành công tới **Ban Tổ Chức (Staff Dashboard)**.\n\n"
+                    "Đội ngũ nhân viên trực hỗ trợ sẽ xem xét thắc mắc và liên hệ giải đáp cho bạn trong thời gian sớm nhất.\n\n"
+                    "Trong lúc chờ đợi, bạn có thể tra cứu thông tin nhanh qua các liên kết bên dưới:\n\n"
+                    "[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events) · [ 🎟️ Xem Vé của tôi ](/registrations)"
+                ),
+                "suggested_questions": [
+                    "🔴 Hôm nay có sự kiện nào đang diễn ra không?",
+                    "📅 Lịch trình các phiên sự kiện sắp diễn ra?",
+                    "🎟️ Các phân hạng vé hiện có trong hệ thống?"
+                ],
+                "sources": ["Hệ thống Điều Phối Hỗ Trợ Khách Hàng (Staff Escalation)"],
+                "is_fallback": False,
+                "is_escalated_to_staff": True,
+                "ai_category": "HUMAN_STAFF_ESCALATION",
+                "action_links": [
+                    {"label": "🔗 Danh mục sự kiện", "url": "/events"},
+                    {"label": "🎟️ Vé của tôi", "url": "/registrations"},
+                ]
+            }
+
         # Step 1: Strict RBAC Guardrail Check
         guardrail_violation = self.check_rbac_guardrails(raw_question, norm_role)
         if guardrail_violation:
@@ -1557,7 +1708,8 @@ class AICopilotService:
             "  + 'Cuối tuần này' => Thứ Bảy & Chủ Nhật tuần hiện tại.\n"
             "  + 'Tuần sau' => Tuần kế tiếp.\n"
             "- Khi người dùng hỏi về thời gian (VD: 'hôm nay có sự kiện nào?', 'ngay mai co sk gi hot ko', 'chieu nay co hoi thao nao'):\n"
-            "  + BẮT BUỘC nêu rõ mốc thời gian hệ thống đang tra cứu ở đầu câu trả lời (VD: 'Tính đến 17:30 hôm nay (02/10/2026), trên hệ thống EventHub có các sự kiện sau:...' hoặc 'Tra cứu theo lịch trình ngày mai (03/10/2026), trên hệ thống EventHub có các sự kiện sau:...').\n"
+            "  + Nếu CÓ sự kiện diễn ra: BẮT BUỘC nêu rõ mốc thời gian hệ thống đang tra cứu ở đầu câu trả lời (VD: 'Tính đến 17:30 hôm nay (02/10/2026), trên hệ thống EventHub có các sự kiện sau:...' hoặc 'Tra cứu theo lịch trình ngày mai (03/10/2026), trên hệ thống EventHub có các sự kiện sau:...').\n"
+            "  + ĐẶC BIỆT: Nếu KHÔNG CÓ sự kiện nào diễn ra hôm nay (count == 0): Câu đầu tiên BẮT BUỘC PHẢI CHÍNH XÁC LÀ: 'Hôm nay hệ thống không có sự kiện nào đang diễn ra.' (Tuyệt đối KHÔNG thêm mốc giờ ở đầu câu này).\n"
             "  + Liệt kê đầy đủ thông tin: Tên sự kiện, Trạng thái (🔴 Đang diễn ra / 🔵 Sắp diễn ra), Khung giờ chính xác, Địa điểm, Mô tả và WiFi.\n"
             "  + TUYỆT ĐỐI KHÔNG trả về các sự kiện trong quá khứ khi người dùng hỏi về hôm nay hoặc tương lai.\n\n"
             "YÊU CẦU ĐỊNH DẠNG ĐẦU RA BẮT BUỘC (STRUCTURED OUTPUT / JSON SCHEMA - TASK 101):\n"
@@ -1577,13 +1729,19 @@ class AICopilotService:
             "1. KHÔNG DÙNG BẪY NGỮ CẢNH CỐ ĐỊNH (GLOBAL SCOPE):\n"
             "   - Bạn có toàn quyền truy xuất toàn bộ dữ liệu CSDL PostgreSQL.\n"
             "   - Không tự ý gán sự kiện cho một ngữ cảnh cố định khi người dùng hỏi về sự kiện khác.\n\n"
-            "2. CHỐNG SUY ĐOÁN ẢO (STRICT ANTI-HALLUCINATION & TOOL ENFORCEMENT):\n"
+            "2. QUY TẮC PHÂN LUỒNG Ý ĐỊNH VÀ TRẢ LỜI TRỰC TIẾP (INTENT ROUTING & DIRECT ANSWER):\n"
+            "   - Khi người dùng hỏi về năng lực/danh tính AI ('bạn làm được gì', 'bạn là ai', 'bạn có thể làm gì'):\n"
+            "     BẮT BUỘC trả lời danh sách tính năng hệ thống EventHub AI (tra cứu sự kiện, lịch trình ca diễn thuyết, soát vé QR check-in, vị trí hội trường & WiFi, báo cáo quản trị), TUYỆT ĐỐI KHÔNG lấy chi tiết một sự kiện cụ thể.\n"
+            "   - Khi người dùng hỏi 'hôm nay có sự kiện gì' (hoặc các câu tương đương) mà KHÔNG CÓ sự kiện nào diễn ra hôm nay (count == 0):\n"
+            "     BẮT BUỘC KHẲNG ĐỊNH NGAY Ở CÂU ĐẦU TIÊN: 'Hôm nay hệ thống không có sự kiện nào đang diễn ra.'\n"
+            "     Sau câu đó, mới gợi ý danh sách các sự kiện sắp tới.\n\n"
+            "3. CHỐNG SUY ĐOÁN ẢO (STRICT ANTI-HALLUCINATION & TOOL ENFORCEMENT):\n"
             "   - BẮT BUỘC trả lời dựa 100% trên kết quả công cụ truy vấn PostgreSQL được cung cấp bên dưới (Zero-Cache Live Tools).\n"
             "   - Nếu công cụ báo sự kiện KHÔNG TỒN TẠI trong CSDL (hoặc đã bị xóa), bạn BẮT BUỘC phải thông báo rõ ràng sự kiện đó không tìm thấy trong hệ thống CSDL EventHub.\n"
             "   - Nếu công cụ tìm thấy sự kiện, bạn BẮT BUỘC phải cung cấp chính xác tên, thời gian, địa điểm từ CSDL mà không được phủ nhận.\n\n"
-            "3. MÚI GIỜ VIỆT NAM & TRẠNG THÁI SỰ KIỆN ĐỘNG (UTC+7 DYNAMIC LOGIC):\n"
+            "4. MÚI GIỜ VIỆT NAM & TRẠNG THÁI SỰ KIỆN ĐỘNG (UTC+7 DYNAMIC LOGIC):\n"
             "   - So sánh thời gian thực hiện tại tại Việt Nam (UTC+7) với start_date và end_date của sự kiện.\n\n"
-            "4. SMART ACTION WIDGETS:\n"
+            "5. SMART ACTION WIDGETS:\n"
             "   - Chủ động đính kèm nút hành động ở cuối câu:\n"
             "     + [ 🔗 Chuyển đến trang Danh mục sự kiện ](/events)\n"
             "     + [ 🎟️ Xem Vé của tôi ](/registrations)\n"
@@ -1641,6 +1799,23 @@ class AICopilotService:
             if not suggested_questions:
                 suggested_questions = fallback_suggestions
 
+        # Enforce requirement 3: Direct Answer for empty today events
+        if temporal_intent and temporal_intent.intent_type in ("TODAY", "ONGOING_NOW"):
+            active_today_evs = [
+                e for e in (temporal_events if temporal_events is not None else (today_events or []))
+                if e.get("is_ongoing") or (e.get("effective_status") in ("ONGOING", "UPCOMING", "PUBLISHED") and (e.get("status") or "").upper() not in ("COMPLETED", "CANCELLED"))
+            ]
+            if not active_today_evs and answer:
+                target_first_sentence = "Hôm nay hệ thống không có sự kiện nào đang diễn ra."
+                if not answer.strip().startswith(target_first_sentence):
+                    first_line = answer.strip().split("\n")[0]
+                    if any(w in first_line.lower() for w in ["không có sự kiện nào", "khong co su kien nao", "chưa có sự kiện nào"]):
+                        lines = answer.strip().split("\n")
+                        lines[0] = target_first_sentence
+                        answer = "\n".join(lines)
+                    else:
+                        answer = target_first_sentence + "\n\n" + answer.strip()
+
         # Ensure exactly 3 smart contextual follow-up questions
         target_title = ev_overview.get("title") if ev_overview else None
         suggested_questions = get_contextual_suggested_questions(
@@ -1672,7 +1847,7 @@ class AICopilotService:
             "answer": answer,
             "suggested_questions": suggested_questions,
             "sources": sources,
-            "is_fallback": is_fallback,
+            "is_fallback": False,
             "ai_category": "COPILOT_SQL_RAG",
             "action_links": action_links
         }
@@ -1733,7 +1908,12 @@ class AICopilotService:
             "hạng vé", "hang ve", "loại vé", "loai ve", "giá vé", "gia ve",
             "các vé", "cac ve", "mua vé", "đăng ký vé", "quyền lợi vé", "vé tham dự"
         ]) or (any(w in q_low for w in ["vé", "ve"]) and any(w in q_low for w in ["hệ thống", "có những", "bao nhiêu", "loại nào", "hạng nào", "bán", "giá", "loại"]))
-        is_event_list_query = any(w in q_low for w in [
+        has_temporal_words = any(w in q_low for w in [
+            "hôm nay", "hom nay", "ngày mai", "ngay mai", "tuần này", "tuan nay",
+            "cuối tuần", "cuoi tuan", "sắp diễn ra", "sap dien ra", "đang diễn ra",
+            "dang dien ra", "hiện tại", "hien tai"
+        ])
+        is_event_list_query = (not temporal_intent) and (not has_temporal_words) and any(w in q_low for w in [
             "những sự kiện nào", "các sự kiện nào", "danh sách sự kiện",
             "tất cả sự kiện", "toàn bộ sự kiện", "có sự kiện gì", "hệ thống có những sự kiện",
             "bao nhiêu sự kiện", "các sự kiện hiện có"
@@ -1769,6 +1949,11 @@ class AICopilotService:
         # 3. Dynamic Temporal Intent Query (Task 102: Today, Tomorrow, Weekend, Afternoon, Ongoing)
         if temporal_intent and not (is_schedule_query or is_location_query or is_wifi_query or is_ticket_query or is_event_list_query):
             target_list = temporal_events if temporal_events is not None else today_events
+            if temporal_intent.intent_type in ("TODAY", "ONGOING_NOW") and target_list:
+                target_list = [
+                    ev for ev in target_list
+                    if ev.get("is_ongoing") or (ev.get("effective_status") in ("ONGOING", "UPCOMING", "PUBLISHED") and (ev.get("status") or "").upper() not in ("COMPLETED", "CANCELLED"))
+                ]
             if target_list:
                 ev_blocks = []
                 for idx, ev in enumerate(target_list, 1):
@@ -1807,11 +1992,34 @@ class AICopilotService:
                 ]
                 return ans, suggs
             else:
-                ans = (
-                    f"{temporal_intent.reference_time_str}, trên hệ thống EventHub hiện **chưa có sự kiện nào** được lên lịch trong khoảng thời gian này.\n\n"
-                    f"Bạn có thể khám phá toàn bộ danh mục các sự kiện sắp diễn ra hoặc đăng ký tham gia tại:\n\n"
-                    f"[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events)"
-                )
+                upcoming_items = []
+                if all_events_summary and all_events_summary.get("events_list"):
+                    upcoming_items = [
+                        e for e in all_events_summary["events_list"]
+                        if e.get("status") in ("UPCOMING", "PUBLISHED")
+                    ][:3]
+                    if not upcoming_items:
+                        upcoming_items = all_events_summary["events_list"][:3]
+
+                upcoming_text = ""
+                if upcoming_items:
+                    upcoming_text = "\n\nDưới đây là một số sự kiện sắp diễn ra trên hệ thống EventHub mà bạn có thể quan tâm:\n" + "\n".join([
+                        f"{idx}. **{ue['title']}**\n   - **Thời gian:** {ue.get('date', 'Sắp diễn ra')}\n   - **Địa điểm:** {ue.get('location', 'Trung tâm sự kiện')}"
+                        for idx, ue in enumerate(upcoming_items, 1)
+                    ])
+
+                if temporal_intent.intent_type in ("TODAY", "ONGOING_NOW"):
+                    ans = (
+                        f"Hôm nay hệ thống không có sự kiện nào đang diễn ra.{upcoming_text}\n\n"
+                        f"Bạn có thể khám phá toàn bộ danh mục các sự kiện sắp diễn ra hoặc đăng ký tham gia tại:\n\n"
+                        f"[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events)"
+                    )
+                else:
+                    ans = (
+                        f"{temporal_intent.reference_time_str}, trên hệ thống EventHub hiện **chưa có sự kiện nào** được lên lịch trong khoảng thời gian này.{upcoming_text}\n\n"
+                        f"Bạn có thể khám phá toàn bộ danh mục các sự kiện sắp diễn ra hoặc đăng ký tham gia tại:\n\n"
+                        f"[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events)"
+                    )
                 suggs = [
                     "📅 Danh mục các sự kiện sắp diễn ra?",
                     "🎟️ Các phân hạng vé hiện có trong hệ thống?",
@@ -1864,8 +2072,24 @@ class AICopilotService:
                 ]
                 return ans, suggs
             else:
+                upcoming_items = []
+                if all_events_summary and all_events_summary.get("events_list"):
+                    upcoming_items = [
+                        e for e in all_events_summary["events_list"]
+                        if e.get("status") in ("UPCOMING", "PUBLISHED")
+                    ][:3]
+                    if not upcoming_items:
+                        upcoming_items = all_events_summary["events_list"][:3]
+
+                upcoming_text = ""
+                if upcoming_items:
+                    upcoming_text = "\n\nDưới đây là gợi ý một số sự kiện sắp diễn ra trên hệ thống EventHub mà bạn có thể quan tâm:\n" + "\n".join([
+                        f"{idx}. **{ue['title']}**\n   - **Thời gian:** {ue.get('date', 'Sắp diễn ra')}\n   - **Địa điểm:** {ue.get('location', 'Trung tâm sự kiện')}"
+                        for idx, ue in enumerate(upcoming_items, 1)
+                    ])
+
                 ans = (
-                    f"Hiện tại trong ngày hôm nay hệ thống EventHub AI không ghi nhận sự kiện nào đang diễn ra.\n\n"
+                    f"Hôm nay hệ thống không có sự kiện nào đang diễn ra.{upcoming_text}\n\n"
                     f"Bạn có thể khám phá toàn bộ các sự kiện sắp diễn ra hoặc đăng ký tham gia tại:\n\n"
                     f"[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events)"
                 )

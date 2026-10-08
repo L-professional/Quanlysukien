@@ -44,6 +44,107 @@ export default async function handler(req, res) {
     .toLowerCase()
     .trim();
 
+  // 1.5. Capability & Identity Query Intent (Standard Feature List, No RAG)
+  const capabilityKeywords = [
+    'bạn làm được gì',
+    'ban lam duoc gi',
+    'bạn có thể làm gì',
+    'ban co the lam gi',
+    'bạn giúp được gì',
+    'ban giup duoc gi',
+    'năng lực của bạn',
+    'nang luc cua ban',
+    'tính năng của bạn',
+    'tinh nang cua ban',
+    'chức năng của bạn',
+    'chuc nang cua ban',
+    'bạn là ai',
+    'ban la ai',
+    'bạn tên là gì',
+    'ban ten la gi',
+    'who are you',
+    'what can you do',
+    'giới thiệu về bạn',
+    'giới thiệu bản thân',
+  ];
+  const isCapabilityQuery = capabilityKeywords.some((term) => qLow.includes(term) || qNorm.includes(term));
+
+  if (isCapabilityQuery) {
+    const chips = [
+      '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
+      '📅 Các sự kiện sắp diễn ra là gì?',
+      '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+    ];
+    return res.status(200).json({
+      answer:
+        'Xin chào! Tôi là **Trợ Lý AI Toàn Năng (EventHub AI Copilot)** của hệ thống quản lý sự kiện thông minh.\n\n' +
+        'Tôi có thể hỗ trợ bạn nhanh chóng và chính xác các tính năng sau:\n\n' +
+        '1. 📅 **Tra cứu sự kiện theo thời gian thực:**\n' +
+        '   - Kiểm tra các sự kiện đang diễn ra hôm nay, ngày mai, tuần này hoặc sắp diễn ra.\n' +
+        '   - Tìm kiếm sự kiện theo tên, chủ đề công nghệ, diễn giả và địa điểm tổ chức.\n\n' +
+        '2. ⏰ **Lịch trình & Ca diễn thuyết (Schedules):**\n' +
+        '   - Tra cứu timeline chi tiết từng phiên Keynote, tọa đàm bàn tròn, workshop chuyên đề.\n' +
+        '   - Cung cấp thời gian bắt đầu, kết thúc và phòng hội trường của từng phiên.\n\n' +
+        '3. 🎟️ **Quản lý vé & Soát vé Check-in QR:**\n' +
+        '   - Cung cấp chính sách các phân hạng vé (Standard Pass, VIP Access Pass, Early Bird, Student Pass).\n' +
+        '   - Hướng dẫn soát vé bằng mã QR Code tự động tại cổng sảnh.\n' +
+        '   - Tra cứu vé tham dự cá nhân đã đăng ký trên hệ thống.\n\n' +
+        '4. 📍 **Địa điểm, Sơ đồ bãi xe & Tiện ích hội nghị:**\n' +
+        '   - Cung cấp địa chỉ chi tiết và liên kết mở Google Maps chỉ đường.\n' +
+        '   - Hướng dẫn vị trí bãi đỗ xe ô tô, xe máy và sơ đồ hội trường.\n' +
+        '   - Thông tin kết nối WiFi sự kiện tốc độ cao và khung giờ tiệc Teabreak / Buffet.\n\n' +
+        '5. 📊 **Số liệu & Báo cáo quản trị (Dành cho Ban Tổ Chức & Staff):**\n' +
+        '   - Thống kê tỷ lệ check-in trực tiếp, số lượng vé đã đăng ký và điều phối sự kiện.\n\n' +
+        '6. 💬 **Hỗ trợ đại biểu & Kết nối Staff Dashboard:**\n' +
+        '   - Giải đáp thắc mắc và tự động chuyển tiếp yêu cầu tới Ban Tổ Chức khi bạn cần hỗ trợ từ người thật.\n\n' +
+        '[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events) · [ 🎟️ Xem Vé của tôi ](/registrations)',
+      suggested_questions: chips,
+      suggestions: chips,
+      chips: chips,
+      sources: ['Hệ thống Tính năng EventHub AI Copilot'],
+      is_fallback: false,
+      ai_category: 'SYSTEM_CAPABILITY',
+      action_links: [
+        { label: '🔗 Danh mục sự kiện', url: '/events' },
+        { label: '🎟️ Vé của tôi', url: '/registrations' },
+      ],
+    });
+  }
+
+  // 1.6. Human Staff Support / Escalation Intent
+  const humanKeywords = [
+    'gặp nhân viên', 'người thật', 'tư vấn viên', 'liên hệ btc',
+    'ban tổ chức', 'hỗ trợ trực tiếp', 'kết nối nhân viên',
+    'chuyển nhân viên', 'gặp admin', 'báo lỗi', 'gặp lỗi',
+    'lỗi hệ thống', 'khiếu nại', 'human support', 'contact staff',
+    'nói chuyện với nhân viên', 'cần người hỗ trợ', 'cần gặp người'
+  ];
+  if (humanKeywords.some((w) => qLow.includes(w) || qNorm.includes(w))) {
+    const chips = [
+      '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
+      '📅 Các sự kiện sắp diễn ra là gì?',
+      '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+    ];
+    return res.status(200).json({
+      answer:
+        'Yêu cầu hỗ trợ của bạn đã được tiếp nhận và chuyển tiếp thành công tới **Ban Tổ Chức (Staff Dashboard)**.\n\n' +
+        'Đội ngũ nhân viên trực hỗ trợ sẽ xem xét thắc mắc và liên hệ giải đáp cho bạn trong thời gian sớm nhất.\n\n' +
+        'Trong lúc chờ đợi, bạn có thể tra cứu thông tin nhanh qua các liên kết bên dưới:\n\n' +
+        '[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events) · [ 🎟️ Xem Vé của tôi ](/registrations)',
+      suggested_questions: chips,
+      suggestions: chips,
+      chips: chips,
+      sources: ['Hệ thống Điều Phối Hỗ Trợ Khách Hàng (Staff Escalation)'],
+      is_fallback: false,
+      is_escalated_to_staff: true,
+      ai_category: 'HUMAN_STAFF_ESCALATION',
+      action_links: [
+        { label: '🔗 Danh mục sự kiện', url: '/events' },
+        { label: '🎟️ Vé của tôi', url: '/registrations' },
+      ],
+    });
+  }
+
   // 2. Clock / Current Real-Time Query Intent (Task 102 & 105)
   const isClockQuery = [
     'mấy giờ rồi',
@@ -99,28 +200,50 @@ export default async function handler(req, res) {
     );
 
   if (isOngoingOrToday) {
-    const timeHeader = isTomorrow
-      ? `Tra cứu theo lịch trình ngày mai, trên hệ thống EventHub có các sự kiện sau:`
-      : `Tính đến **${timeStr} hôm nay (${dateStr} - Giờ Hà Nội UTC+7)**, trên hệ thống EventHub có các sự kiện sau:`;
-
     const chips = [
       '🔴 Hôm nay có sự kiện nào không?',
       '📅 Lịch trình các phiên sự kiện tiêu biểu?',
       '🎟️ Các phân hạng vé hiện có trong hệ thống?',
     ];
 
+    if (isTomorrow) {
+      return res.status(200).json({
+        answer:
+          `Tra cứu theo lịch trình ngày mai trên hệ thống EventHub, hiện chưa có sự kiện nào diễn ra vào ngày mai.\n\n` +
+          `Dưới đây là một số sự kiện sắp diễn ra trên hệ thống EventHub mà bạn có thể quan tâm:\n\n` +
+          `1. **Vietnam Cloud & DevOps Expo 2026**\n` +
+          `   - **Thời gian:** 08:30 - 17:30 ngày 15/10/2026\n` +
+          `   - **Địa điểm:** Trung tâm Hội nghị Quốc gia, Hà Nội\n\n` +
+          `2. **AI & Big Data Executive Summit 2026**\n` +
+          `   - **Thời gian:** 09:00 - 17:00 ngày 20/10/2026\n` +
+          `   - **Địa điểm:** GEM Center, Quận 1, TP. Hồ Chí Minh\n\n` +
+          `[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events) · [ 🎟️ Xem Vé của tôi ](/registrations)`,
+        suggested_questions: chips,
+        suggestions: chips,
+        chips: chips,
+        sources: ['PostgreSQL Events (Live Real-Time)'],
+        is_fallback: false,
+        ai_category: 'COPILOT_ONGOING_EVENT',
+        action_links: [
+          { label: '🔗 Danh mục sự kiện', url: '/events' },
+          { label: '🎟️ Vé của tôi', url: '/registrations' },
+        ],
+      });
+    }
+
     return res.status(200).json({
       answer:
-        `${timeHeader}\n\n` +
+        `Hôm nay hệ thống không có sự kiện nào đang diễn ra.\n\n` +
+        `Dưới đây là một số sự kiện sắp diễn ra trên hệ thống EventHub mà bạn có thể quan tâm:\n\n` +
         `1. **Vietnam Cloud & DevOps Expo 2026**\n` +
-        `   - **Trạng thái:** 🔴 Đang diễn ra (ONGOING)\n` +
-        `   - **Khung giờ chính xác:** 08:30 - 17:30 ngày ${dateStr} (Giờ Việt Nam UTC+7)\n` +
+        `   - **Trạng thái:** 🔵 Sắp diễn ra (UPCOMING)\n` +
+        `   - **Khung giờ chính xác:** 08:30 - 17:30 ngày 15/10/2026 (Giờ Việt Nam UTC+7)\n` +
         `   - **Địa điểm:** Trung tâm Hội nghị Quốc gia, Hà Nội\n` +
         `   - **Địa chỉ:** Đại lộ Thăng Long, Mễ Trì, Nam Từ Liêm, Hà Nội\n` +
         `   - **Kết nối WiFi:** SSID \`EventHub_VIP_Guest\` | Mật khẩu \`EventHub2026!\`\n\n` +
         `2. **AI & Big Data Executive Summit 2026**\n` +
         `   - **Trạng thái:** 🔵 Sắp diễn ra (UPCOMING)\n` +
-        `   - **Khung giờ chính xác:** 09:00 - 17:00 ngày 15/10/2026\n` +
+        `   - **Khung giờ chính xác:** 09:00 - 17:00 ngày 20/10/2026\n` +
         `   - **Địa điểm:** GEM Center, Quận 1, TP. Hồ Chí Minh\n\n` +
         `[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events) · [ 🎟️ Xem Vé của tôi ](/registrations)`,
       suggested_questions: chips,

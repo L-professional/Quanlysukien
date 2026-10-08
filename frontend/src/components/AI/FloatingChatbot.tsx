@@ -208,6 +208,8 @@ export const FloatingChatbot: React.FC = () => {
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         sources: sourcesList,
         isFallback: response.is_fallback,
+        isEscalatedToStaff: response.ai_category === 'HUMAN_STAFF_ESCALATION' || !!response.is_escalated_to_staff,
+        aiCategory: response.ai_category,
         actionLinks: response.action_links,
         suggestedQuestions,
       };
@@ -244,7 +246,9 @@ export const FloatingChatbot: React.FC = () => {
           text: clientRes.answer,
           timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
           sources: clientRes.sources && clientRes.sources.length > 0 ? clientRes.sources : ['PostgreSQL Events (Live Real-Time)'],
-          isFallback: false,
+          isFallback: clientRes.is_fallback,
+          isEscalatedToStaff: clientRes.ai_category === 'HUMAN_STAFF_ESCALATION' || !!(clientRes as any).is_escalated_to_staff,
+          aiCategory: clientRes.ai_category,
           actionLinks: clientRes.action_links,
           suggestedQuestions: fallbackChips,
         };
@@ -497,8 +501,8 @@ export const FloatingChatbot: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Fallback Badge */}
-                  {msg.isFallback && (
+                  {/* Staff Escalation Badge (Only displayed when user asks for human support / escalation) */}
+                  {(msg.isEscalatedToStaff || msg.aiCategory === 'HUMAN_STAFF_ESCALATION') && (
                     <div className="flex items-center gap-1.5 text-[10px] text-amber-300 bg-amber-950/60 border border-amber-800/50 px-2 py-1 rounded-lg">
                       <HelpCircle className="w-3 h-3 text-amber-400 shrink-0" />
                       <span>Đã chuyển thắc mắc tới Staff Dashboard</span>
@@ -506,7 +510,7 @@ export const FloatingChatbot: React.FC = () => {
                   )}
 
                   {/* Sources / Knowledge Base Citation */}
-                  {msg.sender === 'ai' && !msg.isFallback && (
+                  {msg.sender === 'ai' && !(msg.isEscalatedToStaff || msg.aiCategory === 'HUMAN_STAFF_ESCALATION') && (
                     <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 text-[10px] text-red-300 font-medium truncate">
                         <BookOpen className="w-3.5 h-3.5 text-red-400 shrink-0" />
