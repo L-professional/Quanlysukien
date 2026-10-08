@@ -40,95 +40,117 @@ from app.schemas.auth import (
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
+DEMO_USERS = [
+    {
+        "email": "admin@eventhub.ai",
+        "full_name": "Nguyễn Văn Quản Trị",
+        "phone_number": "0901234567",
+        "role_name": RoleEnum.ADMIN.value,
+        "role_id": 1,
+    },
+    {
+        "email": "manager@eventhub.ai",
+        "full_name": "Trần Thị Điều Hành",
+        "phone_number": "0902345678",
+        "role_name": RoleEnum.EVENT_MANAGER.value,
+        "role_id": 2,
+    },
+    {
+        "email": "staff@eventhub.ai",
+        "full_name": "Lê Hoàng Soát Vé",
+        "phone_number": "0903456789",
+        "role_name": RoleEnum.STAFF.value,
+        "role_id": 3,
+    },
+    {
+        "email": "speaker@eventhub.ai",
+        "full_name": "TS. Lê Quang Huy (Speaker)",
+        "phone_number": "0908889999",
+        "role_name": RoleEnum.SPEAKER.value,
+        "role_id": 5,
+    },
+    {
+        "email": "attendee@eventhub.ai",
+        "full_name": "Phạm Quốc Khách Hàng",
+        "phone_number": "0904567890",
+        "role_name": RoleEnum.PARTICIPANT.value,
+        "role_id": 4,
+    },
+]
+
+
 async def ensure_default_roles(db: AsyncSession):
-    """Ensure basic roles and default demo users exist in DB."""
+    """Ensure basic roles and default demo users exist in DB, resetting passwords to '123456'."""
+    # 1. Ensure all basic roles exist
     stmt = select(Role)
     res = await db.execute(stmt)
-    roles = res.scalars().all()
-    if not roles:
-        default_roles = [
-            Role(id=1, role_name=RoleEnum.ADMIN.value),
-            Role(id=2, role_name=RoleEnum.EVENT_MANAGER.value),
-            Role(id=3, role_name=RoleEnum.STAFF.value),
-            Role(id=4, role_name=RoleEnum.PARTICIPANT.value),
-        ]
-        db.add_all(default_roles)
-        await db.commit()
+    existing_roles = {r.role_name: r for r in res.scalars().all()}
 
-    # Seed demo users if no users exist
-    user_stmt = select(User).limit(1)
-    user_res = await db.execute(user_stmt)
-    if not user_res.scalars().first():
-        hashed_pwd = get_password_hash("123456")
-        demo_users = [
-            User(
-                email="admin@eventhub.ai",
-                hashed_password=hashed_pwd,
-                full_name="Nguyễn Văn Quản Trị",
-                phone_number="0901234567",
-                role_id=1,
-                is_active=True,
-            ),
-            User(
-                email="manager@eventhub.ai",
-                hashed_password=hashed_pwd,
-                full_name="Trần Thị Điều Hành",
-                phone_number="0902345678",
-                role_id=2,
-                is_active=True,
-            ),
-            User(
-                email="staff@eventhub.ai",
-                hashed_password=hashed_pwd,
-                full_name="Lê Hoàng Soát Vé",
-                phone_number="0903456789",
-                role_id=3,
-                is_active=True,
-            ),
-            User(
-                email="attendee@eventhub.ai",
-                hashed_password=hashed_pwd,
-                full_name="Phạm Quốc Khách Hàng",
-                phone_number="0904567890",
-                role_id=4,
-                is_active=True,
-            ),
-        ]
-    # Ensure SPEAKER role exists
-    speaker_role_res = await db.execute(select(Role).where(Role.role_name == RoleEnum.SPEAKER.value))
-    speaker_role = speaker_role_res.scalars().first()
-    if not speaker_role:
-        speaker_role = Role(role_name=RoleEnum.SPEAKER.value)
-        db.add(speaker_role)
-        await db.commit()
-        await db.refresh(speaker_role)
+    required_roles = [
+        (1, RoleEnum.ADMIN.value),
+        (2, RoleEnum.EVENT_MANAGER.value),
+        (3, RoleEnum.STAFF.value),
+        (4, RoleEnum.PARTICIPANT.value),
+        (5, RoleEnum.SPEAKER.value),
+    ]
+    for r_id, r_name in required_roles:
+        if r_name not in existing_roles:
+            new_role = Role(id=r_id, role_name=r_name)
+            db.add(new_role)
+            await db.commit()
+            await db.refresh(new_role)
+            existing_roles[r_name] = new_role
 
-    # Seed demo speaker if not exists
-    speaker_user_res = await db.execute(select(User).where(User.email == "speaker@eventhub.ai"))
-    speaker_user = speaker_user_res.scalars().first()
-    if not speaker_user:
-        hashed_pwd = get_password_hash("123456")
-        speaker_user = User(
-            email="speaker@eventhub.ai",
-            hashed_password=hashed_pwd,
-            full_name="TS. Lê Quang Huy (Speaker)",
-            phone_number="0908889999",
-            role_id=speaker_role.id,
-            is_active=True,
-        )
-        db.add(speaker_user)
-        await db.commit()
-        await db.refresh(speaker_user)
+    # 2. Upsert demo accounts and guarantee standardized password "123456"
+    standard_hash = get_password_hash("123456")
+    speaker_user = None
 
-    # Automatically assign first couple of event schedules to demo speaker if unassigned
-    from app.models.event import EventSchedule
-    sched_res = await db.execute(select(EventSchedule).limit(5))
-    schedules = sched_res.scalars().all()
-    if schedules:
-        for s in schedules:
-            if not s.speaker_id:
-                s.speaker_id = speaker_user.id
-        await db.commit()
+    for item in DEMO_USERS:
+        target_role = existing_roles.get(item["role_name"])
+        target_role_id = target_role.id if target_role else item["role_id"]
+
+        user_stmt = select(User).where(User.email == item["email"])
+        user_res = await db.execute(user_stmt)
+        user = user_res.scalar_one_or_none()
+
+        if user:
+            # Overwrite hashed_password with 123456 and ensure active
+            user.hashed_password = standard_hash
+            user.is_active = True
+            user.role_id = target_role_id
+            if not user.full_name:
+                user.full_name = item["full_name"]
+            if not user.phone_number:
+                user.phone_number = item["phone_number"]
+            db.add(user)
+            if item["email"] == "speaker@eventhub.ai":
+                speaker_user = user
+        else:
+            new_user = User(
+                email=item["email"],
+                hashed_password=standard_hash,
+                full_name=item["full_name"],
+                phone_number=item["phone_number"],
+                role_id=target_role_id,
+                is_active=True,
+            )
+            db.add(new_user)
+            await db.flush()
+            if item["email"] == "speaker@eventhub.ai":
+                speaker_user = new_user
+
+    await db.commit()
+
+    # 3. Automatically assign first couple of event schedules to demo speaker if unassigned
+    if speaker_user:
+        from app.models.event import EventSchedule
+        sched_res = await db.execute(select(EventSchedule).limit(5))
+        schedules = sched_res.scalars().all()
+        if schedules:
+            for s in schedules:
+                if not s.speaker_id:
+                    s.speaker_id = speaker_user.id
+            await db.commit()
 
 
 

@@ -4,7 +4,7 @@ import sys
 import time
 from sqlalchemy import text
 from app.core.database import init_db, AsyncSessionLocal
-from app.api.v1.auth import ensure_default_roles
+from app.api.v1.auth import ensure_default_roles, DEMO_USERS
 from app.db.seed_events import seed_20_realistic_events
 from app.db.seed_reports_data import seed_data as seed_reports_data
 
@@ -34,13 +34,27 @@ async def init_with_retry(max_retries: int = 5, retry_delay: float = 2.0) -> Non
 
     logger.info("Database schema and migrations initialized.")
 
-    # 1. Ensure default roles & demo users (admin, manager, staff, attendee, speaker)
+    # 1. Reset & Upsert all demo accounts with standardized password "123456"
     try:
         async with AsyncSessionLocal() as session:
             await ensure_default_roles(session)
-        logger.info("Default roles and demo users verified/created.")
+            
+            # Query back all demo users to log their active status & confirm update
+            demo_emails = [u["email"] for u in DEMO_USERS]
+            res = await session.execute(
+                text("SELECT email, role_id, is_active FROM users WHERE email = ANY(:emails) ORDER BY role_id;"),
+                {"emails": demo_emails}
+            )
+            synced_users = res.mappings().all()
+            for su in synced_users:
+                logger.info(
+                    f"Demo user '{su['email']}' (Role ID: {su['role_id']}, Active: {su['is_active']}) "
+                    f"verified and password reset/upserted to '123456'."
+                )
+
+        logger.info("All demo accounts (Admin, Manager, Staff, Speaker, Attendee) successfully upserted with password '123456'.")
     except Exception as e:
-        logger.warning(f"Default roles setup skipped or encountered an error: {e}")
+        logger.warning(f"Default roles & demo users setup encountered an error: {e}")
 
     # 2. Check and seed sample realistic events if empty
     try:
