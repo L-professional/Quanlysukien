@@ -179,8 +179,9 @@ export const Login: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Only redirect to dashboard if the user is already authenticated AND NOT currently visiting with a demo auto-fill parameter
-    if (isAuthenticated && !searchParams.get("email")) {
+    // Only redirect to dashboard if the user is already authenticated AND NOT currently switching account
+    const isSwitchingAccount = searchParams.get("switch") === "true" || !!searchParams.get("email");
+    if (isAuthenticated && !isSwitchingAccount) {
       navigate("/dashboard", { replace: true });
     }
   }, [isAuthenticated, searchParams, navigate]);
@@ -508,15 +509,24 @@ export const Login: React.FC = () => {
                       ].map(d => (
                         <button
                           key={d.label} type="button"
-                          onClick={() => {
+                          disabled={isLoading}
+                          onClick={async () => {
                             setForm(p => ({ ...p, email: d.email, password: "123456" }));
                             setDemoRoleInfo({ role: d.label, email: d.email });
                             lastPrefilledEmailRef.current = d.email;
-                            toast.info(`Đã điền sẵn thông tin tài khoản ${d.label} Demo. Vui lòng bấm Đăng nhập để tiếp tục.`, {
-                              id: `demo-pill-${d.label}`,
-                            });
+                            try {
+                              setIsLoading(true);
+                              const ok = await login(d.email, "123456");
+                              if (ok) {
+                                navigate("/dashboard", { replace: true });
+                              }
+                            } catch (err) {
+                              console.warn("1-click demo login failed:", err);
+                            } finally {
+                              setIsLoading(false);
+                            }
                           }}
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors hover:opacity-80 ${d.color}`}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors hover:opacity-80 cursor-pointer disabled:opacity-50 ${d.color}`}
                         >
                           {d.label}
                         </button>

@@ -530,9 +530,10 @@ export const Header: React.FC<HeaderProps> = ({
                       return (
                         <button
                           key={r.role}
-                          onClick={() => {
+                          onClick={async () => {
                             setShowDropdown(false);
-                            switchDemoAccount(r.role);
+                            await switchDemoAccount(r.role);
+                            navigate('/dashboard');
                           }}
                           className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
                             isCurrent
@@ -552,6 +553,16 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     onClick={() => {
                       setShowDropdown(false);
+                      navigate('/login?switch=true');
+                    }}
+                    className="w-full px-4 py-2 text-left text-[12px] font-semibold text-indigo-600 hover:bg-indigo-50 flex items-center gap-2 cursor-pointer"
+                  >
+                    <User className="w-4 h-4 text-indigo-500" />
+                    Đổi tài khoản đăng nhập
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDropdown(false);
                       navigate('/settings');
                     }}
                     className="w-full px-4 py-2 text-left text-[12px] font-semibold text-[#12213A] hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
@@ -562,7 +573,7 @@ export const Header: React.FC<HeaderProps> = ({
                   <button
                     onClick={() => {
                       setShowDropdown(false);
-                      logout();
+                      logout({ redirect: '/login?switch=true' });
                     }}
                     className="w-full px-4 py-2 text-left text-[12px] font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
                   >

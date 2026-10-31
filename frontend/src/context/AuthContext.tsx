@@ -37,16 +37,24 @@ export function normalizeRole(raw: string | undefined | null): UserRole {
 
 export const DEMO_PRESETS: Record<UserRole, User> = {
   ADMIN: {
-
-    id: 1,
+    id: 2,
     role_id: 1,
     full_name: 'Nguyễn Văn Quản Trị',
     email: 'admin@eventhub.ai',
     role_name: 'ADMIN',
     is_active: true,
   },
-  EVENT_MANAGER: {
+  SUPER_ADMIN: {
     id: 2,
+    role_id: 1,
+    full_name: 'Nguyễn Văn Quản Trị (Super Admin)',
+    email: 'admin@eventhub.ai',
+    role_name: 'SUPER_ADMIN',
+    permissions: ['*'],
+    is_active: true,
+  },
+  EVENT_MANAGER: {
+    id: 3,
     role_id: 2,
     full_name: 'Trần Thị Điều Hành',
     email: 'manager@eventhub.ai',
@@ -54,15 +62,15 @@ export const DEMO_PRESETS: Record<UserRole, User> = {
     is_active: true,
   },
   ORGANIZER: {
-    id: 2,
+    id: 3,
     role_id: 2,
     full_name: 'Trần Thị Điều Hành (Organizer)',
-    email: 'organizer@eventhub.ai',
-    role_name: 'ORGANIZER',
+    email: 'manager@eventhub.ai',
+    role_name: 'EVENT_MANAGER',
     is_active: true,
   },
   STAFF: {
-    id: 3,
+    id: 4,
     role_id: 3,
     full_name: 'Lê Hoàng Soát Vé',
     email: 'staff@eventhub.ai',
@@ -70,7 +78,7 @@ export const DEMO_PRESETS: Record<UserRole, User> = {
     is_active: true,
   },
   SPEAKER: {
-    id: 37,
+    id: 1,
     role_id: 5,
     full_name: 'TS. Lê Quang Huy (Speaker)',
     email: 'speaker@eventhub.ai',
@@ -78,7 +86,7 @@ export const DEMO_PRESETS: Record<UserRole, User> = {
     is_active: true,
   },
   ATTENDEE: {
-    id: 4,
+    id: 5,
     role_id: 4,
     full_name: 'Phạm Quốc Khách Hàng',
     email: 'attendee@eventhub.ai',
@@ -86,31 +94,32 @@ export const DEMO_PRESETS: Record<UserRole, User> = {
     is_active: true,
   },
   PARTICIPANT: {
-    id: 4,
+    id: 5,
     role_id: 4,
     full_name: 'Phạm Quốc Khách Hàng',
     email: 'attendee@eventhub.ai',
     role_name: 'ATTENDEE',
     is_active: true,
   },
-  SUPER_ADMIN: {
-    id: 99,
-    role_id: 99,
-    full_name: 'Nguyễn Văn Super Admin',
-    email: 'superadmin@eventhub.ai',
-    role_name: 'SUPER_ADMIN',
-    permissions: ['*'],
-    is_active: true,
-  },
   AUDITOR: {
     id: 98,
     role_id: 98,
     full_name: 'Kiểm Toán Viên',
-
     email: 'auditor@eventhub.ai',
     role_name: 'AUDITOR',
     is_active: true,
   },
+};
+
+export const DEMO_CREDENTIALS: Record<string, { email: string; password: string; role: UserRole }> = {
+  ADMIN: { email: 'admin@eventhub.ai', password: '123456', role: 'ADMIN' },
+  SUPER_ADMIN: { email: 'admin@eventhub.ai', password: '123456', role: 'SUPER_ADMIN' },
+  EVENT_MANAGER: { email: 'manager@eventhub.ai', password: '123456', role: 'EVENT_MANAGER' },
+  ORGANIZER: { email: 'manager@eventhub.ai', password: '123456', role: 'EVENT_MANAGER' },
+  STAFF: { email: 'staff@eventhub.ai', password: '123456', role: 'STAFF' },
+  SPEAKER: { email: 'speaker@eventhub.ai', password: '123456', role: 'SPEAKER' },
+  ATTENDEE: { email: 'attendee@eventhub.ai', password: '123456', role: 'ATTENDEE' },
+  PARTICIPANT: { email: 'attendee@eventhub.ai', password: '123456', role: 'ATTENDEE' },
 };
 
 export type MockRole = 'ATTENDEE' | 'STAFF' | 'ORGANIZER' | 'ADMIN';
@@ -131,7 +140,7 @@ interface AuthContextType {
   googleLogin: (payload: { credential?: string; email?: string; full_name?: string; avatar_url?: string }) => Promise<boolean>;
   microsoftLogin: (payload: { access_token?: string; credential?: string; email?: string; full_name?: string; avatar_url?: string }) => Promise<boolean>;
   logout: (options?: { silent?: boolean; redirect?: boolean | string }) => void;
-  switchDemoAccount: (role: UserRole) => void;
+  switchDemoAccount: (role: UserRole) => Promise<boolean>;
   updateUser: (updatedData: Partial<User>) => void;
 }
 
@@ -413,24 +422,62 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const switchDemoAccount = (targetRole: UserRole) => {
-    const key = targetRole === 'PARTICIPANT' ? 'ATTENDEE' : targetRole;
-    const account = DEMO_PRESETS[key] || DEMO_PRESETS.ATTENDEE;
-    const dummyToken = 'demo_jwt_token_eventhub_2026';
-    setToken(dummyToken);
-    setUser(account);
-    localStorage.setItem('eventhub_token', dummyToken);
-    localStorage.setItem('eventhub_user', JSON.stringify(account));
-    const roleTitles: Record<string, string> = {
-      ADMIN: '👑 Quản Trị Viên (Admin)',
-      SUPER_ADMIN: '👑 Quản Trị Viên Cấp Cao (Super Admin)',
-      EVENT_MANAGER: '🎯 Quản Lý Sự Kiện (Event Manager)',
-      SPEAKER: '🎤 Diễn Giả Hội Nghị (Speaker)',
-      STAFF: '🎫 Nhân Viên Soát Vé & Duyệt AI (Staff)',
-      ATTENDEE: '👤 Khách Tham Dự (Attendee)',
+  const switchDemoAccount = async (targetRole: UserRole): Promise<boolean> => {
+    const key =
+      targetRole === 'PARTICIPANT'
+        ? 'ATTENDEE'
+        : targetRole === 'ORGANIZER'
+        ? 'EVENT_MANAGER'
+        : targetRole;
 
-    };
-    toast.success(`Đã chuyển vai trò sang: ${roleTitles[key]}!`);
+    const demoCreds = DEMO_CREDENTIALS[key] || DEMO_CREDENTIALS.ATTENDEE;
+    const fallbackAccount = DEMO_PRESETS[key] || DEMO_PRESETS.ATTENDEE;
+
+    setIsLoading(true);
+    try {
+      // 1. Authenticate with backend to get real signed JWT token
+      const response = await apiService.login({
+        email: demoCreds.email,
+        password: demoCreds.password,
+      });
+
+      setToken(response.access_token);
+      setUser(response.user);
+      localStorage.setItem('eventhub_token', response.access_token);
+      localStorage.setItem('eventhub_user', JSON.stringify(response.user));
+      document.cookie = `eventhub_token=${response.access_token}; path=/; max-age=86400; SameSite=Lax`;
+
+      saveAccountToHistory({
+        email: response.user.email,
+        name: response.user.full_name,
+        avatar: response.user.avatar_url || undefined,
+        provider: (response.user.provider as any) || 'local',
+        lastUsed: Date.now(),
+      });
+
+      const roleTitles: Record<string, string> = {
+        ADMIN: '👑 Quản Trị Viên (Admin)',
+        SUPER_ADMIN: '👑 Quản Trị Viên Cấp Cao (Super Admin)',
+        EVENT_MANAGER: '🎯 Quản Lý Sự Kiện (Event Manager)',
+        SPEAKER: '🎤 Diễn Giả Hội Nghị (Speaker)',
+        STAFF: '🎫 Nhân Viên Soát Vé & Vận Hành (Staff)',
+        ATTENDEE: '👤 Khách Tham Dự (Attendee)',
+      };
+      toast.success(`Đã chuyển vai trò sang: ${roleTitles[key] || key}!`);
+      return true;
+    } catch (err) {
+      console.warn('Real backend login failed during role switch, using offline demo mode:', err);
+      // Offline fallback: keep user in demo mode without triggering 401 kickout
+      const dummyToken = 'demo_jwt_token_eventhub_2026';
+      setToken(dummyToken);
+      setUser(fallbackAccount);
+      localStorage.setItem('eventhub_token', dummyToken);
+      localStorage.setItem('eventhub_user', JSON.stringify(fallbackAccount));
+      toast.success(`Đã chuyển vai trò (Offline): ${fallbackAccount.full_name}!`);
+      return true;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const logout = (options?: { silent?: boolean; redirect?: boolean | string }) => {

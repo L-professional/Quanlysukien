@@ -123,6 +123,8 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+let isRedirectingToLogin = false;
+
 // Response interceptor: handle HTML fallback and 401 Unauthorized globally
 apiClient.interceptors.response.use(
   (response) => {
@@ -140,19 +142,43 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid — clear local state
-      localStorage.removeItem('eventhub_token');
-      localStorage.removeItem('eventhub_user');
-      // DO NOT redirect to /login if user is on public pages (root /, /landing, /events, /login)
-      const currentPath = window.location.pathname;
-      const isPublicPage =
-        currentPath === '/' ||
-        currentPath === '/landing' ||
-        currentPath === '/login' ||
-        currentPath === '/events';
-      if (!isPublicPage) {
-        window.location.href = '/login';
+    const reqUrl = error.config?.url || '';
+    // Never trigger global session wipe or login redirect on auth-related endpoints:
+    // A 401 on /auth/login, /auth/google, /auth/microsoft, or /auth/change-password is an expected credential rejection!
+    const isAuthEndpoint =
+      reqUrl.includes('/auth/login') ||
+      reqUrl.includes('/auth/register') ||
+      reqUrl.includes('/auth/google') ||
+      reqUrl.includes('/auth/microsoft') ||
+      reqUrl.includes('/auth/change-password');
+
+    if (error.response?.status === 401 && !isAuthEndpoint) {
+      const currentToken = localStorage.getItem('eventhub_token');
+      // In offline/demo mode, do NOT wipe session or kick user out
+      if (currentToken === 'demo_jwt_token_eventhub_2026') {
+        return Promise.reject(error);
+      }
+
+      // Throttle and handle single redirect cleanly without refresh loop
+      if (!isRedirectingToLogin) {
+        isRedirectingToLogin = true;
+        localStorage.removeItem('eventhub_token');
+        localStorage.removeItem('eventhub_user');
+
+        const currentPath = window.location.pathname;
+        const isPublicPage =
+          currentPath === '/' ||
+          currentPath === '/landing' ||
+          currentPath === '/login' ||
+          currentPath === '/events';
+
+        if (!isPublicPage) {
+          window.location.replace('/login?expired=1');
+        }
+
+        setTimeout(() => {
+          isRedirectingToLogin = false;
+        }, 3000);
       }
     }
     return Promise.reject(error);
@@ -174,15 +200,15 @@ export const apiService = {
       if (normalizedPw === '123456' || normalizedPw === 'password123') {
         let mockUser: User | null = null;
         if (normalizedEmail === 'admin@eventhub.ai') {
-          mockUser = { id: 1, role_id: 1, full_name: 'Nguyễn Văn Quản Trị', email: 'admin@eventhub.ai', role_name: 'ADMIN', is_active: true } as User;
+          mockUser = { id: 2, role_id: 1, full_name: 'Nguyễn Văn Quản Trị', email: 'admin@eventhub.ai', role_name: 'ADMIN', is_active: true } as User;
         } else if (normalizedEmail === 'manager@eventhub.ai') {
-          mockUser = { id: 2, role_id: 2, full_name: 'Trần Thị Điều Hành', email: 'manager@eventhub.ai', role_name: 'EVENT_MANAGER', is_active: true } as User;
+          mockUser = { id: 3, role_id: 2, full_name: 'Trần Thị Điều Hành', email: 'manager@eventhub.ai', role_name: 'EVENT_MANAGER', is_active: true } as User;
         } else if (normalizedEmail === 'staff@eventhub.ai') {
-          mockUser = { id: 3, role_id: 3, full_name: 'Lê Hoàng Soát Vé', email: 'staff@eventhub.ai', role_name: 'STAFF', is_active: true } as User;
+          mockUser = { id: 4, role_id: 3, full_name: 'Lê Hoàng Soát Vé', email: 'staff@eventhub.ai', role_name: 'STAFF', is_active: true } as User;
         } else if (normalizedEmail === 'speaker@eventhub.ai') {
-          mockUser = { id: 37, role_id: 5, full_name: 'TS. Lê Quang Huy (Speaker)', email: 'speaker@eventhub.ai', role_name: 'SPEAKER', is_active: true } as User;
+          mockUser = { id: 1, role_id: 5, full_name: 'TS. Lê Quang Huy (Speaker)', email: 'speaker@eventhub.ai', role_name: 'SPEAKER', is_active: true } as User;
         } else if (normalizedEmail === 'attendee@eventhub.ai' || normalizedEmail === 'participant@eventhub.ai') {
-          mockUser = { id: 4, role_id: 4, full_name: 'Phạm Quốc Khách Hàng', email: 'attendee@eventhub.ai', role_name: 'ATTENDEE', is_active: true } as User;
+          mockUser = { id: 5, role_id: 4, full_name: 'Phạm Quốc Khách Hàng', email: 'attendee@eventhub.ai', role_name: 'ATTENDEE', is_active: true } as User;
         }
 
         if (mockUser) {
