@@ -453,7 +453,20 @@ async def send_invitation_email(
         )
     else:
         if not qr_token:
-            qr_token = f"QR-EVENTAI-{uuid.uuid4().hex[:8].upper()}"
+            try:
+                from app.services.ticket_service import get_or_create_registration_ticket
+                reg_ticket = await get_or_create_registration_ticket(
+                    email=to_email,
+                    event_id=event_id,
+                    event_title=event_title,
+                    full_name=recipient_name,
+                    ticket_type=ticket_type or "Vé Mời Danh Dự (VIP Pass)",
+                    force_fresh=True,
+                )
+                qr_token = reg_ticket.qr_code_token
+            except Exception as ticket_err:
+                logger.warning(f"Could not create DB registration ticket: {ticket_err}")
+                qr_token = f"QR-EVENTAI-{uuid.uuid4().hex[:8].upper()}"
 
         qr_b64 = qr_image or generate_qr_base64(qr_token)
         html_content = render_invitation_email_html(
@@ -473,7 +486,39 @@ async def send_invitation_email(
     cfg = get_smtp_config()
     is_smtp_ready = bool(cfg["host"] and cfg["user"] and cfg["password"])
 
-    # 0. Ultra-Fast Resend REST API (< 200ms HTTP Non-blocking)
+    # 1. Real SMTP Transport when configured (prioritized to bypass unverified Resend domain limit)
+    if is_smtp_ready:
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = email_subject
+            msg["From"] = cfg["from"]
+            msg["To"] = to_email
+            msg.attach(MIMEText(html_content, "html", "utf-8"))
+
+            if cfg["secure"] or cfg["port"] == 465:
+                with smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=15) as server:
+                    server.login(cfg["user"], cfg["password"])
+                    server.sendmail(cfg["from"], [to_email], msg.as_string())
+            else:
+                with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as server:
+                    server.starttls()
+                    server.login(cfg["user"], cfg["password"])
+                    server.sendmail(cfg["from"], [to_email], msg.as_string())
+
+            logger.info(f"Successfully sent invitation email via SMTP to {to_email}")
+            return {
+                "success": True,
+                "messageId": f"MSG-SMTP-{uuid.uuid4().hex[:12].upper()}",
+                "recipient": to_email,
+                "sentAt": datetime.now(timezone.utc).isoformat(),
+                "previewUrl": None,
+                "isTestMode": False,
+                "qr_token": qr_token,
+            }
+        except Exception as smtp_err:
+            logger.warning(f"Error sending email via SMTP to {to_email}, trying fallback: {smtp_err}")
+
+    # 2. Resend REST API Fallback
     resend_key = cfg.get("resend_key")
     if resend_key:
         try:

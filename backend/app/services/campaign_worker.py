@@ -585,7 +585,18 @@ async def send_campaign_in_background(campaign_id: int):
                 recipient.attempt_count += 1
                 await db.commit()
 
-                # 8. Render responsive HTML & Plain-text alternative
+                # 8. Issue or retrieve official event registration ticket in PostgreSQL
+                from app.services.ticket_service import get_or_create_registration_ticket
+                reg_ticket = await get_or_create_registration_ticket(
+                    db=db,
+                    email=recipient.email,
+                    event_id=campaign.event_id,
+                    event_title=event_title,
+                    full_name=recipient.full_name,
+                    ticket_type="Vé VIP Tham Dự",
+                )
+
+                # 9. Render responsive HTML & Plain-text alternative with QR ticket pass
                 body_content = campaign.ai_email_body or campaign.plain_text_content or "Trân trọng kính mời quý khách tham dự sự kiện của EventHub AI."
                 personalized_html = render_campaign_html(
                     article_body=body_content,
@@ -599,6 +610,8 @@ async def send_campaign_in_background(campaign_id: int):
                     cta_text=campaign.ai_email_cta or "Đăng Ký Tham Dự Ngay",
                     unsubscribe_url=unsub_url,
                     frontend_url=base_url,
+                    qr_token=reg_ticket.qr_code_token,
+                    ticket_type=reg_ticket.ticket_type,
                 )
                 plain_text_alt = generate_plain_text_alternative(
                     article_body=body_content,
@@ -609,9 +622,11 @@ async def send_campaign_in_background(campaign_id: int):
                     event_location=event_location,
                     cta_url=f"{base_url}/events",
                     unsubscribe_url=unsub_url,
+                    qr_token=reg_ticket.qr_code_token,
+                    ticket_type=reg_ticket.ticket_type,
                 )
 
-                # 9. Send via Resend service with idempotency key
+                # 10. Send via Resend service with idempotency key
                 result = await resend_email_service.send_single_email(
                     to_email=recipient.email,
                     subject=campaign.subject,

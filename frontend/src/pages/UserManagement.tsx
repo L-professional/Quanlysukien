@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Users,
@@ -277,14 +278,26 @@ const OnlineIndicator: React.FC<{ isOnline: boolean; lastActive?: string }> = ({
 // ── Main Component ────────────────────────────────────────────────────────────
 export const UserManagement: React.FC = () => {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'users' | 'logs'>('users');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<'users' | 'logs' | 'roles'>(
+    tabParam === 'roles' ? 'roles' : tabParam === 'logs' ? 'logs' : 'users'
+  );
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [logs, setLogs] = useState<SecurityLog[]>([]);
+  const [rolesSummary, setRolesSummary] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [resetPasswordTarget, setResetPasswordTarget] = useState<AdminUser | null>(null);
   const [roleDropdownOpen, setRoleDropdownOpen] = useState<number | null>(null);
+
+  useEffect(() => {
+    const currentTabParam = searchParams.get('tab');
+    if (currentTabParam === 'roles') setActiveTab('roles');
+    else if (currentTabParam === 'logs') setActiveTab('logs');
+    else if (currentTabParam === 'users') setActiveTab('users');
+  }, [searchParams]);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -309,10 +322,27 @@ export const UserManagement: React.FC = () => {
     }
   }, [t]);
 
+  const loadRoles = useCallback(async () => {
+    try {
+      const data = await apiService.getRolesSummary();
+      if (data && data.roles) {
+        setRolesSummary(data.roles);
+      }
+    } catch (e) {
+      console.warn('Could not load roles summary', e);
+    }
+  }, []);
+
   useEffect(() => {
     loadUsers();
     loadLogs();
-  }, [loadUsers, loadLogs]);
+    loadRoles();
+  }, [loadUsers, loadLogs, loadRoles]);
+
+  const handleTabChange = (newTab: 'users' | 'logs' | 'roles') => {
+    setActiveTab(newTab);
+    setSearchParams(newTab === 'users' ? {} : { tab: newTab });
+  };
 
   const handleRoleChange = async (userId: number, newRole: string) => {
     try {
@@ -563,15 +593,16 @@ export const UserManagement: React.FC = () => {
       {/* Tabs */}
       <div className="flex gap-1.5 p-1.5 bg-slate-100 rounded-xl border border-slate-200 w-fit">
         {([
-          { id: 'users', label: t('nav.users'), icon: Users },
-          { id: 'logs', label: t('nav.logs'), icon: Shield },
+          { id: 'users', label: t('nav.users', { defaultValue: 'Danh Sách Người Dùng' }), icon: Users },
+          { id: 'roles', label: 'Vai Trò & Phân Quyền', icon: Crown },
+          { id: 'logs', label: t('nav.logs', { defaultValue: 'Nhật Ký Bảo Mật' }), icon: Shield },
         ] as const).map(({ id, label, icon: Icon }) => (
           <button
             key={id}
-            onClick={() => setActiveTab(id)}
+            onClick={() => handleTabChange(id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === id
-                ? 'bg-red-600 text-white shadow-xs'
+                ? 'bg-[#DC2626] text-white shadow-xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
             }`}
           >
@@ -812,6 +843,230 @@ export const UserManagement: React.FC = () => {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Roles & Permissions Tab */}
+      {activeTab === 'roles' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-[#12213A] to-[#1E3A8A] text-white p-6 rounded-2xl shadow-md border border-slate-700/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <Crown className="w-5 h-5 text-amber-400" />
+                <h3 className="text-lg font-black tracking-tight">
+                  Ma Trận Vai Trò & Phân Quyền Hệ Thống (RBAC Matrix)
+                </h3>
+              </div>
+              <p className="text-slate-300 text-xs leading-relaxed max-w-2xl">
+                EventHub AI áp dụng cơ chế Role-Based Access Control (RBAC) nghiêm ngặt với 5 tác nhân chính:
+                <strong className="text-white"> Admin, Manager, Staff, Speaker, Attendee</strong>. Mọi phân hệ nghiệp vụ,
+                API endpoint và tác vụ quản trị đều được phân tách ranh giới rõ ràng.
+              </p>
+            </div>
+            <div className="shrink-0 flex items-center gap-2 bg-white/10 backdrop-blur-xs px-3.5 py-2 rounded-xl border border-white/20 text-xs font-bold text-amber-300">
+              <Shield className="w-4 h-4 text-emerald-400" />
+              <span>Chính Sách RBAC: Bắt Buộc</span>
+            </div>
+          </div>
+
+          {/* Role Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(rolesSummary.length > 0 ? rolesSummary : [
+              {
+                id: 'SUPER_ADMIN',
+                name: 'Super Admin',
+                role_name: 'SUPER_ADMIN',
+                description: 'Toàn quyền quản trị hệ thống cao cấp nhất, phân bổ tài nguyên và bảo mật.',
+                scope: 'Toàn bộ hệ thống',
+                badgeColor: 'bg-red-50 text-[#DC2626] border-red-200',
+                user_count: users.filter(u => u.role_name === 'SUPER_ADMIN').length,
+                permissions: [
+                  'Quản trị tài khoản toàn hệ thống',
+                  'Quản lý phân quyền & vai trò',
+                  'Cấu hình hạ tầng & tích hợp Resend',
+                  'Giám sát AI Concierge & HITL',
+                  'Xem toàn bộ báo cáo doanh thu & kiểm toán'
+                ]
+              },
+              {
+                id: 'ADMIN',
+                name: 'Quản Trị Viên (Admin)',
+                role_name: 'ADMIN',
+                description: 'Quản trị nền tảng, phê duyệt nội dung, quản trị AI và giám sát an ninh.',
+                scope: 'Toàn bộ nền tảng EventHub AI',
+                badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
+                user_count: users.filter(u => u.role_name === 'ADMIN').length,
+                permissions: [
+                  'Quản lý tài khoản người dùng & khóa tài khoản',
+                  'Giám sát sự kiện toàn hệ thống',
+                  'Quản trị trợ lý AI Concierge & Kho tri thức RAG',
+                  'Cấu hình gửi mail Resend / SMTP',
+                  'Xem nhật ký kiểm toán và báo cáo phân tích'
+                ]
+              },
+              {
+                id: 'EVENT_MANAGER',
+                name: 'Quản Lý Sự Kiện (Manager)',
+                role_name: 'EVENT_MANAGER',
+                description: 'Chịu trách nhiệm lập kế hoạch, tạo sự kiện, chiến dịch Email và quản lý vận hành.',
+                scope: 'Các sự kiện được phân công',
+                badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
+                user_count: users.filter(u => u.role_name === 'EVENT_MANAGER').length,
+                permissions: [
+                  'Khởi tạo & chỉnh sửa thông tin sự kiện',
+                  'Quản lý vé, phiên hội thảo và lịch trình',
+                  'Phân công nhiệm vụ cho nhân viên (Staff)',
+                  'Tạo chiến dịch tiếp thị AI & Email Marketing',
+                  'Xem báo cáo hiệu quả & phản hồi đại biểu'
+                ]
+              },
+              {
+                id: 'STAFF',
+                name: 'Nhân Viên Điều Phối (Staff)',
+                role_name: 'STAFF',
+                description: 'Thực thi tác vụ vận hành tại cổng sự kiện: quét mã QR, soát vé, hỗ trợ khách.',
+                scope: 'Cổng check-in & khu vực sự kiện phân công',
+                badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                user_count: users.filter(u => u.role_name === 'STAFF').length,
+                permissions: [
+                  'Quét mã QR soát vé tốc độ cao',
+                  'Xác thực vé & check-in đại biểu',
+                  'Hỗ trợ đăng ký trực tiếp tại chỗ',
+                  'Báo cáo sự cố vận hành & xem lịch trình',
+                  'Hỗ trợ đại biểu & tiếp nhận thông báo'
+                ]
+              },
+              {
+                id: 'SPEAKER',
+                name: 'Diễn Giả (Speaker)',
+                role_name: 'SPEAKER',
+                description: 'Trình bày tại hội thảo, tương tác Q&A với người nghe, quản lý tài liệu.',
+                scope: 'Các phiên thuyết trình được mời',
+                badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
+                user_count: users.filter(u => u.role_name === 'SPEAKER').length,
+                permissions: [
+                  'Xem lịch trình diễn thuyết & thông tin phiên',
+                  'Tiếp nhận & trả lời câu hỏi Q&A trực tiếp',
+                  'Theo dõi đánh giá CSAT của người nghe',
+                  'Cập nhật tài liệu thuyết trình & hồ sơ diễn giả'
+                ]
+              },
+              {
+                id: 'ATTENDEE',
+                name: 'Khách Tham Dự (User)',
+                role_name: 'ATTENDEE',
+                description: 'Người dùng đăng ký tham gia sự kiện, nhận vé QR và sử dụng trợ lý AI.',
+                scope: 'Cá nhân',
+                badgeColor: 'bg-slate-50 text-slate-700 border-slate-200',
+                user_count: users.filter(u => u.role_name === 'PARTICIPANT' || u.role_name === 'ATTENDEE').length,
+                permissions: [
+                  'Khám phá sự kiện công khai & đăng ký mua vé',
+                  'Nhận vé điện tử có mã QR động',
+                  'Hỏi đáp trợ lý AI Concierge về sự kiện',
+                  'Gửi câu hỏi cho diễn giả & đánh giá sự kiện'
+                ]
+              }
+            ]).map((role: any) => (
+              <div
+                key={role.id}
+                className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${role.badgeColor}`}>
+                      {role.name}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
+                      {role.user_count ?? 0} tài khoản
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-600 font-medium leading-relaxed mb-3">
+                    {role.description}
+                  </p>
+
+                  <div className="text-[11px] text-slate-400 font-semibold mb-2 uppercase tracking-wider">
+                    Phạm vi: <span className="text-slate-700 font-bold">{role.scope}</span>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3">
+                    <p className="text-[11px] font-bold text-slate-800 uppercase tracking-wider mb-2">
+                      Quyền hạn cốt lõi:
+                    </p>
+                    <ul className="space-y-1.5">
+                      {role.permissions?.map((perm: string, pIdx: number) => (
+                        <li key={pIdx} className="flex items-start gap-1.5 text-xs text-slate-600">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                          <span>{perm}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      setSearch(role.role_name === 'ATTENDEE' ? 'PARTICIPANT' : role.role_name);
+                      handleTabChange('users');
+                    }}
+                    className="text-xs font-bold text-[#DC2626] hover:text-red-700 flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    Xem người dùng nhóm này →
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Detailed Permissions Comparison Matrix */}
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-slate-900 text-sm">Bảng So Sánh Quyền Hạn Chi Tiết Giữa Các Nhóm Tác Nhân</h4>
+                <p className="text-slate-500 text-xs">Mô hình phân quyền chuẩn hóa 5 actors theo tài liệu thiết kế hệ thống EventHub AI</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase tracking-wider font-semibold">
+                  <tr>
+                    <th className="py-3 px-4">Tác vụ / Tính năng</th>
+                    <th className="py-3 px-3 text-center">Admin</th>
+                    <th className="py-3 px-3 text-center">Manager</th>
+                    <th className="py-3 px-3 text-center">Staff</th>
+                    <th className="py-3 px-3 text-center">Speaker</th>
+                    <th className="py-3 px-3 text-center">Attendee</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {[
+                    { action: 'Quản lý tài khoản & phân quyền người dùng', admin: true, manager: false, staff: false, speaker: false, user: false },
+                    { action: 'Cấu hình cổng gửi mail Resend & hạ tầng hệ thống', admin: true, manager: false, staff: false, speaker: false, user: false },
+                    { action: 'Quản trị AI Concierge & duyệt HITL', admin: true, manager: true, staff: true, speaker: false, user: false },
+                    { action: 'Kho tri thức RAG Knowledge Base', admin: true, manager: true, staff: false, speaker: false, user: false },
+                    { action: 'Khởi tạo sự kiện & quản lý phiên hội thảo', admin: true, manager: true, staff: false, speaker: false, user: false },
+                    { action: 'Chiến dịch Email Marketing & AI PR Studio', admin: true, manager: true, staff: false, speaker: false, user: false },
+                    { action: 'Quét mã QR soát vé & check-in đại biểu', admin: true, manager: true, staff: true, speaker: false, user: false },
+                    { action: 'Hỗ trợ đăng ký & giải quyết sự cố tại cổng', admin: true, manager: true, staff: true, speaker: false, user: false },
+                    { action: 'Quản lý tài liệu thuyết trình & Q&A sân khấu', admin: true, manager: true, staff: false, speaker: true, user: false },
+                    { action: 'Khám phá sự kiện, mua vé & nhận vé QR', admin: true, manager: true, staff: false, speaker: false, user: true },
+                    { action: 'Báo cáo doanh thu & kiểm toán toàn diện', admin: true, manager: true, staff: false, speaker: false, user: false },
+                  ].map((row, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-3 px-4 font-medium text-slate-900">{row.action}</td>
+                      <td className="py-3 px-3 text-center">{row.admin ? <CheckCircle className="w-4 h-4 text-emerald-600 mx-auto" /> : <XCircle className="w-4 h-4 text-slate-300 mx-auto" />}</td>
+                      <td className="py-3 px-3 text-center">{row.manager ? <CheckCircle className="w-4 h-4 text-emerald-600 mx-auto" /> : <XCircle className="w-4 h-4 text-slate-300 mx-auto" />}</td>
+                      <td className="py-3 px-3 text-center">{row.staff ? <CheckCircle className="w-4 h-4 text-emerald-600 mx-auto" /> : <XCircle className="w-4 h-4 text-slate-300 mx-auto" />}</td>
+                      <td className="py-3 px-3 text-center">{row.speaker ? <CheckCircle className="w-4 h-4 text-emerald-600 mx-auto" /> : <XCircle className="w-4 h-4 text-slate-300 mx-auto" />}</td>
+                      <td className="py-3 px-3 text-center">{row.user ? <CheckCircle className="w-4 h-4 text-emerald-600 mx-auto" /> : <XCircle className="w-4 h-4 text-slate-300 mx-auto" />}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

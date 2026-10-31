@@ -240,7 +240,7 @@ async def verify_check_in(
         .values(
             is_checked_in=True,
             checked_in_at=now_vn,
-            checked_in_by=current_user.id if current_user else None
+            checked_in_by=current_user.id if hasattr(current_user, "id") and isinstance(current_user.id, int) else None
         )
     )
     update_res = await db.execute(stmt)

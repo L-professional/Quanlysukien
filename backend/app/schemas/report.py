@@ -119,4 +119,8 @@ class AIAnalyzeResponse(BaseModel):
     score: int
     confidence_score: float = 0.95
     analyzed_at: str
+    analysis_period: Optional[str] = None
+    data_sources: Optional[List[str]] = None
+    verified_facts: Optional[List[str]] = None
+    anomalies: Optional[List[str]] = None
 

@@ -692,6 +692,7 @@ async def cancel_campaign(
 
 
 @router.post("/{campaign_id}/test-send")
+@router.post("/{campaign_id}/send-test")
 async def send_test_preview(
     campaign_id: int,
     payload: TestSendRequest,
@@ -704,21 +705,38 @@ async def send_test_preview(
         raise HTTPException(status_code=404, detail="Không tìm thấy chiến dịch email.")
 
     subject_to_use = payload.subject or campaign.subject
-    html_to_use = payload.html_content or campaign.html_content
 
-    if not html_to_use:
-        # Generate on the fly
-        ev = await db.get(Event, campaign.event_id) if campaign.event_id else None
-        html_to_use = render_campaign_html(
-            article_body=campaign.ai_email_body or campaign.plain_text_content or "Bản tin thử nghiệm EventHub AI",
-            subject=subject_to_use,
-            event_title=ev.title if ev else campaign.campaign_name,
-            recipient_name=current_user.full_name or "Ban Quản Trị",
-            event_time=f"{ev.start_date or ''} - {ev.end_date or ''}" if ev else "15-16 Oct 2026",
-            event_location=ev.location_address or ev.location if ev else "EventHub AI Hall",
-            cover_image_url=ev.cover_image if ev else None,
-            cta_text=campaign.ai_email_cta or "Đăng Ký Tham Dự Ngay",
-        )
+    # 1. Always create or fetch a valid Registration in DB for this test recipient & event
+    from app.services.ticket_service import get_or_create_registration_ticket
+    ticket_reg = await get_or_create_registration_ticket(
+        db=db,
+        email=str(payload.test_email),
+        event_id=campaign.event_id,
+        event_title=campaign.campaign_name,
+        full_name=current_user.full_name or "Ban Quản Trị",
+        ticket_type="Vé VIP All-Access Pass",
+        force_fresh=True,
+    )
+
+    ev = await db.get(Event, ticket_reg.event_id) if ticket_reg.event_id else None
+    recipient_display_name = (
+        current_user.full_name
+        if (current_user and current_user.full_name and "demo" not in current_user.full_name.lower())
+        else str(payload.test_email).split("@")[0].title()
+    )
+
+    html_to_use = render_campaign_html(
+        article_body=campaign.ai_email_body or campaign.plain_text_content or "Bản tin truyền thông sự kiện EventHub AI.",
+        subject=subject_to_use,
+        event_title=ev.title if ev else campaign.campaign_name,
+        recipient_name=recipient_display_name,
+        event_time=f"{ev.start_date or ''} - {ev.end_date or ''}" if ev else "15-16 Oct 2026",
+        event_location=ev.location_address or ev.location if ev else "Trung tâm Hội nghị EventHub AI",
+        cover_image_url=ev.cover_image if ev else None,
+        cta_text=campaign.ai_email_cta or "Đăng Ký Tham Dự Ngay",
+        qr_token=ticket_reg.qr_code_token,
+        ticket_type=ticket_reg.ticket_type or "Vé VIP All-Access Pass",
+    )
 
     res = await resend_email_service.send_test_email(
         to_email=str(payload.test_email),
@@ -734,9 +752,12 @@ async def send_test_preview(
         )
 
     return {
-        "message": f"Đã gửi email thử nghiệm đến {payload.test_email} thành công.",
+        "message": f"Đã gửi email thử nghiệm kèm vé QR đến {payload.test_email} thành công.",
         "provider_message_id": res.get("message_id"),
         "is_simulated": res.get("is_simulated", False),
+        "qr_code_token": ticket_reg.qr_code_token,
+        "event_id": ticket_reg.event_id,
+        "ticket_id": ticket_reg.id,
     }
 
 

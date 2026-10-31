@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { 
   LayoutDashboard, Calendar, Mic, QrCode, MessageSquare, 
-  Sparkles, Database, Star, Users, ShieldCheck, 
+  Sparkles, Database, Star, Users, ShieldCheck, Shield, Cpu,
   Settings as SettingsIcon, Zap, X, ChevronDown, PieChart, Mail,
   Bell, Layers, Ticket, UserCheck, CheckSquare, BarChart3, LifeBuoy
 } from 'lucide-react';
@@ -116,8 +116,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'users',
-      label: 'Quản Lý Tài Khoản',
+      label: 'Quản Lý Người Dùng',
       icon: Users,
+      allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
+    },
+    {
+      id: 'roles',
+      label: 'Vai Trò & Phân Quyền',
+      icon: Shield,
+      allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
+    },
+    {
+      id: 'email-config',
+      label: 'Cấu Hình Email & Resend',
+      icon: Mail,
+      allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
+    },
+    {
+      id: 'system-config',
+      label: 'Cấu Hình Hệ Thống',
+      icon: Cpu,
       allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
     },
     {
@@ -376,18 +394,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
         {
           title: 'QUẢN TRỊ NỀN TẢNG',
-          items: ['users', 'logs', 'reports', 'knowledge-base'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+          items: ['users', 'roles', 'events', 'reports'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
         },
         {
-          title: 'VẬN HÀNH & TIẾP THỊ',
-          items: ['events', 'campaigns', 'content-studio', 'inquiries'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+          title: 'QUẢN TRỊ AI',
+          items: ['inquiries', 'knowledge-base'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
         },
         {
-          title: 'ĐIỀU PHỐI & DIỄN GIẢ',
-          items: ['scanner', 'speaker', 'feedback'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+          title: 'QUẢN TRỊ HỆ THỐNG',
+          items: ['email-config', 'system-config', 'logs'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
         },
         {
-          title: 'HỆ THỐNG',
+          title: 'CÁ NHÂN',
           items: ['settings'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
         },
       ];

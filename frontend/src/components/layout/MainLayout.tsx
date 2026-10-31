@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
@@ -25,6 +25,7 @@ const pathToTab: Record<string, string> = {
   '/feedback': 'feedback',
   '/feedback-summary': 'feedback',
   '/users': 'users',
+  '/roles': 'roles',
   '/logs': 'logs',
   '/speaker/dashboard': 'speaker',
   '/manager/sessions': 'manager-sessions',
@@ -54,6 +55,9 @@ const tabToPath: Record<string, string> = {
   'knowledge-base': '/knowledge-base',
   feedback: '/feedback',
   users: '/users',
+  roles: '/users?tab=roles',
+  'email-config': '/settings?tab=email',
+  'system-config': '/settings?tab=system',
   logs: '/logs',
   speaker: '/speaker/dashboard',
   'manager-sessions': '/manager/sessions',
@@ -84,7 +88,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false);
 
-  const currentTab = propActiveTab || (location.pathname.startsWith('/speaker') ? 'speaker' : pathToTab[location.pathname]) || 'dashboard';
+  const currentTab = useMemo(() => {
+    if (propActiveTab) return propActiveTab;
+    if (location.pathname.startsWith('/speaker')) return 'speaker';
+    if (location.pathname === '/users' && location.search.includes('tab=roles')) return 'roles';
+    if (location.pathname === '/settings' && location.search.includes('tab=email')) return 'email-config';
+    if (location.pathname === '/settings' && location.search.includes('tab=system')) return 'system-config';
+    return pathToTab[location.pathname] || 'dashboard';
+  }, [propActiveTab, location.pathname, location.search]);
+
   const isLanding = currentTab === 'landing' || location.pathname === '/' || location.pathname === '/landing';
 
   const handleTabChange = (tab: string) => {

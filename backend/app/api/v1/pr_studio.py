@@ -672,6 +672,15 @@ async def dispatch_test_endpoint(payload: TestDispatchRequest):
 
         if payload.channel in ("email", "all"):
             try:
+                from app.services.ticket_service import get_or_create_registration_ticket
+                reg_ticket = await get_or_create_registration_ticket(
+                    email=payload.recipient,
+                    event_id=payload.event_id,
+                    event_title=payload.event_name,
+                    full_name=recipient_display_name,
+                    ticket_type="Vé VIP All-Access Pass",
+                    force_fresh=True,
+                )
                 from app.services.email_service import send_invitation_email
                 mail_result = await send_invitation_email(
                     to_email=payload.recipient,
@@ -679,11 +688,14 @@ async def dispatch_test_endpoint(payload: TestDispatchRequest):
                     event_title=payload.event_name or "EventHub AI Summit 2026",
                     subject=test_subject,
                     custom_message=test_content,
+                    qr_token=reg_ticket.qr_code_token,
+                    ticket_type=reg_ticket.ticket_type or "Vé VIP All-Access Pass",
+                    event_id=reg_ticket.event_id,
                 )
                 preview_url = mail_result.get("previewUrl")
-                dispatch_msg = f"Đã gửi email thử nghiệm thành công tới {payload.recipient}!"
+                dispatch_msg = f"Đã gửi email thử nghiệm kèm vé QR thành công tới {payload.recipient}!"
             except Exception as e:
-                logger.warning(f"Error in test mail dispatch, fallback to simulated test mode: {e}")
+                logger.warning(f"Error in test mail dispatch: {e}")
                 dispatch_msg = f"Đã gửi email thử nghiệm tới {payload.recipient}!"
 
         elif payload.channel == "sms":

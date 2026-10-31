@@ -7,6 +7,10 @@ export interface AIInsightsExportData {
   recommendations?: string[];
   score?: number;
   analyzed_at?: string;
+  analysis_period?: string;
+  data_sources?: string[];
+  verified_facts?: string[];
+  anomalies?: string[];
 }
 
 export function exportToExcel(
