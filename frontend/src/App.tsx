@@ -9,8 +9,9 @@ import { MainLayout } from './components/layout/MainLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Reports } from './pages/Reports';
-import { EventSchedule } from './components/EventSchedule';
 import { Events } from './pages/Events';
+import { CampaignManagement } from './pages/CampaignManagement';
+import { Unsubscribe } from './pages/Unsubscribe';
 import { QRScanner } from './pages/QRScanner';
 import { AIConcierge } from './pages/AIConcierge';
 import { UserManagement } from './pages/UserManagement';
@@ -32,6 +33,9 @@ const AppRoutes: React.FC = () => {
       <Route path="/" element={<LandingPage />} />
       <Route path="/landing" element={<LandingPage />} />
 
+      {/* Standalone Public Unsubscribe Page */}
+      <Route path="/unsubscribe" element={<Unsubscribe />} />
+
       {/* Auth Screen */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Navigate to="/login?mode=register" replace />} />
@@ -41,13 +45,24 @@ const AppRoutes: React.FC = () => {
         {/* 4 Role-Based Dashboards (Attendee, Staff, Organizer, Admin) */}
         <Route
           path="dashboard"
-          element={
-            <Dashboard onNavigateTab={(tab) => navigate(`/${tab === 'schedule' ? 'events' : tab}`)} />
-          }
+          element={<Dashboard />}
         />
 
         {/* Events Catalog — All roles */}
         <Route path="events" element={<Events />} />
+
+        {/* Email Marketing Campaigns — Admin, Event Manager */}
+        <Route
+          path="campaigns"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER']}
+              onRedirect={() => navigate('/dashboard')}
+            >
+              <CampaignManagement />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Reports - Admin, Event Manager, Auditor */}
         <Route

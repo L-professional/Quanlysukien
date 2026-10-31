@@ -42,6 +42,10 @@ class User(Base, TimestampMixin):
     is_2fa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     two_factor_secret: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     preferences: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, default=lambda: {"language": "vi", "theme": "dark"})
+    is_marketing_subscribed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    marketing_consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    marketing_consent_source: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    marketing_unsubscribed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     role: Mapped["Role"] = relationship("Role", back_populates="users")

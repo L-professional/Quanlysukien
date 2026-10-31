@@ -345,7 +345,7 @@ const LandingPage: React.FC = () => {
                             <i className="ph ph-chart-line-up"></i>
                         </div>
                         <h3 className="text-[20px] font-bold text-event-navy mb-3">Báo cáo theo thời gian thực</h3>
-                        <p className="text-event-text-sec text-[15px] leading-relaxed">Theo dõi doanh thu, số lượng khách tham dự và phản hồi trực tiếp qua một dashboard trực quan, chi tiết.</p>
+                        <p className="text-event-text-sec text-[15px] leading-relaxed">Theo dõi doanh thu, số lượng khách tham dự và phản hồi trực tiếp qua một bảng điều khiển trực quan, chi tiết.</p>
                     </div>
 
                     <div className="feature-block border border-event-border p-8 rounded-lg card-hover fade-up bg-event-gray/30" style={{ transitionDelay: '400ms' }}>

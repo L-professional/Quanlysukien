@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'STAFF' | 'ATTENDEE' | 'PARTICIPANT' | 'EVENT_MANAGER' | 'SPEAKER';
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'STAFF' | 'ATTENDEE' | 'PARTICIPANT' | 'EVENT_MANAGER' | 'ORGANIZER' | 'SPEAKER' | 'AUDITOR';
 
 export interface User {
   id: number;
@@ -18,6 +18,7 @@ export interface User {
   };
   last_active_at?: string;
   created_at?: string;
+  permissions?: string[];
 }
 
 export interface ActiveSession {
@@ -391,6 +392,89 @@ export interface AIFeedbackAnalysisResponse {
   success: boolean;
   analyzed_at: string;
   data: AIFeedbackAnalysisData;
+}
+
+export type CampaignStatus =
+  | 'DRAFT'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'SCHEDULED'
+  | 'SENDING'
+  | 'COMPLETED'
+  | 'PARTIALLY_FAILED'
+  | 'FAILED'
+  | 'CANCELLED';
+
+export interface EmailCampaign {
+  id: number;
+  campaign_name: string;
+  subject: string;
+  html_content?: string;
+  plain_text_content?: string;
+  ai_email_body?: string;
+  ai_email_cta?: string;
+  status: CampaignStatus;
+  target_audience?: string;
+  recipient_mode?: 'DATABASE' | 'MANUAL' | 'COMBINED';
+  send_immediately?: boolean;
+  scheduled_at?: string;
+  event_id?: number;
+  event_title?: string;
+  created_by?: number;
+  approved_by?: number;
+  approved_at?: string;
+  total_recipients: number;
+  sent_count: number;
+  delivered_count: number;
+  bounced_count: number;
+  opened_count: number;
+  clicked_count: number;
+  unsubscribed_count: number;
+  created_at: string;
+  sending_started_at?: string;
+  sending_completed_at?: string;
+  audience_preview?: AudiencePreview;
+}
+
+export interface AudiencePreview {
+  total_selected: number;
+  eligible: number;
+  unsubscribed: number;
+  invalid: number;
+  already_sent: number;
+  missing_consent?: number;
+  total_entered?: number;
+  valid?: number;
+  duplicates?: number;
+  suppressed?: number;
+}
+
+export interface CampaignRecipientLog {
+  id: number;
+  email: string;
+  full_name?: string;
+  source?: 'DATABASE' | 'MANUAL';
+  status: string;
+  provider_message_id?: string;
+  error_message?: string;
+  retry_count: number;
+  sent_at?: string;
+  delivered_at?: string;
+  opened_at?: string;
+  clicked_at?: string;
+}
+
+export interface CampaignAnalyticsOverview {
+  total_campaigns: number;
+  total_sent: number;
+  total_delivered: number;
+  total_bounced: number;
+  total_opened: number;
+  total_clicked: number;
+  total_unsubscribed: number;
+  delivery_rate_pct: number;
+  open_rate_pct: number;
+  click_rate_pct: number;
 }
 
 

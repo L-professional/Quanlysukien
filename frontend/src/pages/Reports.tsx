@@ -8,7 +8,6 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { useAuth } from '../context/AuthContext';
 import PermissionGuard from '../components/PermissionGuard';
 import { apiService as api } from '../services/api';
 
@@ -16,7 +15,6 @@ const COLORS = ['#D7193F', '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B'];
 const TABS = ['Tổng quan', 'Hiệu quả sự kiện', 'Người tham dự', 'Vé & QR', 'Diễn giả', 'Feedback', 'AI', 'Hệ thống'];
 
 export const Reports: React.FC = () => {
-  useAuth();
   
   // States
   const [activeTab, setActiveTab] = useState('Tổng quan');
@@ -357,7 +355,7 @@ export const Reports: React.FC = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie data={donutData} cx="50%" cy="50%" innerRadius={70} outerRadius={100} paddingAngle={2} dataKey="value" stroke="none">
-                        {donutData.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                        {donutData.map((_entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                       </Pie>
                       <RechartsTooltip contentStyle={{ borderRadius: '8px', border: '1px solid #E5EAF2', padding: '6px 10px' }} itemStyle={{ fontSize: '13px', fontWeight: 600 }} />
                     </PieChart>

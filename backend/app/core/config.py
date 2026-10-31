@@ -56,5 +56,18 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
 
+    # Resend Email Configuration
+    RESEND_API_KEY: str = ""
+    EMAIL_FROM: str = "EventHub AI <onboarding@resend.dev>"
+    EMAIL_REPLY_TO: Optional[str] = None
+    RESEND_WEBHOOK_SECRET: Optional[str] = None
+    FRONTEND_URL: str = "http://localhost:5173"
+
 
 settings = Settings()
+
+
+def is_resend_configured() -> bool:
+    """Check if a real Resend API key is provided."""
+    key = settings.RESEND_API_KEY.strip()
+    return bool(key and not key.startswith("your_") and not key.startswith("re_your_"))

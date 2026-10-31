@@ -26,6 +26,7 @@ import { apiService } from '../services/api';
 import { useEvent } from '../context/EventContext';
 import { useAuth } from '../context/AuthContext';
 import { Event } from '../types';
+import { useNavigate } from 'react-router-dom';
 
 /** Clean random hash/UUID suffixes like "db3f53", "- a4a703", "_e8b12c", "(db3f53)" from event titles */
 export function cleanEventTitle(title?: string): string {
@@ -153,7 +154,8 @@ export const AIPRStudio: React.FC = () => {
   const [keywords, setKeywords] = useState<string>('EventHub AI, RAG, pgvector, QR Check-in, Công nghệ số');
   const [tone, setTone] = useState<'professional' | 'engaging' | 'casual'>('engaging');
 
-  // Generation & Tab State
+  const navigate = useNavigate();
+  const [isCreatingCampaign, setIsCreatingCampaign] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'email' | 'social' | 'reminder'>('email');
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
@@ -411,6 +413,36 @@ ${generatedResults.reminder}
     toast.success(t('prStudio.exportSuccess') || 'Đã xuất và tải file văn bản thành công!');
   };
 
+  const handleCreateCampaignFromEmail = async () => {
+    if (!generatedResults?.email) {
+      toast.error('Chưa có nội dung email được tạo từ AI!');
+      return;
+    }
+    setIsCreatingCampaign(true);
+    try {
+      const subject = generatedResults.email_subject || `Thư Mời Tham Dự: ${cleanEventTitle(eventName) || 'Sự Kiện Mới'}`;
+      const campaignName = `[AI PR] ${cleanEventTitle(eventName) || subject}`;
+
+      const created = await apiService.createCampaign({
+        campaign_name: campaignName,
+        subject: subject,
+        ai_email_subject: subject,
+        ai_email_body: generatedResults.email,
+        ai_email_cta: generatedResults.email_cta || 'Đăng Ký Tham Gia Ngay',
+        event_id: selectedEventId && selectedEventId !== 'manual' ? Number(selectedEventId) : undefined,
+        target_audience: targetAudience || 'Tất cả khách hàng đã đăng ký nhận tin',
+      });
+
+      toast.success('🎉 Đã khởi tạo chiến dịch Email Marketing thành công! Đang chuyển đến trang Quản lý Chiến dịch để duyệt và gửi...');
+      navigate('/campaigns', { state: { selectedCampaignId: created.id } });
+    } catch (err: any) {
+      console.error('Failed to create campaign from AI:', err);
+      toast.error(err.response?.data?.detail || err.message || 'Không thể tạo chiến dịch Email Marketing.');
+    } finally {
+      setIsCreatingCampaign(false);
+    }
+  };
+
   const addKeyword = (kw: string) => {
     if (!keywords.includes(kw)) {
       setKeywords((prev) => (prev ? `${prev}, ${kw}` : kw));
@@ -422,19 +454,19 @@ ${generatedResults.reminder}
       id: 'email',
       label: t('prStudio.emailTab') || 'Bản Tin Email',
       icon: Mail,
-      badge: 'Subject & CTA',
+      badge: 'Tiêu Đề & Kêu Gọi',
     },
     {
       id: 'social',
       label: t('prStudio.socialTab') || 'Bài Đăng Mạng Xã Hội',
       icon: Share2,
-      badge: 'Hook & Hashtags',
+      badge: 'Lời Dẫn & Thẻ',
     },
     {
       id: 'reminder',
       label: t('prStudio.reminderTab') || 'Tin Nhắc Sự Kiện',
       icon: Bell,
-      badge: 'SMS & Push',
+      badge: 'Tin Nhắn & Thông Báo',
     },
   ];
 
@@ -483,7 +515,7 @@ ${generatedResults.reminder}
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-indigo-600" />
-                  <span>Chọn Sự Kiện Đã Tạo (Auto-Fill)</span>
+                  <span>Chọn Sự Kiện Đã Tạo (Tự Động Điền)</span>
                 </label>
                 {selectedEventId !== 'manual' && (
                   <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold flex items-center gap-1">
@@ -718,7 +750,7 @@ ${generatedResults.reminder}
             {/* Interactive Tone Selector */}
             <div className="space-y-2 pt-2 border-t border-slate-100">
               <label className="block text-xs font-bold text-slate-900">
-                {t('prStudio.toneStyle') || 'Bộ Chọn Tông Giọng (Tone of Voice)'}:
+                {t('prStudio.toneStyle') || 'Tông Giọng & Phong Cách Bài Viết'}:
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {TONE_OPTIONS.map((opt) => {
@@ -857,7 +889,7 @@ ${generatedResults.reminder}
                         <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3.5 flex items-start justify-between gap-3">
                           <div>
                             <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 block mb-1">
-                              {t('prStudio.emailSubject') || 'Tiêu Đề Email (Subject)'}
+                              {t('prStudio.emailSubject') || 'Tiêu Đề Thư Điện Tử'}
                             </span>
                             <p className="text-xs font-bold text-slate-900">{generatedResults.email_subject}</p>
                           </div>
@@ -882,13 +914,41 @@ ${generatedResults.reminder}
                         <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-                              CTA
+                              Nút Kêu Gọi
                             </span>
                             <span className="text-xs font-bold text-emerald-900">{generatedResults.email_cta}</span>
                           </div>
                           <span className="text-[11px] text-emerald-600 font-medium">Nút chuyển đổi</span>
                         </div>
                       )}
+
+                      {/* Direct Trigger to Resend Email Campaign */}
+                      <div className="bg-gradient-to-r from-indigo-50/90 to-blue-50/90 border border-indigo-200/80 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <Mail className="w-4 h-4 text-indigo-600" />
+                            <span className="text-xs font-bold text-indigo-950">
+                              Khởi Tạo Chiến Dịch Email (Resend)
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            Chuyển toàn bộ nội dung AI, tiêu đề & CTA thành chiến dịch Resend với bảo mật RFC 8058 & kiểm tra consent.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCreateCampaignFromEmail}
+                          disabled={isCreatingCampaign}
+                          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm shadow-indigo-600/20 transition-all cursor-pointer whitespace-nowrap disabled:opacity-60"
+                        >
+                          {isCreatingCampaign ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                          )}
+                          <span>Khởi Tạo Chiến Dịch</span>
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -898,7 +958,7 @@ ${generatedResults.reminder}
                       {generatedResults.social_hook && (
                         <div className="bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-100 rounded-xl p-3.5">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-violet-600 block mb-1">
-                            {t('prStudio.socialHook') || 'Câu Mở Đầu Giật Tít (Hook)'}
+                            {t('prStudio.socialHook') || 'Câu Mở Đầu Thu Hút (Lời Dẫn)'}
                           </span>
                           <p className="text-xs font-bold text-slate-900">{generatedResults.social_hook}</p>
                         </div>
@@ -911,7 +971,7 @@ ${generatedResults.reminder}
                       {generatedResults.social_hashtags && generatedResults.social_hashtags.length > 0 && (
                         <div className="space-y-1.5">
                           <span className="text-[11px] font-bold text-slate-700 block">
-                            {t('prStudio.hashtags') || 'Thẻ Hashtags Đề Xuất'}:
+                            {t('prStudio.hashtags') || 'Thẻ Chủ Đề Đề Xuất'}:
                           </span>
                           <div className="flex flex-wrap gap-1.5">
                             {generatedResults.social_hashtags.map((tag, i) => (
@@ -941,7 +1001,7 @@ ${generatedResults.reminder}
                         <div className="flex items-center justify-between text-xs text-slate-400 border-b border-slate-800 pb-2">
                           <div className="flex items-center gap-1.5">
                             <Smartphone className="w-3.5 h-3.5 text-indigo-400" />
-                            <span className="font-semibold text-slate-300">Push Notification / SMS</span>
+                            <span className="font-semibold text-slate-300">Thông Báo Đẩy / Tin Nhắn SMS</span>
                           </div>
                           <span className="text-[10px]">Vừa xong • EventHub AI</span>
                         </div>
@@ -1026,6 +1086,22 @@ ${generatedResults.reminder}
                       >
                         <Check className="w-3.5 h-3.5" />
                         <span>✓ Duyệt Bài AI & Phát Hành</span>
+                      </button>
+                    )}
+
+                    {activeTab === 'email' && (
+                      <button
+                        type="button"
+                        onClick={handleCreateCampaignFromEmail}
+                        disabled={isCreatingCampaign}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-60"
+                      >
+                        {isCreatingCampaign ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Mail className="w-3.5 h-3.5" />
+                        )}
+                        <span>Khởi Tạo Chiến Dịch Email</span>
                       </button>
                     )}
                   </div>

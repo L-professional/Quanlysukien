@@ -6,7 +6,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  PieChart, Pie, Cell
 } from 'recharts';
 
 // Dummy Data
@@ -167,7 +167,7 @@ export const Dashboard: React.FC = () => {
                     dataKey="value"
                     stroke="none"
                   >
-                    {donutData.map((_, index) => (
+                    {donutData.map((_entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>

@@ -371,7 +371,7 @@ export const FloatingChatbot: React.FC = () => {
                   {msg.isFallback && (
                     <div className="flex items-center gap-1.5 text-[10px] text-amber-300 bg-amber-950/60 border border-amber-800/50 px-2 py-1 rounded-lg">
                       <HelpCircle className="w-3 h-3 text-amber-400 shrink-0" />
-                      <span>Đã chuyển thắc mắc tới Staff Dashboard</span>
+                      <span>Đã chuyển thắc mắc tới Bảng Điều Khiển Nhân Viên</span>
                     </div>
                   )}
 
@@ -380,7 +380,7 @@ export const FloatingChatbot: React.FC = () => {
                     <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 text-[10px] text-indigo-300 font-medium truncate">
                         <BookOpen className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                        <span className="truncate">Source: {msg.sources?.[0] || 'Event Knowledge Base'}</span>
+                        <span className="truncate">Nguồn: {msg.sources?.[0] || 'Cơ sở tri thức sự kiện'}</span>
                       </div>
                       <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-indigo-950 border border-indigo-800/70 text-indigo-300 shrink-0">
                         Hybrid AI

@@ -10,14 +10,17 @@ interface NavbarProps {
   onOpenAuthModal?: () => void;
 }
 
-const ROLE_BADGE = {
+const ROLE_BADGE: Record<string, { label: string; icon: any; color: string }> = {
+  SUPER_ADMIN: { label: 'Super Admin', icon: Crown, color: 'bg-rose-500/20 text-rose-300 border border-rose-500/30' },
   ADMIN: { label: 'Admin', icon: Crown, color: 'bg-amber-500/20 text-amber-300 border border-amber-500/30' },
+  EVENT_MANAGER: { label: 'Event Mgr', icon: Briefcase, color: 'bg-purple-500/20 text-purple-300 border border-purple-500/30' },
+  ORGANIZER: { label: 'Organizer', icon: Briefcase, color: 'bg-purple-500/20 text-purple-300 border border-purple-500/30' },
+  AUDITOR: { label: 'Auditor', icon: Crown, color: 'bg-blue-500/20 text-blue-300 border border-blue-500/30' },
   STAFF: { label: 'Staff', icon: Briefcase, color: 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' },
   SPEAKER: { label: 'Speaker', icon: Mic, color: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30' },
   ATTENDEE: { label: 'Attendee', icon: Ticket, color: 'bg-slate-600/30 text-slate-300 border border-slate-600/40' },
   PARTICIPANT: { label: 'Attendee', icon: Ticket, color: 'bg-slate-600/30 text-slate-300 border border-slate-600/40' },
-  EVENT_MANAGER: { label: 'Event Mgr', icon: Briefcase, color: 'bg-purple-500/20 text-purple-300 border border-purple-500/30' },
-} as const;
+};
 
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,

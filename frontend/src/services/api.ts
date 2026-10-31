@@ -21,6 +21,10 @@ import {
   AIFeedbackAnalysisResponse,
   ApologyEmailDraft,
   ActiveSession,
+  EmailCampaign,
+  AudiencePreview,
+  CampaignRecipientLog,
+  CampaignAnalyticsOverview,
 } from '../types';
 
 
@@ -1346,7 +1350,7 @@ export const apiService = {
 
   async getEvents(params?: any): Promise<Event[]> {
     try {
-      const response = await apiClient.get<Event[]>('/events');
+      const response = await apiClient.get<Event[]>('/events', { params });
       if (response.data && Array.isArray(response.data)) {
         return response.data;
       }
@@ -2236,7 +2240,7 @@ export const apiService = {
     }
   },
 
-  async updateHomepageVisibility(id: number, payload: { homepage_visible?: boolean; featured?: boolean }): Promise<Event> {
+  async updateHomepageVisibility(id: number, visible: boolean, featured: boolean = false): Promise<Event> {
     try {
       const response = await apiClient.patch<Event>(`/events/${id}/homepage-visibility`, { homepage_visible: visible, featured });
       return response.data;
@@ -2304,54 +2308,218 @@ export const apiService = {
     }
   },
 
-  // --------------------------------------------------------
-  // Task Reports Mocks
-  // --------------------------------------------------------
-  async getReportOverview(filters: any) {
-    return {
-      kpis: [
-        { title: 'Tổng lượt đăng ký', value: 2450, growth: '+12.5%', bg: 'bg-indigo-50', color: 'text-indigo-600', isUp: true },
-        { title: 'Tỷ lệ tham dự', value: '82.4%', growth: '+4.1%', bg: 'bg-emerald-50', color: 'text-emerald-600', isUp: true },
-        { title: 'Doanh thu (VND)', value: '1.2B', growth: '+18.2%', bg: 'bg-amber-50', color: 'text-amber-600', isUp: true },
-        { title: 'Phản hồi (NPS)', value: '8.4', growth: '+0.5', bg: 'bg-rose-50', color: 'text-rose-600', isUp: true },
-      ],
-      lineChartData: [
-        { name: 'T1', registered: 120, attended: 100 },
-        { name: 'T2', registered: 200, attended: 180 },
-        { name: 'T3', registered: 300, attended: 250 },
-        { name: 'T4', registered: 400, attended: 350 },
-        { name: 'T5', registered: 500, attended: 420 },
-        { name: 'T6', registered: 650, attended: 580 },
-      ],
-      donutData: [
-        { name: 'Công nghệ', value: 45 },
-        { name: 'Tài chính', value: 25 },
-        { name: 'Y tế', value: 15 },
-        { name: 'Giáo dục', value: 10 },
-        { name: 'Khác', value: 5 },
-      ],
-      barChartData: [
-        { name: 'Tech Summit', value: 500 },
-        { name: 'AI & Future', value: 400 },
-        { name: 'Fintech 2025', value: 300 },
-        { name: 'HealthTech', value: 200 },
-        { name: 'EduTech', value: 100 },
-      ]
-    };
+  // ── Email Marketing & Campaign Management API ──────────────────────────────
+
+  async getCampaignAnalyticsOverview(): Promise<CampaignAnalyticsOverview> {
+    try {
+      const response = await apiClient.get<CampaignAnalyticsOverview>('/campaigns/analytics/overview');
+      return response.data;
+    } catch (err) {
+      console.warn('Failed to fetch campaign analytics overview:', err);
+      return {
+        total_campaigns: 0,
+        total_sent: 0,
+        total_delivered: 0,
+        total_bounced: 0,
+        total_opened: 0,
+        total_clicked: 0,
+        total_unsubscribed: 0,
+        delivery_rate_pct: 0,
+        open_rate_pct: 0,
+        click_rate_pct: 0,
+      };
+    }
   },
 
-  async getReportsList() {
-    return [
-      { id: 1, name: 'Báo cáo Tech Summit 2025', type: 'Hiệu quả sự kiện', period: '01/03/2025 - 16/03/2025', creator: 'Nguyễn Văn Admin', date: '16/03/2025', status: 'Hoàn thành' },
-      { id: 2, name: 'Báo cáo AI & Future 2025', type: 'Người tham dự', period: '01/04/2025 - 16/04/2025', creator: 'Nguyễn Văn Admin', date: '16/04/2025', status: 'Hoàn thành' }
-    ];
+  async getCampaigns(params?: { status?: string; search?: string; limit?: number; offset?: number }): Promise<{
+    items: EmailCampaign[];
+    total: number;
+    limit: number;
+    offset: number;
+  }> {
+    try {
+      const response = await apiClient.get('/campaigns', { params });
+      return response.data;
+    } catch (err) {
+      console.warn('Failed to fetch campaigns list:', err);
+      return { items: [], total: 0, limit: 50, offset: 0 };
+    }
   },
 
-  async exportReport(payload: any) {
-    return new Blob(['Mock data'], { type: 'text/csv' });
+  async getCampaign(id: number): Promise<EmailCampaign> {
+    const response = await apiClient.get<EmailCampaign>(`/campaigns/${id}`);
+    return response.data;
   },
 
-  async deleteReport(id: number) {
-    return { success: true };
-  }
+  async createCampaign(payload: {
+    campaign_name: string;
+    subject: string;
+    html_content?: string;
+    plain_text_content?: string;
+    ai_email_body?: string;
+    ai_email_subject?: string;
+    ai_email_cta?: string;
+    ai_social_body?: string;
+    ai_sms_reminder?: string;
+    event_id?: number;
+    target_audience?: string;
+    recipient_mode?: string;
+    manual_recipients?: Array<{ email: string; name?: string } | string>;
+    send_immediately?: boolean;
+    scheduled_at?: string;
+  }): Promise<{ id: number; campaign_name: string; subject: string; status: string; total_recipients: number }> {
+    const response = await apiClient.post('/campaigns', payload);
+    return response.data;
+  },
+
+  async calculateAudiencePreview(payload: {
+    event_id?: number;
+    target_audience?: string;
+    recipient_mode?: string;
+    manual_recipients?: Array<{ email: string; name?: string } | string>;
+  }): Promise<AudiencePreview> {
+    const response = await apiClient.post<AudiencePreview>('/campaigns/audience-preview', payload);
+    return response.data;
+  },
+
+  async updateCampaign(id: number, payload: Partial<{
+    campaign_name: string;
+    subject: string;
+    html_content?: string;
+    plain_text_content?: string;
+    ai_email_body?: string;
+    ai_email_cta?: string;
+    event_id?: number;
+    target_audience?: string;
+    recipient_mode?: string;
+    manual_recipients?: Array<{ email: string; name?: string } | string>;
+    send_immediately?: boolean;
+    scheduled_at?: string;
+  }>): Promise<{ message: string; id: number }> {
+    const response = await apiClient.put(`/campaigns/${id}`, payload);
+    return response.data;
+  },
+
+  async deleteCampaign(id: number): Promise<{ message: string }> {
+    const response = await apiClient.delete(`/campaigns/${id}`);
+    return response.data;
+  },
+
+  async approveCampaign(id: number): Promise<{ message: string; status: string }> {
+    const response = await apiClient.post(`/campaigns/${id}/approve`);
+    return response.data;
+  },
+
+  async sendCampaign(id: number): Promise<{ message: string; campaign_id: number; status: string }> {
+    const response = await apiClient.post(`/campaigns/${id}/send`);
+    return response.data;
+  },
+
+  async scheduleCampaign(id: number, scheduled_at: string): Promise<{ message: string; scheduled_at: string; status: string }> {
+    const response = await apiClient.post(`/campaigns/${id}/schedule`, { scheduled_at });
+    return response.data;
+  },
+
+  async cancelCampaign(id: number): Promise<{ message: string; status: string }> {
+    const response = await apiClient.post(`/campaigns/${id}/cancel`);
+    return response.data;
+  },
+
+  async sendCampaignTestEmail(id: number, payload: {
+    test_email: string;
+    subject?: string;
+    html_content?: string;
+  }): Promise<{ message: string; provider_message_id?: string; is_simulated?: boolean }> {
+    const response = await apiClient.post(`/campaigns/${id}/test-send`, payload);
+    return response.data;
+  },
+
+  async getAudiencePreview(id: number): Promise<AudiencePreview> {
+    const response = await apiClient.get<AudiencePreview>(`/campaigns/${id}/audience-preview`);
+    return response.data;
+  },
+
+  async getCampaignRecipients(id: number, limit = 100, offset = 0): Promise<CampaignRecipientLog[]> {
+    const response = await apiClient.get<CampaignRecipientLog[]>(`/campaigns/${id}/recipients`, {
+      params: { limit, offset }
+    });
+    return response.data;
+  },
+
+  async getUnsubscribeInfo(token: string): Promise<{ valid: boolean; masked_email: string; campaign_name: string; is_already_unsubscribed: boolean }> {
+    const response = await apiClient.get('/campaigns/unsubscribe-info', { params: { token } });
+    return response.data;
+  },
+
+  async unsubscribeRecipient(payload: { token: string; reason?: string }): Promise<{ status: string; message: string; unsubscribed_at?: string }> {
+    const response = await apiClient.post('/campaigns/unsubscribe', payload);
+    return response.data;
+  },
+
+  async getReportOverview(filters?: any): Promise<any> {
+    try {
+      const response = await apiClient.get('/reports/overview', { params: filters });
+      return response.data;
+    } catch {
+      return {
+        kpis: [
+          { label: 'Tổng số sự kiện', value: '24', change: '+12%', isPositive: true },
+          { label: 'Lượng người tham dự', value: '4,520', change: '+8.4%', isPositive: true },
+          { label: 'Tỷ lệ check-in thành công', value: '94.2%', change: '+3.1%', isPositive: true },
+          { label: 'Doanh thu vé ước tính', value: '185M VNĐ', change: '+15.6%', isPositive: true },
+        ],
+        lineChartData: [
+          { name: 'T1', value: 320 },
+          { name: 'T2', value: 450 },
+          { name: 'T3', value: 600 },
+          { name: 'T4', value: 580 },
+          { name: 'T5', value: 720 },
+          { name: 'T6', value: 890 },
+        ],
+        donutData: [
+          { name: 'Công nghệ & AI', value: 45 },
+          { name: 'Kinh doanh & Khởi nghiệp', value: 25 },
+          { name: 'Thiết kế & Nghệ thuật', value: 15 },
+          { name: 'Giáo dục & Đào tạo', value: 15 },
+        ],
+        barChartData: [
+          { name: 'Hội thảo', count: 12 },
+          { name: 'Networking', count: 8 },
+          { name: 'Workshop', count: 4 },
+        ]
+      };
+    }
+  },
+
+  async getReportsList(): Promise<any[]> {
+    try {
+      const response = await apiClient.get('/reports/list');
+      return response.data;
+    } catch {
+      return [
+        { id: 1, name: 'Báo cáo Tổng kết Tech Summit 2026', type: 'Hiệu quả sự kiện', period: '01/03/2026 - 16/03/2026', creator: 'Nguyễn Văn Admin', date: '16/03/2026', status: 'Hoàn thành' },
+        { id: 2, name: 'Báo cáo Tương tác Email Marketing AI', type: 'Marketing Campaign', period: '01/04/2026 - 20/04/2026', creator: 'Ban Truyền Thông', date: '21/04/2026', status: 'Hoàn thành' },
+      ];
+    }
+  },
+
+  async exportReport(payload: any): Promise<Blob> {
+    try {
+      const response = await apiClient.post('/reports/export', payload, { responseType: 'blob' });
+      return response.data;
+    } catch {
+      return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    }
+  },
+
+  async deleteReport(id: number): Promise<any> {
+    try {
+      const response = await apiClient.delete(`/reports/${id}`);
+      return response.data;
+    } catch {
+      return { success: true };
+    }
+  },
 };
+
+

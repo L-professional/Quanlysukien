@@ -27,6 +27,18 @@ async def lifespan(app: FastAPI):
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;"
             ))
             await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_marketing_subscribed BOOLEAN NOT NULL DEFAULT FALSE;"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS marketing_consent_at TIMESTAMPTZ NULL;"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS marketing_consent_source VARCHAR(100) NULL;"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS marketing_unsubscribed_at TIMESTAMPTZ NULL;"
+            ))
+            await conn.execute(text(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ NULL;"
             ))
             await conn.execute(text(
@@ -37,6 +49,12 @@ async def lifespan(app: FastAPI):
             ))
             await conn.execute(text(
                 "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS ticket_type VARCHAR(100) DEFAULT 'Vé Tham Dự';"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS recipient_mode VARCHAR(50) NOT NULL DEFAULT 'DATABASE';"
+            ))
+            await conn.execute(text(
+                "ALTER TABLE email_recipients ADD COLUMN IF NOT EXISTS source VARCHAR(50) NOT NULL DEFAULT 'DATABASE';"
             ))
             await conn.execute(text(
                 "ALTER TABLE events ADD COLUMN IF NOT EXISTS start_date VARCHAR(50) NULL;"
@@ -123,16 +141,20 @@ async def lifespan(app: FastAPI):
                 "CREATE UNIQUE INDEX IF NOT EXISTS uq_session_participant ON registrations (session_id, participant_id) WHERE session_id IS NOT NULL;"
             ))
             # Seed initial realistic capacity and registered_count for demo schedules if all registered_counts are 0
-            await conn.execute(text("""
-                UPDATE event_schedules SET capacity = 150, registered_count = 84 WHERE id = 1 AND registered_count = 0;
-                UPDATE event_schedules SET capacity = 500, registered_count = 340 WHERE id = 2 AND registered_count = 0;
-                UPDATE event_schedules SET capacity = 300, registered_count = 215 WHERE id = 3 AND registered_count = 0;
-                UPDATE event_schedules SET capacity = 200, registered_count = 136 WHERE id = 4 AND registered_count = 0;
-                UPDATE event_schedules SET capacity = 450, registered_count = 306 WHERE id = 5 AND registered_count = 0;
-            """))
+            for schedule_id, cap, reg in [(1, 150, 84), (2, 500, 340), (3, 300, 215), (4, 200, 136), (5, 450, 306)]:
+                await conn.execute(text(
+                    f"UPDATE event_schedules SET capacity = {cap}, registered_count = {reg} WHERE id = {schedule_id} AND registered_count = 0;"
+                ))
         print("User, Registration & Event columns ensured.")
     except Exception as e:
         print(f"Warning: Column migration skipped: {e}")
+
+    # Validate Resend Email Configuration (Task: Resend Integration)
+    from app.core.config import is_resend_configured
+    if is_resend_configured():
+        print(f"[OK] Resend Email API configured. Sender: '{settings.EMAIL_FROM}'")
+    else:
+        print("[INFO] Resend Email API Key is not set or using placeholder. Running in test/mock email preview mode.")
 
     # Start Background Email Reminder Scheduler (Task 34)
     try:

@@ -132,14 +132,14 @@ export const Header: React.FC<HeaderProps> = ({
                 {/* Role Switcher Demo */}
                 <div className="px-4 py-2">
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                    Chuyển Role (Demo)
+                    Chuyển Vai Trò Thử Nghiệm
                   </div>
                   <div className="grid grid-cols-2 gap-1.5">
                     {[
-                      { role: 'SUPER_ADMIN' as UserRole, label: 'Super Admin', icon: ShieldCheck },
-                      { role: 'EVENT_MANAGER' as UserRole, label: 'Manager', icon: Briefcase },
-                      { role: 'STAFF' as UserRole, label: 'Staff', icon: Ticket },
-                      { role: 'ATTENDEE' as UserRole, label: 'User', icon: User },
+                      { role: 'SUPER_ADMIN' as UserRole, label: 'Quản Trị Cấp Cao', icon: ShieldCheck },
+                      { role: 'EVENT_MANAGER' as UserRole, label: 'Quản Lý Sự Kiện', icon: Briefcase },
+                      { role: 'STAFF' as UserRole, label: 'Nhân Viên Soát Vé', icon: Ticket },
+                      { role: 'ATTENDEE' as UserRole, label: 'Khách Tham Dự', icon: User },
                     ].map((r) => {
                       const Icon = r.icon;
                       const isCurrent = userRole === r.role || (r.role === 'ATTENDEE' && userRole === 'PARTICIPANT');

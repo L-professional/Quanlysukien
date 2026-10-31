@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { 
   LayoutDashboard, Calendar, Mic, QrCode, MessageSquare, 
   Sparkles, Database, Star, Users, ShieldCheck, 
-  Settings as SettingsIcon, Zap, X, ChevronDown, PieChart
+  Settings as SettingsIcon, Zap, X, ChevronDown, PieChart, Mail
 } from 'lucide-react';
 
 export interface MenuItem {
@@ -28,7 +28,7 @@ export interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
-  pendingCount = 0,
+  pendingCount: _pendingCount = 0,
   isCollapsed = false,
   isMobileDrawer = false,
   onCloseMobileDrawer,
@@ -39,7 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const menuItems: MenuItem[] = useMemo(() => [
     {
       id: 'dashboard',
-      label: 'Dashboard',
+      label: 'Bảng Điều Khiển',
       icon: LayoutDashboard,
       requiresRole: ['SUPER_ADMIN', 'ADMIN']
     },
@@ -56,6 +56,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       requiresRole: ['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER']
     },
     {
+      id: 'campaigns',
+      label: 'Chiến Dịch Email',
+      icon: Mail,
+      badge: 'Mới',
+      badgeColor: 'bg-emerald-600 text-white',
+      requiresRole: ['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER']
+    },
+    {
       id: 'speaker',
       label: 'Cổng Diễn Giả',
       icon: Mic,
@@ -63,13 +71,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'scanner',
-      label: 'Soát vé QR Code',
+      label: 'Soát Vé QR',
       icon: QrCode,
       requiresRole: ['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'CHECK_IN_STAFF']
     },
     {
       id: 'inquiries',
-      label: 'AI Concierge (HITL)',
+      label: 'AI Trợ Lý Sự Kiện',
       icon: MessageSquare,
       badge: 'AI',
       badgeColor: 'bg-[#D7193F] text-white',
@@ -93,7 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'feedback',
-      label: 'Feedback & Summary',
+      label: 'Đánh Giá & Tóm Tắt',
       icon: Star,
       requiresRole: ['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'SUPPORT', 'AI_EDITOR']
     },
@@ -155,7 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   EventAI
                 </div>
                 <div className="text-[9px] font-semibold text-[#64748B] tracking-widest uppercase mt-0.5 truncate">
-                  CONNECT · CREATE · INSPIRE
+                  KẾT NỐI · SÁNG TẠO · TRUYỀN CẢM HỨNG
                 </div>
               </div>
             )}

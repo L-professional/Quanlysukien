@@ -12,6 +12,14 @@ from app.models.session_interaction import SessionQuestion, SessionMaterial, Ses
 from app.models.feedback import Feedback
 from app.models.reminder import UserReminder
 from app.models.user_session import UserSession
+from app.models.email_campaign import (
+    EmailCampaign,
+    EmailRecipient,
+    EmailWebhookEvent,
+    EmailUnsubscribe,
+    CampaignStatusEnum,
+    RecipientStatusEnum,
+)
 
 __all__ = [
     "TimestampMixin",
@@ -36,5 +44,11 @@ __all__ = [
     "Feedback",
     "UserReminder",
     "UserSession",
+    "EmailCampaign",
+    "EmailRecipient",
+    "EmailWebhookEvent",
+    "EmailUnsubscribe",
+    "CampaignStatusEnum",
+    "RecipientStatusEnum",
 ]
 

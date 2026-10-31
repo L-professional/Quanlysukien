@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from sqlalchemy import select, and_, or_
@@ -116,8 +117,44 @@ async def check_and_send_scheduled_reminders():
             logger.error(f"Error checking scheduled reminders: {e}", exc_info=True)
 
 
+async def process_due_email_campaigns():
+    """
+    Periodic job: Scan email_campaigns table for due scheduled campaigns
+    (status == 'SCHEDULED' and scheduled_at <= now).
+    Uses database row locking (with_for_update) to prevent race conditions.
+    """
+    logger.debug("Checking due email marketing campaigns...")
+    now_utc = datetime.now(timezone.utc)
+    from app.models.email_campaign import EmailCampaign, CampaignStatusEnum
+    from app.services.campaign_worker import send_campaign_in_background
+
+    async with AsyncSessionLocal() as db:
+        try:
+            stmt = (
+                select(EmailCampaign)
+                .where(
+                    EmailCampaign.status == CampaignStatusEnum.SCHEDULED.value,
+                    EmailCampaign.scheduled_at <= now_utc,
+                )
+                .with_for_update(skip_locked=True)
+            )
+            res = await db.execute(stmt)
+            due_campaigns = res.scalars().all()
+
+            for campaign in due_campaigns:
+                logger.info(
+                    f"Claimed due scheduled campaign #{campaign.id} ('{campaign.campaign_name}'). Launching delivery..."
+                )
+                campaign.status = CampaignStatusEnum.SENDING.value
+                await db.commit()
+                # Run worker as detached async task
+                asyncio.create_task(send_campaign_in_background(campaign.id))
+        except Exception as e:
+            logger.error(f"Error checking due email campaigns: {e}", exc_info=True)
+
+
 def start_scheduler():
-    """Start the APScheduler background worker."""
+    """Start the APScheduler background worker and recover interrupted jobs."""
     if not scheduler.running:
         scheduler.add_job(
             check_and_send_scheduled_reminders,
@@ -126,8 +163,22 @@ def start_scheduler():
             name="Check and Send Event Reminders (24h & 1h)",
             replace_existing=True,
         )
+        scheduler.add_job(
+            process_due_email_campaigns,
+            trigger=IntervalTrigger(seconds=30),
+            id="eventhub_email_campaigns_job",
+            name="Process Due Email Marketing Campaigns",
+            replace_existing=True,
+        )
         scheduler.start()
-        logger.info("APScheduler background email reminder service started successfully.")
+        logger.info("APScheduler background email reminder and campaign services started successfully.")
+
+        # On scheduler start, run crash recovery for any previously interrupted campaigns
+        try:
+            from app.services.campaign_worker import recover_interrupted_campaigns
+            asyncio.create_task(recover_interrupted_campaigns())
+        except Exception as e:
+            logger.warning(f"Could not trigger startup campaign recovery: {e}")
 
 
 def stop_scheduler():

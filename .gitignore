@@ -25,9 +25,9 @@ venv/
 ENV/
 
 # Environment Variables
-/.env
+.env
+.env.*
 !.env.example
-!frontend/.env
 !frontend/.env.example
 
 # IDE
@@ -48,3 +48,6 @@ htmlcov/
 node_modules/
 dist/
 .env.local
+
+# Scratch
+scratch/

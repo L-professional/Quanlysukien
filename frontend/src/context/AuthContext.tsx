@@ -32,7 +32,17 @@ export function normalizeRole(raw: string | undefined | null): UserRole {
   return 'ATTENDEE'; // PARTICIPANT, ATTENDEE, etc.
 }
 
+export type { UserRole };
+
 export const DEMO_PRESETS: Record<UserRole, User> = {
+  SUPER_ADMIN: {
+    id: 1,
+    role_id: 1,
+    full_name: 'Nguyễn Văn Quản Trị Tối Cao',
+    email: 'superadmin@eventhub.ai',
+    role_name: 'SUPER_ADMIN',
+    is_active: true,
+  },
   ADMIN: {
     id: 1,
     role_id: 1,
@@ -47,6 +57,14 @@ export const DEMO_PRESETS: Record<UserRole, User> = {
     full_name: 'Trần Thị Điều Hành',
     email: 'manager@eventhub.ai',
     role_name: 'EVENT_MANAGER',
+    is_active: true,
+  },
+  ORGANIZER: {
+    id: 2,
+    role_id: 2,
+    full_name: 'Trần Thị Điều Hành (Organizer)',
+    email: 'organizer@eventhub.ai',
+    role_name: 'ORGANIZER',
     is_active: true,
   },
   STAFF: {
@@ -79,6 +97,14 @@ export const DEMO_PRESETS: Record<UserRole, User> = {
     full_name: 'Phạm Quốc Khách Hàng',
     email: 'attendee@eventhub.ai',
     role_name: 'ATTENDEE',
+    is_active: true,
+  },
+  AUDITOR: {
+    id: 5,
+    role_id: 6,
+    full_name: 'Hoàng Minh Kiểm Toán',
+    email: 'auditor@eventhub.ai',
+    role_name: 'AUDITOR',
     is_active: true,
   },
 };
@@ -328,10 +354,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.setItem('eventhub_token', dummyToken);
     localStorage.setItem('eventhub_user', JSON.stringify(account));
     const roleTitles: Record<string, string> = {
-      ADMIN: '👑 Quản Trị Viên (Admin)',
-      EVENT_MANAGER: '🎯 Quản Lý Sự Kiện (Event Manager)',
-      STAFF: '🎫 Nhân Viên Soát Vé & Duyệt AI (Staff)',
-      ATTENDEE: '👤 Khách Tham Dự (Attendee)',
+      ADMIN: '👑 Quản Trị Viên',
+      EVENT_MANAGER: '🎯 Quản Lý Sự Kiện',
+      STAFF: '🎫 Nhân Viên Soát Vé & Duyệt AI',
+      ATTENDEE: '👤 Khách Tham Dự',
     };
     toast.success(`Đã chuyển vai trò sang: ${roleTitles[key]}!`);
   };

@@ -2,12 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Search, Calendar, MapPin, Users, Activity, Eye, Edit, Trash2, Copy, Play, X, Image as ImageIcon, Globe, FileOutput, Navigation2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiService as api } from '../services/api';
-import { useAuth } from '../context/AuthContext';
 import { PermissionGuard } from '../components/PermissionGuard';
 
 export const Events: React.FC = () => {
-  useAuth();
-  
   // State
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,7 +90,7 @@ export const Events: React.FC = () => {
 
   const toggleHomepage = async (id: number, current: boolean) => {
     try {
-      await api.updateHomepageVisibility(id, { homepage_visible: !current, featured: current ? false : undefined });
+      await api.updateHomepageVisibility(id, !current, false);
       toast.success(current ? 'Đã ẩn khỏi trang chủ' : 'Đã hiển thị trên trang chủ');
       fetchData();
     } catch (err) {
@@ -103,7 +100,7 @@ export const Events: React.FC = () => {
 
   const toggleFeatured = async (id: number, current: boolean) => {
     try {
-      await api.updateHomepageVisibility(id, { featured: !current });
+      await api.updateHomepageVisibility(id, true, !current);
       toast.success(current ? 'Bỏ đánh dấu nổi bật' : 'Đã đánh dấu nổi bật');
       fetchData();
     } catch (err) {

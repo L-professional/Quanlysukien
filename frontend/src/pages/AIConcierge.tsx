@@ -116,7 +116,7 @@ const SAMPLE_INQUIRIES: InquiryItem[] = [
     ragChunkId: 'chunk #22',
     ragDistance: 0.045,
     ragSnippet:
-      'Tất cả slide bài giảng đã được diễn giả phê duyệt và video ghi hình chuẩn HD của từng phiên sẽ được tải lên attendee dashboard của người tham dự trong vòng 24 giờ sau khi sự kiện kết thúc.',
+      'Tất cả slide bài giảng đã được diễn giả phê duyệt và video ghi hình chuẩn HD của từng phiên sẽ được tải lên bảng điều khiển của người tham dự trong vòng 24 giờ sau khi sự kiện kết thúc.',
   },
   {
     id: 'inq-4',
