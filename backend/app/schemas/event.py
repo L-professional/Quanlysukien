@@ -20,6 +20,7 @@ class EventBase(BaseModel):
     featured: bool = False
     homepage_order: int = 0
     capacity: int = 500
+    registered_count: int = 0
 
 
 class EventCreate(EventBase):
@@ -44,13 +45,16 @@ class EventUpdate(BaseModel):
 
 class EventResponse(EventBase):
     id: int
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
+    start_time: Optional[Union[datetime, str]] = None
+    end_time: Optional[Union[datetime, str]] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     is_registered: bool = False
     is_checked_in: bool = False
     has_reviewed: bool = False
+    user_registration_id: Optional[int] = None
+    user_ticket_token: Optional[str] = None
+    is_reminded: bool = False
 
     class Config:
         from_attributes = True

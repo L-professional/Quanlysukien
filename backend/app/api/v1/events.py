@@ -6,12 +6,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.security import require_roles, get_current_user_optional, get_user_role_name
+from app.core.timezone import (
+    get_vn_now,
+    to_vn_datetime,
+    parse_event_datetime_vn,
+    calculate_realtime_event_status,
+)
 from app.models.event import Event, EventSchedule
 from app.models.knowledge import KnowledgeBase
 from app.models.user import User
 from app.models.registration import Registration
 from app.models.feedback import Feedback
 from app.models.reminder import UserReminder
+from app.models.notification import Notification
 from app.models.inquiry import EventInquiry, InquiryReply
 from app.models.session_interaction import (
     SessionQuestion,
@@ -118,14 +125,47 @@ INITIAL_SEED_SCHEDULE = [
 
 @router.get("", response_model=List[EventResponse])
 async def list_events(
+    status: Optional[str] = None,
+    search: Optional[str] = None,
+    event_type: Optional[str] = None,
+    is_featured: Optional[bool] = None,
+    limit: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """
     List all events with dates, address, and Google Maps embed links.
+    Supports filtering by status, search keyword, event_type, is_featured, limit.
     Returns user-specific flags: is_registered, is_checked_in, has_reviewed.
     """
     stmt = select(Event).order_by(Event.id.asc())
+
+    if status and status.strip():
+        s_upper = status.strip().upper()
+        if s_upper in ("UPCOMING", "PUBLISHED"):
+            stmt = stmt.where(Event.status.in_(["UPCOMING", "PUBLISHED", "upcoming", "published"]))
+        elif s_upper in ("ONGOING", "LIVE"):
+            stmt = stmt.where(Event.status.in_(["ONGOING", "LIVE", "ongoing", "live"]))
+        elif s_upper in ("ENDED", "COMPLETED"):
+            stmt = stmt.where(Event.status.in_(["ENDED", "COMPLETED", "ended", "completed"]))
+        elif s_upper == "DRAFT":
+            stmt = stmt.where(Event.status.in_(["DRAFT", "draft"]))
+        else:
+            stmt = stmt.where(Event.status.ilike(status.strip()))
+    if event_type and event_type.strip():
+        stmt = stmt.where(Event.event_type.ilike(f"%{event_type.strip()}%"))
+    if search and search.strip():
+        kw = f"%{search.strip()}%"
+        stmt = stmt.where(
+            (Event.title.ilike(kw)) |
+            (Event.location.ilike(kw)) |
+            (Event.description.ilike(kw))
+        )
+    if is_featured is not None:
+        stmt = stmt.where(Event.featured == is_featured)
+    if limit and limit > 0:
+        stmt = stmt.limit(limit)
+
     res = await db.execute(stmt)
     events = res.scalars().all()
 
@@ -135,6 +175,8 @@ async def list_events(
     user_reg_events = set()
     user_checked_in_events = set()
     user_reviewed_events = set()
+    user_reminded_events = set()
+    user_reg_details = {}  # event_id -> (reg_id, qr_token)
 
     if current_user:
         # Check user registrations
@@ -142,8 +184,15 @@ async def list_events(
         reg_res = await db.execute(reg_stmt)
         for r in reg_res.scalars().all():
             user_reg_events.add(r.event_id)
+            user_reg_details[r.event_id] = (r.id, r.qr_code_token)
             if r.is_checked_in:
                 user_checked_in_events.add(r.event_id)
+
+        # Check user reminders
+        rem_stmt = select(UserReminder.event_id).where(UserReminder.user_id == current_user.id)
+        rem_res = await db.execute(rem_stmt)
+        for r_eid in rem_res.scalars().all():
+            user_reminded_events.add(r_eid)
 
         # Check user feedbacks
         fb_stmt = select(Feedback).where(Feedback.user_id == current_user.id)
@@ -153,12 +202,18 @@ async def list_events(
 
     response_items = []
     for e in events:
+        reg_info = user_reg_details.get(e.id)
+        start_dt = e.start_time or parse_event_datetime_vn(e.start_date)
+        end_dt = e.end_time or parse_event_datetime_vn(e.end_date)
+        realtime_status = calculate_realtime_event_status(start_dt, end_dt, e.status)
         response_items.append(
             EventResponse(
                 id=e.id,
                 title=e.title,
+                slug=e.slug,
                 description=e.description,
                 category_id=e.category_id,
+                event_type=e.event_type or "Hội thảo",
                 location=e.location,
                 location_address=e.location_address,
                 google_maps_url=e.google_maps_url,
@@ -166,12 +221,21 @@ async def list_events(
                 end_time=e.end_time,
                 start_date=e.start_date,
                 end_date=e.end_date,
-                status=e.status,
+                status=realtime_status,
+                capacity=e.capacity if e.capacity is not None else 500,
+                registered_count=e.registered_count if e.registered_count is not None else 0,
+                cover_image=e.cover_image,
+                homepage_visible=e.homepage_visible if e.homepage_visible is not None else False,
+                featured=e.featured if e.featured is not None else False,
+                homepage_order=e.homepage_order if e.homepage_order is not None else 0,
                 created_at=e.created_at,
                 updated_at=e.updated_at,
                 is_registered=e.id in user_reg_events,
                 is_checked_in=e.id in user_checked_in_events,
                 has_reviewed=e.id in user_reviewed_events,
+                user_registration_id=reg_info[0] if reg_info else None,
+                user_ticket_token=reg_info[1] if reg_info else None,
+                is_reminded=e.id in user_reminded_events,
             )
         )
 
@@ -197,6 +261,9 @@ async def get_event(
     is_registered = False
     is_checked_in = False
     has_reviewed = False
+    user_registration_id = None
+    user_ticket_token = None
+    is_reminded = False
 
     if current_user:
         reg_stmt = select(Registration).where(
@@ -208,6 +275,16 @@ async def get_event(
         if regs:
             is_registered = True
             is_checked_in = any(r.is_checked_in for r in regs)
+            user_registration_id = regs[0].id
+            user_ticket_token = regs[0].qr_code_token
+
+        rem_stmt = select(UserReminder).where(
+            UserReminder.event_id == id,
+            UserReminder.user_id == current_user.id
+        )
+        rem_res = await db.execute(rem_stmt)
+        if rem_res.scalar_one_or_none():
+            is_reminded = True
 
         fb_stmt = select(Feedback).where(
             Feedback.event_id == id,
@@ -217,11 +294,17 @@ async def get_event(
         if fb_res.scalar_one_or_none():
             has_reviewed = True
 
+    start_dt = event.start_time or parse_event_datetime_vn(event.start_date)
+    end_dt = event.end_time or parse_event_datetime_vn(event.end_date)
+    realtime_status = calculate_realtime_event_status(start_dt, end_dt, event.status)
+
     return EventResponse(
         id=event.id,
         title=event.title,
+        slug=event.slug,
         description=event.description,
         category_id=event.category_id,
+        event_type=event.event_type or "Hội thảo",
         location=event.location,
         location_address=event.location_address,
         google_maps_url=event.google_maps_url,
@@ -229,56 +312,37 @@ async def get_event(
         end_time=event.end_time,
         start_date=event.start_date,
         end_date=event.end_date,
-        status=event.status,
+        status=realtime_status,
+        capacity=event.capacity if event.capacity is not None else 500,
+        registered_count=event.registered_count if event.registered_count is not None else 0,
+        cover_image=event.cover_image,
+        homepage_visible=event.homepage_visible if event.homepage_visible is not None else False,
+        featured=event.featured if event.featured is not None else False,
+        homepage_order=event.homepage_order if event.homepage_order is not None else 0,
         created_at=event.created_at,
         updated_at=event.updated_at,
         is_registered=is_registered,
         is_checked_in=is_checked_in,
         has_reviewed=has_reviewed,
+        user_registration_id=user_registration_id,
+        user_ticket_token=user_ticket_token,
+        is_reminded=is_reminded,
     )
 
 
 def parse_event_datetime(val: Any) -> Optional[datetime]:
-    if not val:
-        return None
-    if isinstance(val, datetime):
-        return val
-    if isinstance(val, str):
-        val_str = val.strip()
-        if not val_str:
-            return None
-        try:
-            return datetime.fromisoformat(val_str.replace("Z", "+00:00"))
-        except Exception:
-            pass
-        formats = [
-            "%d/%m/%Y %H:%M",
-            "%d/%m/%Y %H:%M:%S",
-            "%d/%m/%Y",
-            "%Y-%m-%d %H:%M",
-            "%Y-%m-%d %H:%M:%S",
-            "%Y-%m-%d",
-            "%Y-%m-%dT%H:%M",
-            "%Y-%m-%dT%H:%M:%S",
-        ]
-        for fmt in formats:
-            try:
-                return datetime.strptime(val_str, fmt)
-            except Exception:
-                pass
-    return None
+    return parse_event_datetime_vn(val)
 
 
 def to_comparable_utc(dt: Optional[datetime]) -> Optional[datetime]:
     if dt is None:
         return None
     if isinstance(dt, str):
-        dt = parse_event_datetime(dt)
+        dt = parse_event_datetime_vn(dt)
         if dt is None:
             return None
-    if dt.tzinfo is None:
-        return dt.astimezone().astimezone(timezone.utc)
-    return dt.astimezone(timezone.utc)
+    vn_dt = to_vn_datetime(dt)
+    return vn_dt.astimezone(timezone.utc)
 
 
 async def check_event_time_location_overlap(
@@ -393,7 +457,7 @@ async def create_event(
         if role_name not in ["ADMIN", "EVENT_MANAGER"]:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Không có quyền tạo sự kiện")
 
-    now = datetime.now()
+    now = get_vn_now()
     raw_start = parse_event_datetime(payload.start_time) or parse_event_datetime(payload.start_date) or now
     raw_end = parse_event_datetime(payload.end_time) or parse_event_datetime(payload.end_date) or (raw_start + timedelta(hours=3))
     start_dt = to_comparable_utc(raw_start)
@@ -521,9 +585,11 @@ async def update_event(
     await db.commit()
     await db.refresh(event)
 
-    # Task 59 Requirement 1: Real-time RAG Knowledge Re-indexing into pgvector
+    # Task 59 & Task 70: Real-time RAG Knowledge Re-indexing into pgvector
     try:
         await rag_engine.sync_event_knowledge(db, event, action="UPSERT")
+        import logging
+        logging.getLogger(__name__).info(f"Vector embedding for event #{event.id} ('{event.title}') re-indexed in pgvector.")
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"Failed to auto-update event in pgvector: {e}")
@@ -601,9 +667,11 @@ async def delete_event(
     # 3. Cascade delete schedules
     await db.execute(delete(EventSchedule).where(EventSchedule.event_id == id))
 
-    # Sync pgvector deletion
+    # Task 59 & Task 70: Sync pgvector deletion
     try:
         await rag_engine.sync_event_knowledge(db, event, action="DELETE")
+        import logging
+        logging.getLogger(__name__).info(f"Vector embedding for event #{id} removed from pgvector.")
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"Failed to remove event knowledge in pgvector: {e}")
@@ -906,10 +974,13 @@ async def delete_event_schedule(
 
 class GenerateSessionDescriptionRequest(BaseModel):
     title: str
-    track: Optional[str] = "AI & Tech"
+    track: Optional[str] = None
+    category: Optional[str] = None
+    event_type: Optional[str] = None
+    location: Optional[str] = None
     speaker_name: Optional[str] = ""
     speaker_role: Optional[str] = ""
-    style: Optional[str] = "auto"  # auto | professional | literary | inspirational | academic
+    style: Optional[str] = "auto"  # auto | professional | literary | inspirational | academic | wellness
 
 
 class GenerateSessionDescriptionResponse(BaseModel):
@@ -949,6 +1020,8 @@ def _detect_and_build_prompt_matrix(
         resolved_style = "inspirational"
     elif req_style in ["academic", "hoc_thuat", "nghien_cuu"]:
         resolved_style = "academic"
+    elif req_style in ["wellness", "suc_khoe", "tam_ly", "health"]:
+        resolved_style = "wellness"
     else:
         # Auto detection
         if is_art or req_style == "literary":
@@ -1108,7 +1181,7 @@ async def generate_session_description(payload: GenerateSessionDescriptionReques
     """
     system_instruction, prompt, resolved_style, fallback_desc, is_non_tech = _detect_and_build_prompt_matrix(
         title=payload.title,
-        track=payload.track,
+        track=payload.track or payload.category or payload.event_type or "AI & Tech",
         speaker_name=payload.speaker_name,
         speaker_role=payload.speaker_role,
         style=payload.style
@@ -1139,35 +1212,315 @@ async def generate_session_description(payload: GenerateSessionDescriptionReques
 
 
 @router.post("/{id}/publish", response_model=EventResponse)
-async def publish_event(id: int):
-    # Mock logic - robust production logic should be here, but database is down.
-    return {"id": id, "title": "Mock", "location": "Mock", "status": "PUBLISHED"}
+async def publish_event(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.status = "PUBLISHED"
+    event.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(event)
+    return await get_event(id, db, current_user)
 
 @router.post("/{id}/unpublish", response_model=EventResponse)
-async def unpublish_event(id: int):
-    return {"id": id, "title": "Mock", "location": "Mock", "status": "DRAFT"}
+async def unpublish_event(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.status = "DRAFT"
+    event.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(event)
+    return await get_event(id, db, current_user)
 
 @router.post("/{id}/cancel", response_model=EventResponse)
-async def cancel_event(id: int):
-    return {"id": id, "title": "Mock", "location": "Mock", "status": "CANCELLED"}
+async def cancel_event(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.status = "CANCELLED"
+    event.cancelled_at = datetime.now(timezone.utc)
+    event.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(event)
+    return await get_event(id, db, current_user)
 
 @router.post("/{id}/archive", response_model=EventResponse)
-async def archive_event(id: int):
-    return {"id": id, "title": "Mock", "location": "Mock", "status": "ARCHIVED"}
+async def archive_event(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.status = "ARCHIVED"
+    event.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(event)
+    return await get_event(id, db, current_user)
 
 @router.post("/{id}/duplicate", response_model=EventResponse)
-async def duplicate_event(id: int):
-    return {"id": 999, "title": "Duplicated Event", "location": "Mock", "status": "DRAFT"}
+async def duplicate_event(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    orig = res.scalar_one_or_none()
+    if not orig:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+
+    cloned = Event(
+        title=f"{orig.title} (Bản sao)",
+        slug=f"{orig.slug}-copy-{int(datetime.now(timezone.utc).timestamp())}" if orig.slug else None,
+        description=orig.description,
+        category_id=orig.category_id,
+        event_type=orig.event_type,
+        location=orig.location,
+        location_address=orig.location_address,
+        google_maps_url=orig.google_maps_url,
+        start_time=orig.start_time,
+        end_time=orig.end_time,
+        start_date=orig.start_date,
+        end_date=orig.end_date,
+        status="DRAFT",
+        capacity=orig.capacity,
+        registered_count=0,
+        cover_image=orig.cover_image,
+        homepage_visible=False,
+        featured=False,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db.add(cloned)
+    await db.commit()
+    await db.refresh(cloned)
+    return await get_event(cloned.id, db, current_user)
 
 @router.patch("/{id}/homepage", response_model=EventResponse)
-async def update_homepage_visibility(id: int, payload: dict):
-    return {"id": id, "title": "Mock", "location": "Mock", "status": "PUBLISHED"}
+async def update_homepage_visibility(
+    id: int,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.homepage_visible = payload.get("homepage_visible", True)
+    event.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(event)
+    return await get_event(id, db, current_user)
 
 @router.patch("/{id}/featured", response_model=EventResponse)
-async def update_featured(id: int, payload: dict):
-    return {"id": id, "title": "Mock", "location": "Mock", "status": "PUBLISHED"}
+async def update_featured(
+    id: int,
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event not found")
+    event.featured = payload.get("featured", True)
+    event.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+    await db.refresh(event)
+    return await get_event(id, db, current_user)
 
 @router.post("/export")
 async def export_events(payload: dict):
     # Dummy export endpoint, frontend uses Blob locally anyway if fails
     return {"url": "dummy"}
+
+
+# ── Task 70: Dedicated Reminder & Scheduling Endpoints ─────────────────────────
+
+@router.post("/{id}/remind")
+async def schedule_event_reminder(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    """
+    Task 70: Dedicated reminder scheduling for an event.
+    Records UserReminder, registers user if not registered (so they have QR ticket),
+    and creates in-app notification + triggers confirmation.
+    """
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy sự kiện")
+
+    target_user = current_user
+    if not target_user:
+        u_stmt = select(User).where(User.email == "attendee@eventhub.ai")
+        u_res = await db.execute(u_stmt)
+        target_user = u_res.scalar_one_or_none()
+        if not target_user:
+            u_stmt2 = select(User).limit(1)
+            u_res2 = await db.execute(u_stmt2)
+            target_user = u_res2.scalar_one_or_none()
+
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vui lòng đăng nhập để đặt lịch nhắc sự kiện"
+        )
+
+    # 1. Check or create UserReminder
+    rem_stmt = select(UserReminder).where(
+        UserReminder.event_id == id,
+        UserReminder.user_id == target_user.id
+    )
+    rem_res = await db.execute(rem_stmt)
+    existing_reminder = rem_res.scalar_one_or_none()
+
+    if not existing_reminder:
+        reminder = UserReminder(
+            user_id=target_user.id,
+            event_id=event.id,
+            start_time=event.start_time,
+            notified_24h=False,
+            notified_1h=False,
+        )
+        db.add(reminder)
+
+    # 2. Check if user already registered for event; if not, create registration with QR code
+    reg_stmt = select(Registration).where(
+        Registration.event_id == id,
+        Registration.participant_id == target_user.id,
+        Registration.schedule_id.is_(None)
+    )
+    reg_res = await db.execute(reg_stmt)
+    existing_reg = reg_res.scalar_one_or_none()
+
+    ticket_token = None
+    if not existing_reg:
+        import uuid, json
+        qr_token = f"QR-EVENTHUB-{uuid.uuid4().hex.upper()[:16]}"
+        ticket_token = qr_token
+        new_reg = Registration(
+            event_id=event.id,
+            participant_id=target_user.id,
+            full_name=target_user.full_name,
+            email=target_user.email,
+            phone=target_user.phone_number,
+            qr_code=qr_token,
+            qr_code_token=qr_token,
+            ticket_type="Vé Tham Dự",
+            is_checked_in=False,
+        )
+        db.add(new_reg)
+        event.registered_count = (event.registered_count or 0) + 1
+        db.add(event)
+        await db.flush()
+        new_reg.qr_code = json.dumps({
+            "ticket_id": new_reg.id,
+            "event_id": event.id,
+            "user_id": target_user.id,
+        })
+        db.add(new_reg)
+    else:
+        ticket_token = existing_reg.qr_code_token
+
+    # 3. Create instant in-app notification (Milestone 1)
+    notif = Notification(
+        user_id=target_user.id,
+        target_role="PARTICIPANT",
+        title="Đã đặt lịch nhắc sự kiện thành công! 📅",
+        message=f"Hệ thống đã lên lịch nhắc cho '{event.title}'. Bạn sẽ nhận được thông báo trước 24 giờ và 2 giờ sự kiện diễn ra kèm mã QR ({ticket_token}).",
+        type="REMINDER_24H",
+        link="/events",
+        is_read=False,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(notif)
+    await db.commit()
+
+    return {
+        "status": "success",
+        "is_reminded": True,
+        "event_id": id,
+        "ticket_token": ticket_token,
+        "message": f"Đã đặt lịch nhắc cho '{event.title}'. Hệ thống sẽ tự động gửi thông báo theo 3 mốc thời gian!"
+    }
+
+
+@router.delete("/{id}/remind")
+async def cancel_event_reminder(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    """
+    Task 70: Cancel reminder for an event.
+    Removes UserReminder and sends confirmation in-app notification.
+    """
+    stmt = select(Event).where(Event.id == id)
+    res = await db.execute(stmt)
+    event = res.scalar_one_or_none()
+    if not event:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy sự kiện")
+
+    target_user = current_user
+    if not target_user:
+        u_stmt = select(User).where(User.email == "attendee@eventhub.ai")
+        u_res = await db.execute(u_stmt)
+        target_user = u_res.scalar_one_or_none()
+
+    if target_user:
+        await db.execute(
+            delete(UserReminder).where(
+                UserReminder.event_id == id,
+                UserReminder.user_id == target_user.id
+            )
+        )
+        notif = Notification(
+            user_id=target_user.id,
+            target_role="PARTICIPANT",
+            title="Đã hủy đặt lịch nhắc sự kiện 🔕",
+            message=f"Đã hủy lịch nhắc tự động cho sự kiện '{event.title}'.",
+            type="INFO",
+            link="/events",
+            is_read=False,
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(notif)
+        await db.commit()
+
+    return {
+        "status": "success",
+        "is_reminded": False,
+        "event_id": id,
+        "message": f"Đã hủy đặt lịch nhắc sự kiện '{event.title}'."
+    }
+

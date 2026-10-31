@@ -4,6 +4,8 @@ import {
   Sparkles, Database, Star, Users, ShieldCheck, 
   Settings as SettingsIcon, Zap, X, ChevronDown, PieChart, Mail
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { UserRole } from '../types';
 
 export interface MenuItem {
   id: string;
@@ -11,6 +13,7 @@ export interface MenuItem {
   icon: React.ElementType;
   badge?: string | number;
   badgeColor?: string;
+  allowedRoles?: UserRole[];
   requiresRole?: string[];
 }
 
@@ -22,7 +25,7 @@ export interface SidebarProps {
   onToggleCollapse?: () => void;
   isMobileDrawer?: boolean;
   onCloseMobileDrawer?: () => void;
-  userRole?: string; // e.g. "SUPER_ADMIN", "EVENT_MANAGER", etc.
+  userRole?: string; // e.g. "ADMIN", "EVENT_MANAGER", "SPEAKER", "ATTENDEE", etc.
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -32,28 +35,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed = false,
   isMobileDrawer = false,
   onCloseMobileDrawer,
-  userRole = "SUPER_ADMIN"
+  userRole: propUserRole
 }) => {
+  const { user, userRole: authRole } = useAuth();
+
+  // Canonical current role: prioritize prop -> user.role_name -> authRole -> default 'ATTENDEE'
+  const resolvedRole = (propUserRole || user?.role_name || authRole || 'ATTENDEE').toUpperCase();
+  const currentRole = (resolvedRole === 'PARTICIPANT' ? 'ATTENDEE' : resolvedRole) as UserRole;
   
-  // Define all possible menu items exactly as requested in the reference image
+  // Define all menu items with explicit RBAC permissions
   const menuItems: MenuItem[] = useMemo(() => [
     {
       id: 'dashboard',
       label: 'Bảng Điều Khiển',
       icon: LayoutDashboard,
-      requiresRole: ['SUPER_ADMIN', 'ADMIN']
+      allowedRoles: ['ADMIN', 'EVENT_MANAGER', 'SPEAKER', 'ATTENDEE', 'STAFF', 'SUPER_ADMIN'],
     },
     {
       id: 'reports',
       label: 'Báo Cáo',
       icon: PieChart,
-      requiresRole: ['SUPER_ADMIN', 'ADMIN', 'AUDITOR', 'EVENT_MANAGER']
+      allowedRoles: ['ADMIN', 'EVENT_MANAGER', 'SUPER_ADMIN', 'AUDITOR'],
     },
     {
       id: 'events',
       label: 'Danh Mục Sự Kiện',
       icon: Calendar,
-      requiresRole: ['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER']
+      allowedRoles: ['ADMIN', 'EVENT_MANAGER', 'SPEAKER', 'ATTENDEE', 'STAFF', 'SUPER_ADMIN'],
     },
     {
       id: 'campaigns',
@@ -67,73 +75,80 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'speaker',
       label: 'Cổng Diễn Giả',
       icon: Mic,
-      requiresRole: ['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'SPEAKER_MANAGER']
+      allowedRoles: ['ADMIN', 'EVENT_MANAGER', 'SPEAKER', 'SUPER_ADMIN'],
     },
     {
       id: 'scanner',
       label: 'Soát Vé QR',
       icon: QrCode,
-      requiresRole: ['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'CHECK_IN_STAFF']
+      allowedRoles: ['ADMIN', 'EVENT_MANAGER', 'STAFF', 'SUPER_ADMIN'],
     },
     {
       id: 'inquiries',
       label: 'AI Trợ Lý Sự Kiện',
       icon: MessageSquare,
       badge: 'AI',
-      badgeColor: 'bg-[#D7193F] text-white',
-      requiresRole: ['SUPER_ADMIN', 'ADMIN', 'AI_EDITOR', 'CONTENT_MANAGER']
+      badgeColor: 'bg-[#DC2626] text-white',
+      allowedRoles: ['ADMIN', 'EVENT_MANAGER', 'STAFF', 'SUPER_ADMIN'],
     },
     {
       id: 'content-studio',
       label: 'AI PR Studio',
       icon: Sparkles,
       badge: 'AI',
-      badgeColor: 'bg-[#D7193F] text-white',
-      requiresRole: ['SUPER_ADMIN', 'ADMIN', 'AI_EDITOR', 'CONTENT_MANAGER']
+      badgeColor: 'bg-[#DC2626] text-white',
+      allowedRoles: ['ADMIN', 'EVENT_MANAGER', 'SUPER_ADMIN'],
     },
     {
       id: 'knowledge-base',
       label: 'Kho Tri Thức RAG',
       icon: Database,
       badge: 'AI',
-      badgeColor: 'bg-[#D7193F] text-white',
-      requiresRole: ['SUPER_ADMIN', 'ADMIN', 'AI_EDITOR', 'CONTENT_MANAGER']
+      badgeColor: 'bg-[#DC2626] text-white',
+      allowedRoles: ['ADMIN', 'EVENT_MANAGER', 'SUPER_ADMIN'],
     },
     {
       id: 'feedback',
       label: 'Đánh Giá & Tóm Tắt',
       icon: Star,
-      requiresRole: ['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'SUPPORT', 'AI_EDITOR']
+      allowedRoles: ['ADMIN', 'EVENT_MANAGER', 'SPEAKER', 'STAFF', 'SUPER_ADMIN'],
     },
     {
       id: 'users',
       label: 'Quản Lý Tài Khoản',
       icon: Users,
-      requiresRole: ['SUPER_ADMIN', 'ADMIN']
+      allowedRoles: ['ADMIN', 'SUPER_ADMIN'],
     },
     {
       id: 'logs',
       label: 'Nhật Ký Bảo Mật',
       icon: ShieldCheck,
-      requiresRole: ['SUPER_ADMIN', 'ADMIN', 'AUDITOR']
+      allowedRoles: ['ADMIN', 'SUPER_ADMIN', 'AUDITOR'],
     },
     {
       id: 'settings',
       label: 'Cài Đặt',
       icon: SettingsIcon,
-      requiresRole: ['SUPER_ADMIN', 'ADMIN']
+      allowedRoles: ['ADMIN', 'EVENT_MANAGER', 'SPEAKER', 'ATTENDEE', 'STAFF', 'SUPER_ADMIN'],
     },
   ], []);
 
-  // Filter based on roles, but fallback to showing all if we mock SUPER_ADMIN
+  // Filter based on allowedRoles: items with insufficient permissions are completely removed
   const visibleMenuItems = useMemo(() => {
-    return menuItems.filter(item => {
-      if (!item.requiresRole) return true;
-      // In a real app we'd check properly. For now we assume the current user has access
-      // if their role matches, or if it's SUPER_ADMIN.
-      return userRole === 'SUPER_ADMIN' || item.requiresRole.includes(userRole);
+    const list = Array.isArray(menuItems) ? menuItems : [];
+    return list.filter((item) => {
+      const allowed = item.allowedRoles || (item.requiresRole as UserRole[]);
+      if (!allowed || allowed.length === 0) return true;
+      // ADMIN & SUPER_ADMIN have full 100% access to all menus
+      if (currentRole === 'SUPER_ADMIN' || currentRole === 'ADMIN') {
+        return true;
+      }
+      return (
+        allowed.includes(currentRole) ||
+        (currentRole === 'ATTENDEE' && allowed.includes('PARTICIPANT' as any))
+      );
     });
-  }, [menuItems, userRole]);
+  }, [menuItems, currentRole]);
 
   return (
     <aside
@@ -154,7 +169,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="flex items-center gap-3 cursor-pointer"
           >
             {/* EventAI Logo matching reference */}
-            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#D7193F] shrink-0">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#DC2626] shrink-0">
               <Zap className="w-4 h-4 text-white fill-white" />
             </div>
             {!isCollapsed && (
@@ -181,7 +196,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation items */}
         <nav className="flex-1 px-4 space-y-1.5 mt-2 overflow-y-auto pb-4">
-          {visibleMenuItems.map((item) => {
+          {(Array.isArray(visibleMenuItems) ? visibleMenuItems : []).map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
@@ -193,7 +208,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[14px] font-semibold transition-all duration-200 cursor-pointer ${
                   isActive
-                    ? 'bg-[#D7193F] text-white shadow-[0_4px_12px_rgba(215,25,63,0.25)]'
+                    ? 'bg-[#DC2626] text-white shadow-[0_4px_12px_rgba(215,25,63,0.25)]'
                     : 'text-[#64748B] hover:bg-[#F6F8FC] hover:text-[#12213A]'
                 } ${isCollapsed ? 'justify-center px-0' : ''}`}
               >
@@ -230,11 +245,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="p-4 mt-auto">
             <div className="p-3.5 rounded-xl bg-[#F6F8FC] border border-[#E5EAF2] flex gap-3 items-center">
               <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
-                <div className="w-3.5 h-3.5 bg-[#D7193F] rotate-45 rounded-sm" />
+                <div className="w-3.5 h-3.5 bg-[#DC2626] rotate-45 rounded-sm" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-bold text-[#12213A] truncate">EventAI</div>
-                <div className="text-[9px] text-[#64748B] truncate mt-0.5" title="Nền tảng quản lý sự kiện tích hợp AI">Nền tảng quản lý sự kiện...</div>
+                <div className="text-[10px] text-[#64748B] font-medium leading-tight mt-0.5">Nền tảng sự kiện AI</div>
                 <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-slate-200/50">
                   <div className="text-[10px] font-medium text-slate-500">Phiên bản hệ thống</div>
                   <div className="text-[10px] font-bold text-[#12213A]">v1.0.0</div>

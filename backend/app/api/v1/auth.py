@@ -18,6 +18,7 @@ from app.core.security import (
     create_access_token,
     get_current_user,
     get_user_role_name,
+    get_permissions_for_role,
 )
 from app.models.user import User
 from app.models.role import Role, RoleEnum
@@ -28,6 +29,7 @@ from app.schemas.auth import (
     Token,
     UserResponse,
     GoogleAuthRequest,
+    MicrosoftAuthRequest,
     ChangePasswordRequest,
     TwoFactorGenerateResponse,
     TwoFactorVerifyRequest,
@@ -38,72 +40,155 @@ from app.schemas.auth import (
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
+DEMO_USERS = [
+    {
+        "email": "admin@eventhub.ai",
+        "full_name": "Nguyễn Văn Quản Trị",
+        "phone_number": "0901234567",
+        "role_name": RoleEnum.ADMIN.value,
+        "role_id": 1,
+    },
+    {
+        "email": "manager@eventhub.ai",
+        "full_name": "Trần Thị Điều Hành",
+        "phone_number": "0902345678",
+        "role_name": RoleEnum.EVENT_MANAGER.value,
+        "role_id": 2,
+    },
+    {
+        "email": "staff@eventhub.ai",
+        "full_name": "Lê Hoàng Soát Vé",
+        "phone_number": "0903456789",
+        "role_name": RoleEnum.STAFF.value,
+        "role_id": 3,
+    },
+    {
+        "email": "speaker@eventhub.ai",
+        "full_name": "TS. Lê Quang Huy (Speaker)",
+        "phone_number": "0908889999",
+        "role_name": RoleEnum.SPEAKER.value,
+        "role_id": 5,
+    },
+    {
+        "email": "attendee@eventhub.ai",
+        "full_name": "Phạm Quốc Khách Hàng",
+        "phone_number": "0904567890",
+        "role_name": RoleEnum.PARTICIPANT.value,
+        "role_id": 4,
+        "is_marketing_subscribed": True,
+        "marketing_consent_source": "EVENT_REGISTRATION",
+    },
+    {
+        "email": "vip.customer@eventhub.ai",
+        "full_name": "Hoàng Minh Khách VIP",
+        "phone_number": "0905556666",
+        "role_name": RoleEnum.PARTICIPANT.value,
+        "role_id": 4,
+        "is_marketing_subscribed": True,
+        "marketing_consent_source": "NEWSLETTER_SUBSCRIBE",
+    },
+    {
+        "email": "developer@eventhub.ai",
+        "full_name": "Ngô Kỹ Thuật",
+        "phone_number": "0907778888",
+        "role_name": RoleEnum.PARTICIPANT.value,
+        "role_id": 4,
+        "is_marketing_subscribed": True,
+        "marketing_consent_source": "MARKETING_OPTIN",
+    },
+]
+
+
 async def ensure_default_roles(db: AsyncSession):
-    """Ensure basic roles and default demo users exist in DB."""
-    roles_def = [
+    """Ensure basic roles and default demo users exist in DB, resetting passwords to '123456'."""
+    # 1. Ensure all basic roles exist
+    stmt = select(Role)
+    res = await db.execute(stmt)
+    existing_roles = {r.role_name: r for r in res.scalars().all()}
+
+    required_roles = [
         (1, RoleEnum.ADMIN.value),
         (2, RoleEnum.EVENT_MANAGER.value),
         (3, RoleEnum.STAFF.value),
         (4, RoleEnum.PARTICIPANT.value),
         (5, RoleEnum.SPEAKER.value),
     ]
-    for r_id, r_name in roles_def:
-        r = (await db.execute(select(Role).where(Role.id == r_id))).scalar_one_or_none()
-        if not r:
-            r_by_name = (await db.execute(select(Role).where(Role.role_name == r_name))).scalar_one_or_none()
-            if not r_by_name:
-                db.add(Role(id=r_id, role_name=r_name))
-            else:
-                r_by_name.id = r_id
-    await db.commit()
+    for r_id, r_name in required_roles:
+        if r_name not in existing_roles:
+            new_role = Role(id=r_id, role_name=r_name)
+            db.add(new_role)
+            await db.commit()
+            await db.refresh(new_role)
+            existing_roles[r_name] = new_role
 
-    hashed_pwd = get_password_hash("123456")
+    # 2. Upsert demo accounts and guarantee standardized password "123456"
+    standard_hash = get_password_hash("123456")
+    speaker_user = None
     now_utc = datetime.now(timezone.utc)
-    demo_users_data = [
-        ("admin@eventhub.ai", "Nguyễn Văn Quản Trị", 1, False, None, None),
-        ("manager@eventhub.ai", "Trần Thị Điều Hành", 2, False, None, None),
-        ("staff@eventhub.ai", "Lê Hoàng Soát Vé", 3, False, None, None),
-        ("attendee@eventhub.ai", "Phạm Quốc Khách Hàng", 4, True, now_utc, "EVENT_REGISTRATION"),
-        ("vip.customer@eventhub.ai", "Hoàng Minh Khách VIP", 4, True, now_utc, "NEWSLETTER_SUBSCRIBE"),
-        ("developer@eventhub.ai", "Ngô Kỹ Thuật", 4, True, now_utc, "MARKETING_OPTIN"),
-        ("speaker@eventhub.ai", "TS. Lê Quang Huy (Speaker)", 5, False, None, None),
-    ]
-    for email, name, role_id, consent, c_time, c_src in demo_users_data:
-        u = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
-        if not u:
-            db.add(User(
-                email=email,
-                hashed_password=hashed_pwd,
-                full_name=name,
-                role_id=role_id,
-                is_active=True,
-                is_marketing_subscribed=consent,
-                marketing_consent_at=c_time,
-                marketing_consent_source=c_src,
-            ))
+
+    for item in DEMO_USERS:
+        target_role = existing_roles.get(item["role_name"])
+        target_role_id = target_role.id if target_role else item["role_id"]
+
+        user_stmt = select(User).where(User.email == item["email"])
+        user_res = await db.execute(user_stmt)
+        user = user_res.scalar_one_or_none()
+
+        is_sub = item.get("is_marketing_subscribed", False)
+        sub_src = item.get("marketing_consent_source")
+
+        if user:
+            # Overwrite hashed_password with 123456 and ensure active
+            user.hashed_password = standard_hash
+            user.is_active = True
+            user.role_id = target_role_id
+            if not user.full_name:
+                user.full_name = item["full_name"]
+            if not user.phone_number:
+                user.phone_number = item["phone_number"]
+            if is_sub and not user.is_marketing_subscribed:
+                user.is_marketing_subscribed = True
+                user.marketing_consent_at = now_utc
+                user.marketing_consent_source = sub_src
+            db.add(user)
+            if item["email"] == "speaker@eventhub.ai":
+                speaker_user = user
         else:
-            u.role_id = role_id
-            if consent and not u.is_marketing_subscribed:
-                u.is_marketing_subscribed = consent
-                u.marketing_consent_at = c_time
-                u.marketing_consent_source = c_src
+            new_user = User(
+                email=item["email"],
+                hashed_password=standard_hash,
+                full_name=item["full_name"],
+                phone_number=item["phone_number"],
+                role_id=target_role_id,
+                is_active=True,
+                is_marketing_subscribed=is_sub,
+                marketing_consent_at=now_utc if is_sub else None,
+                marketing_consent_source=sub_src if is_sub else None,
+            )
+            db.add(new_user)
+            await db.flush()
+            if item["email"] == "speaker@eventhub.ai":
+                speaker_user = new_user
+
     await db.commit()
 
-    # Automatically assign first couple of event schedules to demo speaker if unassigned
-    from app.models.event import EventSchedule
-    sched_res = await db.execute(select(EventSchedule).limit(5))
-    schedules = sched_res.scalars().all()
-    if schedules:
-        for s in schedules:
-            if not s.speaker_id:
-                s.speaker_id = speaker_user.id
-        await db.commit()
+    # 3. Automatically assign first couple of event schedules to demo speaker if unassigned
+    if speaker_user:
+        from app.models.event import EventSchedule
+        sched_res = await db.execute(select(EventSchedule).limit(5))
+        schedules = sched_res.scalars().all()
+        if schedules:
+            for s in schedules:
+                if not s.speaker_id:
+                    s.speaker_id = speaker_user.id
+            await db.commit()
 
 
 
 async def _build_user_response(user: User, db: AsyncSession) -> UserResponse:
     """Build UserResponse with role_name fetched from related Role table."""
     role_name = await get_user_role_name(user, db)
+    permissions = get_permissions_for_role(role_name)
     data = {
         "id": user.id,
         "email": user.email,
@@ -111,6 +196,7 @@ async def _build_user_response(user: User, db: AsyncSession) -> UserResponse:
         "phone_number": user.phone_number,
         "role_id": user.role_id,
         "role_name": role_name,
+        "permissions": permissions,
         "is_active": user.is_active,
         "avatar_url": getattr(user, "avatar_url", None),
         "provider": getattr(user, "provider", "local"),
@@ -336,6 +422,126 @@ async def google_auth(
             user.avatar_url = avatar_url
         if hasattr(user, "provider"):
             user.provider = "google"
+
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    role_name = await get_user_role_name(user, db)
+    access_token = create_access_token(data={
+        "sub": str(user.id),
+        "email": user.email,
+        "role": role_name,
+    })
+
+    user_resp = await _build_user_response(user, db)
+    return Token(access_token=access_token, token_type="bearer", user=user_resp)
+
+
+@router.post("/microsoft", response_model=Token)
+async def microsoft_auth(
+    payload: MicrosoftAuthRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Authenticate user with Microsoft OAuth 2.0 (Azure AD / Entra ID) credential or profile.
+    - If email does not exist: Automatically register in PostgreSQL with role PARTICIPANT and provider="microsoft".
+    - If email exists: Log in, update last_active_at / avatar_url, and return JWT token.
+    """
+    await ensure_default_roles(db)
+
+    email = None
+    full_name = None
+    avatar_url = None
+
+    # 1. If access_token is provided, verify with Microsoft Graph API
+    if payload.access_token:
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                res = await client.get(
+                    "https://graph.microsoft.com/v1.0/me",
+                    headers={"Authorization": f"Bearer {payload.access_token}"}
+                )
+                if res.status_code == 200:
+                    info = res.json()
+                    email = info.get("mail") or info.get("userPrincipalName")
+                    full_name = info.get("displayName") or info.get("givenName")
+        except Exception:
+            pass
+
+    # 2. If credential (JWT id_token) is provided, decode payload
+    if not email and payload.credential:
+        try:
+            import json, base64
+            parts = payload.credential.split(".")
+            if len(parts) >= 2:
+                padding = 4 - len(parts[1]) % 4
+                padded = parts[1] + ("=" * (padding % 4))
+                decoded_bytes = base64.urlsafe_b64decode(padded)
+                jwt_data = json.loads(decoded_bytes.decode("utf-8"))
+                email = jwt_data.get("email") or jwt_data.get("preferred_username") or jwt_data.get("upn")
+                full_name = jwt_data.get("name") or jwt_data.get("preferred_username")
+        except Exception:
+            pass
+
+    # 3. Use direct payload fields if present
+    if not email and payload.email:
+        email = str(payload.email)
+        full_name = payload.full_name or email.split("@")[0]
+        avatar_url = payload.avatar_url
+
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không thể xác thực danh tính Microsoft. Token hoặc email không hợp lệ!"
+        )
+
+    email_clean = email.lower().strip()
+    full_name_clean = (full_name or email_clean.split("@")[0]).strip()
+    if not avatar_url:
+        avatar_url = f"https://api.dicebear.com/7.x/initials/svg?seed={email_clean}"
+
+    # Check if user already exists
+    stmt = select(User).where(User.email == email_clean)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+
+    if user:
+        # Trường hợp: Email Microsoft ĐÃ tồn tại -> Đăng nhập
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin.",
+            )
+        user.last_active_at = datetime.now(timezone.utc)
+        if avatar_url and hasattr(user, "avatar_url"):
+            user.avatar_url = avatar_url  # Auto sync avatar
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    else:
+        # Trường hợp: Email Microsoft CHƯA tồn tại -> Tự động đăng ký mới với role PARTICIPANT
+        res_role = await db.execute(select(Role).where(Role.role_name == RoleEnum.PARTICIPANT.value))
+        role = res_role.scalars().first()
+        if not role:
+            role = await db.get(Role, 4)
+        role_id = role.id if role else 4
+
+        random_pwd = secrets.token_urlsafe(16)
+        hashed_pwd = get_password_hash(random_pwd)
+
+        user = User(
+            email=email_clean,
+            full_name=full_name_clean,
+            hashed_password=hashed_pwd,
+            role_id=role_id,
+            is_active=True,
+            last_active_at=datetime.now(timezone.utc),
+        )
+        if hasattr(user, "avatar_url"):
+            user.avatar_url = avatar_url
+        if hasattr(user, "provider"):
+            user.provider = "microsoft"
 
         db.add(user)
         await db.commit()

@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X,
   Minus,
@@ -13,20 +14,20 @@ import {
   Mic,
   Paperclip,
   Wifi,
+  ExternalLink,
+  ArrowRight,
 } from 'lucide-react';
-import { ChatMessage, EventScheduleItem } from '../../types';
+import { ChatMessage, EventScheduleItem, ActionLink } from '../../types';
 import { apiService } from '../../services/api';
 import { useEvent } from '../../context/EventContext';
-
-const QUICK_SUGGESTIONS = [
-  '☕ Teabreak & Mật khẩu WiFi?',
-  '🎟️ Hướng dẫn check-in QR vào cổng?',
-  '📍 Sơ đồ hội trường & Bãi đỗ xe?',
-  '📅 Lịch trình hôm nay như thế nào?',
-];
+import { useAuth } from '../../context/AuthContext';
+import { executeClientAutonomousCopilot } from '../../utils/aiCopilotClient';
 
 export const FloatingChatbot: React.FC = () => {
   const { activeEvent } = useEvent();
+  const { user, userRole } = useAuth();
+  const navigate = useNavigate();
+
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
   const [inputQuery, setInputQuery] = useState<string>('');
@@ -35,6 +36,41 @@ export const FloatingChatbot: React.FC = () => {
 
   const wifiName = activeEvent.wifiName || 'EventHub_VIP_Guest';
   const wifiPass = activeEvent.wifiPassword || 'EventHub2026!';
+
+  // Role-based Suggestions
+  const roleSuggestions = useMemo(() => {
+    const role = (userRole || 'ATTENDEE').toUpperCase();
+    if (role === 'ADMIN' || role === 'EVENT_MANAGER') {
+      return [
+        '📊 Báo cáo tỷ lệ check-in và số lượng sự kiện?',
+        '🎟️ Thống kê tổng số vé đã đăng ký?',
+        '📅 Lịch trình các phiên sự kiện?',
+        '📍 Sơ đồ hội trường & Bãi đỗ xe?',
+      ];
+    }
+    if (role === 'STAFF') {
+      return [
+        '🎟️ Tỷ lệ check-in hiện tại bao nhiêu?',
+        '🎟️ Hướng dẫn check-in QR vào cổng?',
+        '📍 Sơ đồ hội trường & Bãi đỗ xe?',
+        '☕ Teabreak & Mật khẩu WiFi?',
+      ];
+    }
+    if (role === 'SPEAKER') {
+      return [
+        '🎤 Phiên diễn thuyết của tôi ở phòng nào?',
+        '📅 Lịch trình hôm nay như thế nào?',
+        '📍 Sơ đồ hội trường & Bãi đỗ xe?',
+        '☕ Teabreak & Mật khẩu WiFi?',
+      ];
+    }
+    return [
+      '☕ Teabreak & Mật khẩu WiFi?',
+      '🎟️ Hướng dẫn check-in QR vào cổng?',
+      '📍 Sơ đồ hội trường & Bãi đỗ xe?',
+      '📅 Lịch trình hôm nay như thế nào?',
+    ];
+  }, [userRole]);
 
   useEffect(() => {
     const loadSessions = async () => {
@@ -48,15 +84,56 @@ export const FloatingChatbot: React.FC = () => {
     loadSessions();
   }, [activeEvent.id]);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome-1',
-      sender: 'ai',
-      text: `Xin chào quý khách! Em là Trợ Lý Sự Kiện Thông Minh EventHub AI. Em rất hân hạnh được hỗ trợ Anh/Chị thông tin về WiFi (${wifiName}), lịch trình, địa điểm (${activeEvent.location}) và dịch vụ hôm nay!`,
-      timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      sources: ['Event Context Auto-Loaded'],
-    },
-  ]);
+  // Dynamic Initial Welcome Message tailored to Role
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  const resetWelcomeMessage = () => {
+    const role = (userRole || 'ATTENDEE').toUpperCase();
+    let welcomeDesc = 'Xin chào bạn! Em là Trợ Lý AI Toàn Năng EventHub Copilot. Em có thể hỗ trợ bạn tra cứu toàn bộ danh mục sự kiện, kiểm tra sự kiện đang diễn ra hôm nay, lịch trình các phiên, địa điểm và vé cá nhân!';
+    if (role === 'ADMIN' || role === 'EVENT_MANAGER') {
+      welcomeDesc = `Xin chào Quản trị viên ${user?.full_name || 'Admin'}! Em là Autonomous AI Copilot toàn năng, sẵn sàng tra cứu dữ liệu PostgreSQL real-time (tỷ lệ check-in, số lượng sự kiện, thống kê vé) và hỗ trợ quản trị sự kiện.`;
+    } else if (role === 'STAFF') {
+      welcomeDesc = `Xin chào Nhân viên ${user?.full_name || 'Staff'}! Em là AI Copilot hỗ trợ kiểm tra tiến độ soát vé, tỷ lệ check-in và điều phối sảnh hội nghị.`;
+    } else if (role === 'SPEAKER') {
+      welcomeDesc = `Kính chào Diễn giả ${user?.full_name || 'Speaker'}! Em là AI Copilot hỗ trợ kiểm tra phòng thuyết trình, lịch trình cá nhân và feedback từ khán giả.`;
+    }
+
+    const initialSuggestions = role === 'ADMIN' || role === 'EVENT_MANAGER'
+      ? [
+          '📊 Báo cáo tỷ lệ check-in và số lượng sự kiện?',
+          '🎟️ Thống kê tổng số vé đã đăng ký?',
+          '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+        ]
+      : [
+          '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
+          '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+          '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+        ];
+
+    setMessages([
+      {
+        id: `welcome-${Date.now()}`,
+        sender: 'ai',
+        text: welcomeDesc,
+        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        sources: ['PostgreSQL & AI Copilot Auto-Loaded'],
+        actionLinks: role === 'ADMIN' || role === 'EVENT_MANAGER'
+          ? [
+              { label: '📊 Bảng Điều Khiển', url: '/dashboard' },
+              { label: '🔗 Danh mục sự kiện', url: '/events' },
+            ]
+          : [
+              { label: '🔗 Danh mục sự kiện', url: '/events' },
+              { label: '🎟️ Vé của tôi', url: '/registrations' },
+            ],
+        suggestedQuestions: initialSuggestions,
+      },
+    ]);
+  };
+
+  useEffect(() => {
+    resetWelcomeMessage();
+  }, [userRole, user?.full_name]);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -85,63 +162,44 @@ export const FloatingChatbot: React.FC = () => {
     setInputQuery('');
     setLoading(true);
 
-    const q = query.toLowerCase();
+    const historyPayload = messages.slice(-6).map((m) => ({
+      sender: m.sender,
+      text: m.text,
+    }));
 
+    // Task 93: Remove event context lock - only pass specific eventId if explicitly on an event page
+    const pathname = window.location.pathname;
+    const eventDetailMatch = pathname.match(/^\/events\/(\d+)$/);
+    const contextualEventId = eventDetailMatch ? parseInt(eventDetailMatch[1], 10) : undefined;
 
-    // ── Tiered WiFi Query Resolution ──
-    if (q.includes('wifi') || q.includes('mật khẩu') || q.includes('pass') || q.includes('ssid') || q.includes('mạng') || q.includes('internet')) {
-      // Check if asking for a specific room or speaker session
-      const matchedSession = sessions.find((s) => {
-        const roomMatch = s.room_location && q.includes(s.room_location.toLowerCase());
-        const speakerMatch = s.speaker_name && q.includes(s.speaker_name.toLowerCase());
-        const titleMatch = s.title && q.includes(s.title.toLowerCase());
-        return (roomMatch || speakerMatch || titleMatch) && (s.wifiName || s.wifiPassword);
+    try {
+      const response = await apiService.sendAttendeeChat(query, contextualEventId, {
+        history: historyPayload,
+        user_id: user?.id,
+        role: userRole,
       });
 
-      if (matchedSession) {
-        setTimeout(() => {
-          const roomWifiMsg: ChatMessage = {
-            id: `ai-room-wifi-${Date.now()}`,
-            sender: 'ai',
-            text: `Dạ kính chào Anh/Chị! Thông tin kết nối WiFi riêng tại **${matchedSession.room_location}** (Diễn giả: ${matchedSession.speaker_name} — "${matchedSession.title}") như sau:\n\n📶 **Mạng WiFi Phòng (SSID):** \`${matchedSession.wifiName || wifiName}\`\n🔑 **Mật khẩu:** \`${matchedSession.wifiPassword || wifiPass}\`\n\n*Ngoài ra, Anh/Chị cũng có thể dùng mạng tổng sự kiện: SSID \`${wifiName}\` / Pass \`${wifiPass}\`.*`,
-            timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-            sources: [`Room Session Config — ${matchedSession.room_location}`],
-            isFallback: false,
-          };
-          setMessages((prev) => [...prev, roomWifiMsg]);
-          setLoading(false);
-        }, 400);
-        return;
-      }
-
-      // General WiFi Query
-      setTimeout(() => {
-        const wifiMsg: ChatMessage = {
-          id: `ai-wifi-${Date.now()}`,
-          sender: 'ai',
-          text: `Dạ kính chào Anh/Chị! Thông tin kết nối mạng WiFi tại sự kiện **${activeEvent.title}** như sau:\n\n📶 **Mạng WiFi Tổng (SSID):** \`${wifiName}\`\n🔑 **Mật khẩu:** \`${wifiPass}\`\n\n💡 **WiFi Theo Phòng Họp / Session:**\n- **Grand Ballroom A:** \`EventHub_GrandBallroomA\` (Pass: \`BallroomA2026@Pass\`)\n- **Grand Ballroom B:** \`EventHub_GrandBallroomB\` (Pass: \`BallroomB2026@Pass\`)\n- **Phòng Workshop B1:** \`EventHub_WorkshopB1\` (Pass: \`WorkshopB1@Pass\`)\n- **Sảnh Gala:** \`EventHub_GalaLounge\` (Pass: \`GalaLounge@2026\`)`,
-          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-          sources: ['Active Event & Session Config'],
-          isFallback: false,
-        };
-        setMessages((prev) => [...prev, wifiMsg]);
-        setLoading(false);
-      }, 400);
-      return;
-    }
-
-    // Priority 2 & 3: RAG Query + Hybrid Gemini Reasoning
-    try {
-      const response = await apiService.sendAttendeeChat(query, activeEvent.id || 1);
-
       let answerText = response.answer;
-      let sourcesList = response.sources && response.sources.length > 0 ? response.sources : ['RAG Knowledge Base & Gemini AI'];
+      let sourcesList = response.sources && response.sources.length > 0 ? response.sources : ['PostgreSQL Real-Time & Gemini AI'];
 
-      // If answerText is empty, provide a clean direct prompt
       if (!answerText) {
-        answerText = `Dạ hiện chưa có thông tin chi tiết về nội dung này. Bạn có thể hỏi tôi về lịch trình, diễn giả, phòng họp, WiFi hoặc dịch vụ tại sự kiện **${activeEvent.title}** nhé!`;
-        sourcesList = ['Event Context'];
+        answerText = 'Dạ hiện tại em chưa tìm thấy thông tin chi tiết về nội dung này trong CSDL PostgreSQL. Bạn có thể kiểm tra danh sách sự kiện đầy đủ tại:\n\n[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events)';
+        sourcesList = ['CSDL PostgreSQL Events'];
       }
+
+      const rawChips =
+        (response as any).suggestions ||
+        (response as any).chips ||
+        response.suggested_questions ||
+        (response as any).suggestedQuestions ||
+        [];
+      const suggestedQuestions = Array.isArray(rawChips) && rawChips.length > 0
+        ? rawChips
+        : [
+            '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
+            '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+            '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+          ];
 
       const aiMsg: ChatMessage = {
         id: `ai-${Date.now()}`,
@@ -149,65 +207,118 @@ export const FloatingChatbot: React.FC = () => {
         text: answerText,
         timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         sources: sourcesList,
-        isFallback: false,
+        isFallback: response.is_fallback,
+        isEscalatedToStaff: response.ai_category === 'HUMAN_STAFF_ESCALATION' || !!response.is_escalated_to_staff,
+        aiCategory: response.ai_category,
+        actionLinks: response.action_links,
+        suggestedQuestions,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
-    } catch {
-      // Graceful natural fallback — no user query echo
-      const fallbackAiMsg: ChatMessage = {
-        id: `ai-hybrid-${Date.now()}`,
-        sender: 'ai',
-        text: `Xin lỗi, hệ thống đang bận. Bạn có thể hỏi tôi về WiFi (\`${wifiName}\`), lịch trình hoặc địa điểm sự kiện **${activeEvent.title}** — tôi sẵn sàng hỗ trợ ngay!`,
-        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        sources: ['Gemini Intelligent Reasoning', 'Event Context'],
-        isFallback: false,
-      };
-      setMessages((prev) => [...prev, fallbackAiMsg]);
+    } catch (err) {
+      console.warn('Chat request fallback error:', err);
+      try {
+        const liveEvents = await apiService.getEvents();
+        const clientRes = executeClientAutonomousCopilot({
+          question: query,
+          events: liveEvents,
+          eventId: contextualEventId,
+          userId: user?.id,
+          role: userRole,
+          history: historyPayload,
+        });
+        const rawClientChips =
+          (clientRes as any).suggestions ||
+          (clientRes as any).chips ||
+          clientRes.suggested_questions ||
+          (clientRes as any).suggestedQuestions ||
+          [];
+        const fallbackChips = Array.isArray(rawClientChips) && rawClientChips.length > 0
+          ? rawClientChips
+          : [
+              '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
+              '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+              '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+            ];
+        const fallbackAiMsg: ChatMessage = {
+          id: `ai-hybrid-${Date.now()}`,
+          sender: 'ai',
+          text: clientRes.answer,
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          sources: clientRes.sources && clientRes.sources.length > 0 ? clientRes.sources : ['PostgreSQL Events (Live Real-Time)'],
+          isFallback: clientRes.is_fallback,
+          isEscalatedToStaff: clientRes.ai_category === 'HUMAN_STAFF_ESCALATION' || !!(clientRes as any).is_escalated_to_staff,
+          aiCategory: clientRes.ai_category,
+          actionLinks: clientRes.action_links,
+          suggestedQuestions: fallbackChips,
+        };
+        setMessages((prev) => [...prev, fallbackAiMsg]);
+      } catch {
+        const fallbackAiMsg: ChatMessage = {
+          id: `ai-hybrid-${Date.now()}`,
+          sender: 'ai',
+          text: `Hệ thống AI Copilot đang kết nối CSDL EventHub. Bạn có thể hỏi tôi về bất kỳ sự kiện nào trong danh mục hoặc sự kiện đang diễn ra hôm nay!\n\n[ 🔗 Chuyển đến trang Danh mục sự kiện ](/events)`,
+          timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+          sources: ['EventHub Events (Global)'],
+          isFallback: false,
+          actionLinks: [
+            { label: '🔗 Danh mục sự kiện', url: '/events' },
+          ],
+          suggestedQuestions: [
+            '🔴 Hôm nay có sự kiện nào đang diễn ra không?',
+            '🎟️ Các phân hạng vé hiện có trong hệ thống?',
+            '📅 Lịch trình các phiên sự kiện tiêu biểu?',
+          ],
+        };
+        setMessages((prev) => [...prev, fallbackAiMsg]);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleResetChat = () => {
-    setMessages([
-      {
-        id: `welcome-${Date.now()}`,
-        sender: 'ai',
-        text: `Cuộc trò chuyện đã được làm mới. Em là AI Concierge của sự kiện **${activeEvent.title}**. Em có thể giúp gì thêm cho Anh/Chị hôm nay?`,
-        timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-        sources: ['Event Context Auto-Loaded'],
-      },
-    ]);
-  };
-
   /** Parse inline markdown: **bold**, `code`, and [text](url) clickable links */
   const parseInline = (raw: string): React.ReactNode[] => {
     const parts: React.ReactNode[] = [];
-    // Combined regex: links, bold, inline code
     const regex = /\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|`([^`]+)`/g;
     let last = 0;
     let m: RegExpExecArray | null;
     while ((m = regex.exec(raw)) !== null) {
       if (m.index > last) parts.push(raw.slice(last, m.index));
       if (m[1] && m[2]) {
-        // Markdown link [label](url)
+        const label = m[1];
+        const url = m[2];
+        const isInternal = url.startsWith('/');
         parts.push(
-          <a
-            key={m.index}
-            href={m[2]}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-300 underline underline-offset-2 hover:text-indigo-100 transition-colors"
-          >
-            {m[1]}
-          </a>
+          isInternal ? (
+            <button
+              key={m.index}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(url);
+              }}
+              className="inline-flex items-center gap-1 mx-1 my-0.5 px-2.5 py-1 bg-red-600/30 hover:bg-red-600/50 border border-red-500/50 text-red-200 hover:text-white rounded-lg font-bold text-[11px] transition-all cursor-pointer shadow-xs"
+            >
+              <span>{label}</span>
+              <ArrowRight className="w-3 h-3 text-red-400" />
+            </button>
+          ) : (
+            <a
+              key={m.index}
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 mx-1 my-0.5 px-2.5 py-1 bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-200 hover:text-white rounded-lg font-bold text-[11px] transition-all"
+            >
+              <span>{label}</span>
+              <ExternalLink className="w-3 h-3 text-indigo-300" />
+            </a>
+          )
         );
       } else if (m[3]) {
-        // **bold**
         parts.push(<strong key={m.index} className="font-semibold text-white">{m[3]}</strong>);
       } else if (m[4]) {
-        // `code`
         parts.push(<code key={m.index} className="bg-slate-700 text-emerald-300 px-1 rounded font-mono text-[11px]">{m[4]}</code>);
       }
       last = m.index + m[0].length;
@@ -260,8 +371,8 @@ export const FloatingChatbot: React.FC = () => {
             setIsOpen(true);
             setIsMinimized(false);
           }}
-          className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative"
-          aria-label="Open AI Concierge Chatbot"
+          className="w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30 flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative"
+          aria-label="Open AI Copilot"
         >
           <Sparkles className="w-7 h-7 text-white" />
           <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-400 border-2 border-white"></span>
@@ -270,32 +381,32 @@ export const FloatingChatbot: React.FC = () => {
 
       {/* Chat Popup Window */}
       {isOpen && !isMinimized && (
-        <div className="w-[92vw] sm:w-[420px] h-[590px] max-h-[85vh] bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-3xl shadow-2xl shadow-indigo-950/80 flex flex-col overflow-hidden animate-fade-in transition-all">
+        <div className="w-[92vw] sm:w-[440px] h-[610px] max-h-[85vh] bg-slate-900/95 backdrop-blur-xl border border-slate-700/80 rounded-3xl shadow-2xl shadow-slate-950/80 flex flex-col overflow-hidden animate-fade-in transition-all">
           {/* Header */}
-          <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 border-b border-slate-800/80 flex items-center justify-between">
+          <div className="px-5 py-4 bg-gradient-to-r from-slate-950 via-red-950 to-slate-900 border-b border-slate-800/80 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 p-0.5 shadow-md">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-400 p-0.5 shadow-md">
                   <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-                    <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse-subtle" />
+                    <Sparkles className="w-5 h-5 text-red-400 animate-pulse-subtle" />
                   </div>
                 </div>
                 <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-extrabold text-white tracking-tight">EventHub AI Assistant</h3>
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded">
-                    RAG + Gemini 1.5
+                  <h3 className="text-sm font-extrabold text-white tracking-tight">EventHub AI Copilot</h3>
+                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-red-500/20 text-red-300 border border-red-500/30 rounded">
+                    {userRole || 'ATTENDEE'}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 truncate max-w-[200px]">{activeEvent.title}</p>
+                <p className="text-[11px] text-slate-400 truncate max-w-[210px]">{activeEvent.title}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-1">
               <button
-                onClick={handleResetChat}
+                onClick={resetWelcomeMessage}
                 title="Làm mới đoạn chat"
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors cursor-pointer"
               >
@@ -319,13 +430,13 @@ export const FloatingChatbot: React.FC = () => {
           </div>
 
           {/* Active WiFi Context Pill Header */}
-          <div className="px-4 py-1.5 bg-indigo-950/80 border-b border-indigo-900/60 flex items-center justify-between text-[11px]">
-            <div className="flex items-center gap-1.5 text-indigo-300 font-semibold">
-              <Wifi className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-              <span>WiFi: <code className="text-white bg-indigo-900 px-1 rounded font-mono">{wifiName}</code></span>
+          <div className="px-4 py-1.5 bg-red-950/80 border-b border-red-900/60 flex items-center justify-between text-[11px]">
+            <div className="flex items-center gap-1.5 text-red-200 font-semibold">
+              <Wifi className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              <span>WiFi: <code className="text-white bg-red-900 px-1 rounded font-mono">{wifiName}</code></span>
             </div>
-            <div className="text-indigo-300 font-semibold">
-              <span>Pass: <code className="text-white bg-indigo-900 px-1 rounded font-mono">{wifiPass}</code></span>
+            <div className="text-red-200 font-semibold">
+              <span>Pass: <code className="text-white bg-red-900 px-1 rounded font-mono">{wifiPass}</code></span>
             </div>
           </div>
 
@@ -342,8 +453,8 @@ export const FloatingChatbot: React.FC = () => {
                 <div
                   className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                     msg.sender === 'user'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-slate-800 border border-slate-700 text-indigo-400'
+                      ? 'bg-red-600 text-white'
+                      : 'bg-slate-800 border border-slate-700 text-red-400'
                   }`}
                 >
                   {msg.sender === 'user' ? (
@@ -355,9 +466,9 @@ export const FloatingChatbot: React.FC = () => {
 
                 {/* Message Bubble */}
                 <div
-                  className={`max-w-[82%] rounded-2xl p-3.5 space-y-2 leading-relaxed ${
+                  className={`max-w-[85%] rounded-2xl p-3.5 space-y-2 leading-relaxed ${
                     msg.sender === 'user'
-                      ? 'bg-indigo-600 text-white rounded-tr-none shadow-md'
+                      ? 'bg-red-600 text-white rounded-tr-none shadow-md'
                       : 'bg-slate-800/90 border border-slate-700/80 text-slate-100 rounded-tl-none shadow-sm'
                   }`}
                 >
@@ -367,8 +478,31 @@ export const FloatingChatbot: React.FC = () => {
                     <p className="text-xs whitespace-pre-wrap">{msg.text}</p>
                   )}
 
-                  {/* Fallback Badge */}
-                  {msg.isFallback && (
+                  {/* Smart Action Widgets */}
+                  {msg.actionLinks && msg.actionLinks.length > 0 && (
+                    <div className="pt-2 flex flex-wrap gap-1.5 border-t border-slate-700/50">
+                      {msg.actionLinks.map((action, aIdx) => (
+                        <button
+                          key={aIdx}
+                          type="button"
+                          onClick={() => {
+                            if (action.url.startsWith('/')) {
+                              navigate(action.url);
+                            } else {
+                              window.open(action.url, '_blank', 'noopener,noreferrer');
+                            }
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-600/25 hover:bg-red-600/40 border border-red-500/40 text-red-200 hover:text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer shadow-2xs"
+                        >
+                          <span>{action.label}</span>
+                          <ArrowRight className="w-3 h-3 text-red-400" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Staff Escalation Badge (Only displayed when user asks for human support / escalation) */}
+                  {(msg.isEscalatedToStaff || msg.aiCategory === 'HUMAN_STAFF_ESCALATION') && (
                     <div className="flex items-center gap-1.5 text-[10px] text-amber-300 bg-amber-950/60 border border-amber-800/50 px-2 py-1 rounded-lg">
                       <HelpCircle className="w-3 h-3 text-amber-400 shrink-0" />
                       <span>Đã chuyển thắc mắc tới Bảng Điều Khiển Nhân Viên</span>
@@ -376,21 +510,55 @@ export const FloatingChatbot: React.FC = () => {
                   )}
 
                   {/* Sources / Knowledge Base Citation */}
-                  {msg.sender === 'ai' && !msg.isFallback && (
+                  {msg.sender === 'ai' && !(msg.isEscalatedToStaff || msg.aiCategory === 'HUMAN_STAFF_ESCALATION') && (
                     <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 text-[10px] text-indigo-300 font-medium truncate">
-                        <BookOpen className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                        <span className="truncate">Nguồn: {msg.sources?.[0] || 'Cơ sở tri thức sự kiện'}</span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-red-300 font-medium truncate">
+                        <BookOpen className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                        <span className="truncate">Nguồn: {msg.sources?.[0] || 'Cơ sở dữ liệu sự kiện thời gian thực'}</span>
                       </div>
-                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-indigo-950 border border-indigo-800/70 text-indigo-300 shrink-0">
-                        Hybrid AI
+
+                      <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-red-950 border border-red-800/70 text-red-300 shrink-0">
+                        AI Copilot
                       </span>
                     </div>
                   )}
 
+                  {/* Gemini-style Dynamic Pill Suggestion Chips */}
+                  {msg.sender === 'ai' && (() => {
+                    const chips =
+                      msg.suggestedQuestions ||
+                      (msg as any).suggested_questions ||
+                      (msg as any).suggestions ||
+                      (msg as any).chips ||
+                      [];
+                    if (!chips || chips.length === 0) return null;
+                    return (
+                      <div className="pt-2.5 flex flex-col gap-1.5 border-t border-slate-700/50">
+                        <div className="text-[10px] font-semibold text-slate-400 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-cyan-400" />
+                          <span>Gợi ý câu hỏi tiếp theo:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {chips.slice(0, 3).map((chip: string, cIdx: number) => (
+                            <button
+                              key={cIdx}
+                              type="button"
+                              disabled={loading}
+                              onClick={() => handleSendMessage(chip)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-700/90 border border-slate-600/70 hover:border-cyan-500/60 text-slate-200 hover:text-cyan-200 text-[11px] font-medium transition-all shadow-sm cursor-pointer disabled:opacity-50 text-left active:scale-95"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0"></span>
+                              <span>{chip}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <span
                     className={`block text-[9px] ${
-                      msg.sender === 'user' ? 'text-indigo-200 text-right' : 'text-slate-500'
+                      msg.sender === 'user' ? 'text-red-200 text-right' : 'text-slate-500'
                     }`}
                   >
                     {msg.timestamp}
@@ -402,16 +570,16 @@ export const FloatingChatbot: React.FC = () => {
             {/* Typing / Analyzing Indicator */}
             {loading && (
               <div className="flex items-start gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-indigo-400 shrink-0">
+                <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-red-400 shrink-0">
                   <Bot className="w-4 h-4" />
                 </div>
                 <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl rounded-tl-none p-3 text-xs text-slate-400 flex items-center gap-2">
                   <div className="flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></span>
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
+                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-bounce"></span>
+                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                    <span className="w-1.5 h-1.5 bg-red-400 rounded-full animate-bounce [animation-delay:0.4s]"></span>
                   </div>
-                  <span className="text-[11px] text-slate-300 font-medium">Hybrid RAG &amp; Gemini AI đang suy luận...</span>
+                  <span className="text-[11px] text-slate-300 font-medium">AI Copilot đang truy vấn PostgreSQL &amp; suy luận...</span>
                 </div>
               </div>
             )}
@@ -421,7 +589,7 @@ export const FloatingChatbot: React.FC = () => {
 
           {/* Quick Suggestions */}
           <div className="px-4 py-2 bg-slate-950/80 border-t border-slate-800/80 overflow-x-auto flex gap-1.5 scrollbar-none">
-            {QUICK_SUGGESTIONS.map((chip, idx) => (
+            {roleSuggestions.map((chip, idx) => (
               <button
                 key={idx}
                 onClick={() => handleSendMessage(chip)}
@@ -459,9 +627,13 @@ export const FloatingChatbot: React.FC = () => {
                     handleSendMessage();
                   }
                 }}
-                placeholder="Hỏi về WiFi tổng, WiFi phòng họp, lịch trình..."
+                placeholder={
+                  userRole === 'ADMIN' || userRole === 'EVENT_MANAGER'
+                    ? 'Hỏi về tỷ lệ check-in, số lượng sự kiện, thống kê vé...'
+                    : 'Hỏi về lịch trình, phòng họp, WiFi, vé của bạn...'
+                }
                 disabled={loading}
-                className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500 transition-colors"
               />
               <button
                 type="button"
@@ -473,7 +645,7 @@ export const FloatingChatbot: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading || !inputQuery.trim()}
-                className="p-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
+                className="p-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white rounded-xl shadow-md shadow-red-600/30 transition-all cursor-pointer"
                 title="Gửi câu hỏi"
               >
                 <Send className="w-4 h-4" />
@@ -481,9 +653,9 @@ export const FloatingChatbot: React.FC = () => {
             </div>
             <div className="mt-1.5 px-1 flex items-center justify-between text-[10px] text-slate-500">
               <span className="flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-emerald-400" /> RAG + Gemini AI Concierge · UTC+7
+                <ShieldCheck className="w-3 h-3 text-emerald-400" /> PostgreSQL Tools + RBAC Guardrails
               </span>
-              <span>Google Maps · Real-time VN</span>
+              <span>Multi-turn Memory · UTC+7</span>
             </div>
           </form>
         </div>
@@ -493,7 +665,7 @@ export const FloatingChatbot: React.FC = () => {
       {isOpen && isMinimized && (
         <button
           onClick={() => setIsMinimized(false)}
-          className="w-14 h-14 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative"
+          className="w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30 flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer relative"
         >
           <Sparkles className="w-7 h-7 text-white" />
           <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-emerald-400 border-2 border-white"></span>

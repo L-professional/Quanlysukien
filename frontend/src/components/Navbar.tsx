@@ -22,6 +22,7 @@ const ROLE_BADGE: Record<string, { label: string; icon: any; color: string }> = 
   PARTICIPANT: { label: 'Attendee', icon: Ticket, color: 'bg-slate-600/30 text-slate-300 border border-slate-600/40' },
 };
 
+
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   setActiveTab,
@@ -41,7 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'scanner', label: 'Soát Vé QR', roles: ['ADMIN', 'STAFF', 'EVENT_MANAGER'] },
     { id: 'inquiries', label: 'Hỏi Đáp AI HITL', icon: Bot, roles: ['ADMIN', 'STAFF'], badge: pendingCount },
     { id: 'users', label: 'Quản Trị User', icon: Users, roles: ['ADMIN'] },
-  ].filter((item) => item.roles.includes(userRole));
+  ].filter((item) => Array.isArray(item.roles) && userRole && item.roles.includes(userRole));
 
   return (
     <header className="sticky top-0 z-50 glass-panel border-b border-slate-800/80 px-6 py-3.5 flex items-center justify-between">

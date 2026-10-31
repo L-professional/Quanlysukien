@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Event } from '../types';
 import { apiService } from '../services/api';
+import { useEventSync } from '../services/eventSync';
 
 interface EventContextType {
   events: Event[];
@@ -16,7 +17,7 @@ interface EventContextType {
 
 const DEFAULT_EVENT: Event = {
   id: 1,
-  title: 'EventHub AI Summit 2026',
+  title: 'AI Summit Vietnam 2026: Kiến Tạo Tương Lai Số',
   description: 'Hội thảo quốc tế hàng đầu về Generative AI, RAG Vector Search và Tự Động Hóa Quản Trị Sự Kiện.',
   category_id: 1,
   location: 'GEM Center, TP. Hồ Chí Minh',
@@ -26,16 +27,16 @@ const DEFAULT_EVENT: Event = {
   end_time: '16 Oct 2026, 17:30 PM',
   start_date: '15/10/2026 08:30',
   end_date: '16/10/2026 17:30',
-  status: 'ONGOING',
+  status: 'PUBLISHED',
   wifiName: 'EventHub_VIP_Guest',
   wifiPassword: 'EventHub2026!',
 };
 
 const EventContext = createContext<EventContextType>({
-  events: [DEFAULT_EVENT],
+  events: [],
   activeEvent: DEFAULT_EVENT,
   isLoadingEvents: false,
-  refreshEvents: async () => [DEFAULT_EVENT],
+  refreshEvents: async () => [],
   setActiveEvent: () => {},
   selectEventById: () => {},
   updateActiveEvent: () => {},
@@ -44,7 +45,7 @@ const EventContext = createContext<EventContextType>({
 });
 
 export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [events, setEvents] = useState<Event[]>([DEFAULT_EVENT]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [activeEvent, setActiveEventState] = useState<Event>(DEFAULT_EVENT);
   const [isLoadingEvents, setIsLoadingEvents] = useState<boolean>(false);
 
@@ -63,20 +64,16 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (matched) {
           setActiveEventState(matched);
         } else if (fetched.length > 0) {
-          // If activeEvent is default or not in fetched list, pick the first
-          setActiveEventState((prev) => {
-            const currentExists = fetched.find((e) => e.id === prev.id);
-            return currentExists || fetched[0];
-          });
-        } else {
-          setActiveEventState(DEFAULT_EVENT);
+          setActiveEventState(fetched[0]);
         }
         return fetched;
       }
-      return [DEFAULT_EVENT];
+      setEvents([]);
+      return [];
     } catch (err) {
-      console.warn('Failed to load events list:', err);
-      return [DEFAULT_EVENT];
+      console.warn('Failed to load events list from database:', err);
+      setEvents([]);
+      return [];
     } finally {
       setIsLoadingEvents(false);
     }
@@ -86,6 +83,12 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     refreshEvents();
   }, [refreshEvents]);
 
+  useEventSync(
+    useCallback(() => {
+      refreshEvents();
+    }, [refreshEvents])
+  );
+
   const setActiveEvent = (event: Event) => {
     setActiveEventState(event);
     if (event.id) {
@@ -94,7 +97,8 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const selectEventById = (id: number) => {
-    const found = events.find((e) => e.id === id);
+    const safeEvents = Array.isArray(events) ? events : [];
+    const found = safeEvents.find((e) => e.id === id);
     if (found) {
       setActiveEvent(found);
     }
@@ -104,16 +108,18 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setActiveEventState((prev) => {
       const merged = { ...prev, ...updated };
       // Also update in events array
-      setEvents((currentEvents) =>
-        currentEvents.map((e) => (e.id === merged.id ? { ...e, ...merged } : e))
-      );
+      setEvents((currentEvents) => {
+        const safeCurrent = Array.isArray(currentEvents) ? currentEvents : [];
+        return safeCurrent.map((e) => (e.id === merged.id ? { ...e, ...merged } : e));
+      });
       return merged;
     });
   };
 
   const removeEvent = (id: number) => {
     setEvents((prev) => {
-      const filtered = prev.filter((e) => e.id !== id);
+      const safePrev = Array.isArray(prev) ? prev : [];
+      const filtered = safePrev.filter((e) => e.id !== id);
       if (activeEvent.id === id) {
         if (filtered.length > 0) {
           setActiveEvent(filtered[0]);
@@ -126,7 +132,10 @@ export const EventProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const addEvent = (newEvent: Event) => {
-    setEvents((prev) => [newEvent, ...prev.filter((e) => e.id !== newEvent.id)]);
+    setEvents((prev) => {
+      const safePrev = Array.isArray(prev) ? prev : [];
+      return [newEvent, ...safePrev.filter((e) => e.id !== newEvent.id)];
+    });
     setActiveEvent(newEvent);
   };
 

@@ -262,7 +262,17 @@
     "hashtags": "Thẻ Hashtags",
     "smsNotification": "Tin Nhắn SMS / Push Notification",
     "preview": "Xem trước nội dung",
-    "loadingSkeleton": "Đang khởi tạo bài viết và tối ưu đa kênh..."
+    "loadingSkeleton": "Đang khởi tạo bài viết và tối ưu đa kênh...",
+    "emailCampaign": "Bản Tin Email (Campaign)",
+    "facebookLinkedin": "Facebook & LinkedIn",
+    "zaloSms": "Zalo OA & SMS",
+    "pressRelease": "Thông Cáo Báo Chí",
+    "aiScore": "AI Performance Score",
+    "abTesting": "Tạo 3 Biến Thể A/B",
+    "dispatchPublish": "Duyệt Bài AI & Phát Hành",
+    "testSend": "Gửi Thử Nghiệm",
+    "marketingBanner": "Ảnh Banner Đính Kèm",
+    "generateAIBanner": "Sinh Banner Marketing AI"
   },
   "knowledge": {
     "title": "Kho Tri Thức RAG (Knowledge Base)",

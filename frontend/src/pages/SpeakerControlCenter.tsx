@@ -200,9 +200,10 @@ export const SpeakerControlCenter: React.FC = () => {
   const handleDeleteResource = async (resId: number) => {
     try {
       await apiService.deleteSpeakerResource(resId);
-      setResources((prev) => prev.filter((r) => r.id !== resId));
-      if (resources.length > 1) {
-        const remaining = resources.filter((r) => r.id !== resId);
+      setResources((prev) => (Array.isArray(prev) ? prev : []).filter((r) => r.id !== resId));
+      const safeRes = Array.isArray(resources) ? resources : [];
+      if (safeRes.length > 1) {
+        const remaining = safeRes.filter((r) => r.id !== resId);
         setActiveSlideUrl(remaining[0]?.file_url || '');
       } else {
         setActiveSlideUrl('');

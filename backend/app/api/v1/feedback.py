@@ -3,7 +3,8 @@ import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, Form
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import select, func, desc, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -680,3 +681,363 @@ Chỉ trả về JSON, không thêm lời mở đầu hay kết thúc.
         "analyzed_at": datetime.now(timezone.utc).isoformat(),
         "data": parsed_result,
     }
+
+
+# -------------------------------------------------------------
+# Task 100: Interactive 1-Click Post-Event Quick Rating System
+# -------------------------------------------------------------
+
+def render_quick_rate_landing_html(
+    event_title: str,
+    rating: int,
+    feedback_id: int,
+    comment: Optional[str] = None,
+    is_updated: bool = False,
+    app_url: str = "http://localhost:3000",
+) -> str:
+    """Render a responsive, modern HTML landing page for passwordless post-event rating."""
+    score_labels = {
+        1: ("Rất thất vọng", "#EF4444", "Chúng tôi rất tiếc vì trải nghiệm chưa trọn vẹn. Ban Tổ Chức sẽ nghiêm túc tiếp thu để khắc phục ngay."),
+        2: ("Cần cải thiện", "#F97316", "Cảm ơn bạn đã phản hồi thẳng thắn. Chúng tôi sẽ nâng cấp các điểm chưa tốt."),
+        3: ("Bình thường", "#F59E0B", "Cảm ơn bạn đã tham gia. Chúng tôi sẽ nỗ lực hơn nữa để mang đến trải nghiệm xuất sắc hơn."),
+        4: ("Hài lòng", "#10B981", "Tuyệt vời! Cảm ơn bạn đã đồng hành và hài lòng với sự kiện."),
+        5: ("Xuất sắc! Tuyệt vời", "#6366F1", "Thật tuyệt vời! Ban Tổ Chức vô cùng vinh hạnh khi mang lại trải nghiệm hoàn hảo cho bạn!"),
+    }
+    label, color, desc = score_labels.get(rating, ("Đã đánh giá", "#6366F1", "Cảm ơn bạn đã gửi phản hồi!"))
+
+    stars_html = ""
+    for s in range(1, 6):
+        fill_color = "#FBBF24" if s <= rating else "#D1D5DB"
+        stars_html += f"""
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="{fill_color}" width="36" height="36" style="display:inline-block; margin: 0 3px;">
+          <path fill-rule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clip-rule="evenodd" />
+        </svg>
+        """
+
+    feedback_notice = ""
+    if is_updated:
+        feedback_notice = f"""
+        <div style="background-color: #ECFDF5; border: 1.5px solid #A7F3D0; border-radius: 12px; padding: 16px; margin: 20px 0; text-align: left;">
+          <div style="display: flex; align-items: center; gap: 8px; color: #065F46; font-weight: 700; font-size: 14px; margin-bottom: 6px;">
+            <span>🎉</span> <span>Ý kiến đóng góp đã được ghi nhận thành công!</span>
+          </div>
+          <p style="margin: 0; color: #047857; font-size: 13px; line-height: 1.5; font-style: italic;">
+            "{comment or 'Cảm ơn đóng góp quý báu của bạn!'}"
+          </p>
+        </div>
+        """
+    else:
+        feedback_notice = f"""
+        <form action="/api/v1/feedback/quick-rate/comment" method="POST" style="margin-top: 24px; text-align: left;">
+          <input type="hidden" name="feedback_id" value="{feedback_id}" />
+          <label style="display: block; font-size: 13px; font-weight: 700; color: #374151; margin-bottom: 8px;">
+            💬 Bạn có chia sẻ hoặc góp ý thêm cho Ban Tổ Chức? (Không bắt buộc)
+          </label>
+          <textarea name="comment" rows="3" placeholder="Chia sẻ thêm cảm nhận về diễn giả, nội dung, cơ sở vật chất hoặc điều cần cải thiện..." style="width: 100%; box-sizing: border-box; padding: 12px; border: 1.5px solid #D1D5DB; border-radius: 10px; font-size: 13px; font-family: inherit; resize: vertical; outline: none; transition: border-color 0.2s;" onfocus="this.style.borderColor='#6366F1'"></textarea>
+          <button type="submit" style="margin-top: 10px; width: 100%; background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%); color: #FFFFFF; border: none; border-radius: 10px; padding: 12px 18px; font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25); transition: opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
+            Gửi Góp Ý Bổ Sung
+          </button>
+        </form>
+        """
+
+    return f"""<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Khảo Sát Hài Lòng - EventHub AI</title>
+  <style>
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      padding: 40px 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, #0F172A 0%, #1E1B4B 50%, #0F172A 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1F2937;
+    }}
+    .card {{
+      background: #FFFFFF;
+      max-width: 520px;
+      width: 100%;
+      border-radius: 24px;
+      padding: 36px 28px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }}
+    .badge {{
+      display: inline-block;
+      background-color: #EEF2FF;
+      color: #4F46E5;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+    }}
+    .btn-secondary {{
+      display: inline-block;
+      background: #F3F4F6;
+      color: #374151;
+      padding: 10px 16px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      margin: 4px;
+      transition: background 0.2s;
+    }}
+    .btn-secondary:hover {{
+      background: #E5E7EB;
+    }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">✨ KHẢO SÁT HÀI LÒNG SỰ KIỆN</div>
+    
+    <div style="font-size: 48px; line-height: 1; margin-bottom: 12px;">🙏</div>
+    <h1 style="margin: 0 0 8px 0; font-size: 22px; font-weight: 900; color: #111827;">
+      Cảm ơn bạn đã phản hồi!
+    </h1>
+    <div style="color: #6366F1; font-weight: 700; font-size: 15px; margin-bottom: 16px;">
+      {event_title}
+    </div>
+
+    <!-- Rating Visual Display -->
+    <div style="background-color: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 16px; padding: 18px 12px; margin-bottom: 20px;">
+      <div style="margin-bottom: 8px;">
+        {stars_html}
+      </div>
+      <div style="font-size: 17px; font-weight: 800; color: {color}; margin-bottom: 4px;">
+        {rating} / 5 Sao • {label}
+      </div>
+      <p style="margin: 0; font-size: 12px; color: #64748B; line-height: 1.5;">
+        {desc}
+      </p>
+    </div>
+
+    {feedback_notice}
+
+    <!-- Quick Navigation Links -->
+    <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid #F1F5F9;">
+      <div style="font-size: 12px; color: #9CA3AF; margin-bottom: 12px;">Lối tắt tiện ích:</div>
+      <a href="{app_url}/events" class="btn-secondary">📜 Tải E-Certificate & Slide</a>
+      <a href="{app_url}/reports" class="btn-secondary">📊 Báo Cáo Phân Tích</a>
+      <a href="{app_url}" class="btn-secondary">🏠 Về Trang Chủ</a>
+    </div>
+
+    <div style="margin-top: 20px; font-size: 11px; color: #9CA3AF;">
+      Hệ sinh thái Quản lý & Vận hành Sự kiện Thông minh <strong>EventHub AI</strong>
+    </div>
+  </div>
+</body>
+</html>"""
+
+
+@router.get("/quick-rate", response_class=HTMLResponse)
+async def quick_rate_get(
+    request: Request,
+    eventId: Optional[int] = Query(None),
+    event_id: Optional[int] = Query(None),
+    userId: Optional[int] = Query(None),
+    user_id: Optional[int] = Query(None),
+    email: Optional[str] = Query(None),
+    stars: Optional[int] = Query(None),
+    rating: Optional[int] = Query(None),
+    format: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Task 100: Interactive 1-click post-event feedback rating directly from email links.
+    Records score passwordlessly into PostgreSQL feedbacks table.
+    """
+    ev_id = eventId or event_id
+    u_id = userId or user_id
+    star_val = max(1, min(5, stars or rating or 5))
+
+    if not ev_id:
+        return HTMLResponse(
+            content="<h3>Thông số sự kiện không hợp lệ hoặc thiếu eventId.</h3>",
+            status_code=400,
+        )
+
+    # 1. Look up event
+    stmt_evt = select(Event).where(Event.id == ev_id)
+    res_evt = await db.execute(stmt_evt)
+    event_obj = res_evt.scalars().first()
+    if not event_obj:
+        return HTMLResponse(
+            content=f"<h3>Không tìm thấy sự kiện với ID {ev_id}.</h3>",
+            status_code=404,
+        )
+
+    # 2. Resolve user by email if user_id is missing
+    if not u_id and email:
+        clean_email = email.strip().lower()
+        stmt_user = select(User).where(func.lower(User.email) == clean_email)
+        res_user = await db.execute(stmt_user)
+        user_obj = res_user.scalars().first()
+        if user_obj:
+            u_id = user_obj.id
+        else:
+            # Check registration
+            stmt_reg = select(Registration).where(
+                Registration.event_id == ev_id,
+                func.lower(Registration.email) == clean_email
+            )
+            res_reg = await db.execute(stmt_reg)
+            reg_obj = res_reg.scalars().first()
+            if reg_obj and reg_obj.participant_id:
+                u_id = reg_obj.participant_id
+
+    # 3. Check existing feedback or create new
+    feedback_obj = None
+    if u_id:
+        stmt_fb = select(Feedback).where(
+            Feedback.event_id == ev_id,
+            Feedback.user_id == u_id
+        ).order_by(desc(Feedback.created_at))
+        res_fb = await db.execute(stmt_fb)
+        feedback_obj = res_fb.scalars().first()
+
+    sentiment_val = detect_sentiment(star_val, feedback_obj.comment if feedback_obj else None)
+
+    if feedback_obj:
+        feedback_obj.rating = star_val
+        feedback_obj.sentiment = sentiment_val
+        feedback_obj.updated_at = datetime.now(timezone.utc)
+    else:
+        feedback_obj = Feedback(
+            event_id=ev_id,
+            user_id=u_id,
+            rating=star_val,
+            comment=None,
+            sentiment=sentiment_val,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+        )
+        db.add(feedback_obj)
+
+    await db.commit()
+    await db.refresh(feedback_obj)
+
+    # Return JSON if requested
+    accept_header = request.headers.get("accept", "")
+    if format == "json" or "application/json" in accept_header:
+        return JSONResponse({
+            "success": True,
+            "feedback_id": feedback_obj.id,
+            "event_id": ev_id,
+            "rating": star_val,
+            "sentiment": sentiment_val,
+            "message": "Đã ghi nhận phản hồi đánh giá thành công!",
+        })
+
+    html = render_quick_rate_landing_html(
+        event_title=event_obj.title,
+        rating=star_val,
+        feedback_id=feedback_obj.id,
+        comment=feedback_obj.comment,
+        is_updated=False,
+    )
+    return HTMLResponse(content=html)
+
+
+@router.post("/quick-rate")
+async def quick_rate_post(
+    request: Request,
+    eventId: Optional[int] = Query(None),
+    event_id: Optional[int] = Query(None),
+    userId: Optional[int] = Query(None),
+    user_id: Optional[int] = Query(None),
+    email: Optional[str] = Query(None),
+    stars: Optional[int] = Query(None),
+    rating: Optional[int] = Query(None),
+    comment: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """POST endpoint for quick-rate submission with optional JSON body."""
+    # Check if request has JSON body
+    if request.headers.get("content-type", "").startswith("application/json"):
+        try:
+            body = await request.json()
+            eventId = eventId or body.get("eventId") or body.get("event_id")
+            userId = userId or body.get("userId") or body.get("user_id")
+            email = email or body.get("email")
+            stars = stars or body.get("stars") or body.get("rating")
+            comment = comment or body.get("comment")
+        except Exception:
+            pass
+
+    return await quick_rate_get(
+        request=request,
+        eventId=eventId,
+        event_id=event_id,
+        userId=userId,
+        user_id=user_id,
+        email=email,
+        stars=stars,
+        rating=rating,
+        format="json",
+        db=db,
+    )
+
+
+@router.post("/quick-rate/comment", response_class=HTMLResponse)
+async def quick_rate_comment_post(
+    request: Request,
+    feedback_id: int = Form(...),
+    comment: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Submit additional qualitative feedback text for a previously recorded rating.
+    """
+    stmt = select(Feedback).where(Feedback.id == feedback_id)
+    res = await db.execute(stmt)
+    feedback_obj = res.scalars().first()
+
+    if not feedback_obj:
+        return HTMLResponse(
+            content="<h3>Không tìm thấy bản ghi đánh giá tương ứng.</h3>",
+            status_code=404,
+        )
+
+    clean_comment = comment.strip()
+    feedback_obj.comment = clean_comment
+    feedback_obj.sentiment = detect_sentiment(feedback_obj.rating, clean_comment)
+    feedback_obj.updated_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    # Get event title
+    stmt_evt = select(Event).where(Event.id == feedback_obj.event_id)
+    res_evt = await db.execute(stmt_evt)
+    event_obj = res_evt.scalars().first()
+    event_title = event_obj.title if event_obj else "Sự kiện EventHub AI"
+
+    accept_header = request.headers.get("accept", "")
+    if "application/json" in accept_header:
+        return JSONResponse({
+            "success": True,
+            "feedback_id": feedback_obj.id,
+            "comment": clean_comment,
+            "sentiment": feedback_obj.sentiment,
+            "message": "Đã lưu góp ý thành công!",
+        })
+
+    html = render_quick_rate_landing_html(
+        event_title=event_title,
+        rating=feedback_obj.rating,
+        feedback_id=feedback_obj.id,
+        comment=clean_comment,
+        is_updated=True,
+    )
+    return HTMLResponse(content=html)
+

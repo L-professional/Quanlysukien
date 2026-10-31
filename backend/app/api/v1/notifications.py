@@ -205,3 +205,13 @@ async def send_notification(
     await db.commit()
     await db.refresh(notification)
     return notification
+
+
+@router.post("/trigger-reminders")
+async def trigger_reminders():
+    """
+    Manually trigger scanning and sending 24h & 2h reminders.
+    """
+    from app.services.scheduler import check_and_send_scheduled_reminders
+    await check_and_send_scheduled_reminders()
+    return {"success": True, "message": "Đã kích hoạt quét và gửi nhắc lịch thành công."}

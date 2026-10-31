@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(".env", "../.env"),
+        env_file=(".env", "../.env", ".env.local", "../.env.local"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore"
@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "EventHub AI"
     API_V1_STR: str = "/api/v1"
     DEBUG: bool = True
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000,http://localhost:8080"
+    TIMEZONE: str = "Asia/Ho_Chi_Minh"
+    TIMEZONE_LABEL: str = "Giờ Hà Nội, Việt Nam (UTC+7)"
 
     # PostgreSQL Database
     POSTGRES_SERVER: str = "localhost"
@@ -28,10 +31,13 @@ class Settings(BaseSettings):
     @property
     def async_database_url(self) -> str:
         if self.DATABASE_URL:
-            # Ensure dialect is postgresql+asyncpg
-            if self.DATABASE_URL.startswith("postgresql://"):
-                return self.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
-            return self.DATABASE_URL
+            url = self.DATABASE_URL
+            # Handle Render postgres:// and standard postgresql://
+            if url.startswith("postgres://"):
+                return url.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+                return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            return url
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
 
     # Redis Cache & Session
@@ -62,6 +68,32 @@ class Settings(BaseSettings):
     EMAIL_REPLY_TO: Optional[str] = None
     RESEND_WEBHOOK_SECRET: Optional[str] = None
     FRONTEND_URL: str = "http://localhost:5173"
+
+    # SMTP & Email Configuration
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    SMTP_FROM: str = "EventAI System <noreply@eventhub.ai>"
+    SMTP_SECURE: bool = False
+
+    # SMS Gateway Configuration (eSMS.vn / SpeedSMS / Twilio)
+    ESMS_API_KEY: str = ""
+    ESMS_SECRET_KEY: str = ""
+    ESMS_BRANDNAME: str = "EVENTHUB"
+    SPEEDSMS_ACCESS_TOKEN: str = ""
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_PHONE_NUMBER: str = ""
+
+    # Zalo Official Account & ZNS Configuration
+    ZALO_OA_ID: str = ""
+    ZALO_APP_ID: str = ""
+    ZALO_SECRET_KEY: str = ""
+    ZALO_ACCESS_TOKEN: str = ""
+    ZALO_REFRESH_TOKEN: str = ""
+    ZALO_TEMPLATE_ID: str = ""
+
 
 
 settings = Settings()

@@ -107,7 +107,7 @@ export const InquiryDetail: React.FC<InquiryDetailProps> = ({ initialInquiryId =
           ? {
               ...prev,
               status: updatedStatus,
-              replies: [updatedReply, ...prev.replies.filter((r) => !r.is_ai_generated)],
+              replies: [updatedReply, ...(Array.isArray(prev.replies) ? prev.replies : []).filter((r) => !r.is_ai_generated)],
             }
           : null
       );
@@ -175,9 +175,10 @@ export const InquiryDetail: React.FC<InquiryDetailProps> = ({ initialInquiryId =
     setCustomReply('');
   };
 
-  const filteredInquiries = inquiries.filter(
+  const safeInquiries = Array.isArray(inquiries) ? inquiries : [];
+  const filteredInquiries = safeInquiries.filter(
     (i) =>
-      i.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (i.question || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (i.participant_name && i.participant_name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
@@ -252,7 +253,7 @@ export const InquiryDetail: React.FC<InquiryDetailProps> = ({ initialInquiryId =
           {/* Inquiry Queue Selector */}
           <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
-              <span>HÀNG ĐỢI CHỜ DUYỆT ({inquiries.filter((i) => i.status === 'AI_SUGGESTED').length})</span>
+              <span>HÀNG ĐỢI CHỜ DUYỆT ({safeInquiries.filter((i) => i.status === 'AI_SUGGESTED').length})</span>
               <button onClick={loadInquiries} className="text-slate-400 hover:text-slate-700 transition-colors" title="Làm mới">
                 <RefreshCw className="w-3.5 h-3.5" />
               </button>
@@ -465,7 +466,7 @@ export const InquiryDetail: React.FC<InquiryDetailProps> = ({ initialInquiryId =
                 )}
 
                 {/* 3. Published Replies Stream */}
-                {selectedInquiry.replies
+                {(Array.isArray(selectedInquiry.replies) ? selectedInquiry.replies : [])
                   .filter((r) => !r.is_ai_generated || selectedInquiry.status !== 'AI_SUGGESTED')
                   .map((reply) => (
                     <div key={reply.id} className="flex items-start gap-3 justify-end">

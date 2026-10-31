@@ -7,6 +7,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-eventhub}
+      TZ: Asia/Ho_Chi_Minh
+      PGTZ: Asia/Ho_Chi_Minh
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -21,6 +23,8 @@ services:
     image: redis:7-alpine
     container_name: eventhub_redis
     restart: always
+    environment:
+      TZ: Asia/Ho_Chi_Minh
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:

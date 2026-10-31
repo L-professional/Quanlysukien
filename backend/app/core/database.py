@@ -1,3 +1,4 @@
+import logging
 from typing import AsyncGenerator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -6,12 +7,16 @@ from sqlalchemy.pool import NullPool
 
 from app.core.config import settings
 
+logger = logging.getLogger(__name__)
+
 # Create Async SQLAlchemy Engine with NullPool to prevent event loop connection reuse issues on Windows
+# Force PostgreSQL session timezone to Asia/Ho_Chi_Minh (UTC+7)
 engine = create_async_engine(
     settings.async_database_url,
     echo=False,
     future=True,
     poolclass=NullPool,
+    connect_args={"server_settings": {"timezone": "Asia/Ho_Chi_Minh"}},
 )
 
 # Async Session Factory
@@ -42,8 +47,11 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """Initialize database extensions and create tables."""
     async with engine.begin() as conn:
-        # Enable pgvector extension for PostgreSQL
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        # Enable pgvector extension for PostgreSQL if available
+        try:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        except Exception as e:
+            logger.warning(f"Could not enable vector extension (may not be supported on this instance): {e}")
         # Create all tables registered with Base metadata
         await conn.run_sync(Base.metadata.create_all)
         # Ensure schema migrations for newly added columns
@@ -58,6 +66,7 @@ async def init_db() -> None:
             "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS organization VARCHAR(255);",
             "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS job_title VARCHAR(255);",
             "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS notes VARCHAR(1000);",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_event_participant ON registrations (event_id, participant_id) WHERE schedule_id IS NULL AND session_id IS NULL;",
             """
             CREATE TABLE IF NOT EXISTS session_questions (
                 id SERIAL PRIMARY KEY,
@@ -288,5 +297,11 @@ async def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_unsubscribe_user ON email_unsubscribes(user_id);",
         ]
         for migration in migrations:
-            await conn.execute(text(migration))
+            try:
+                async with conn.begin_nested():
+                    await conn.execute(text(migration))
+            except Exception as e:
+                # Log and safely continue past duplicate index errors
+                logger.debug(f"Migration statement skipped: {e}")
+
 

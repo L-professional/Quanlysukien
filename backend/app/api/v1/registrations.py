@@ -5,9 +5,9 @@ Staff-only: check-in and manual ticket issuance.
 """
 import json
 import uuid
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, delete, update, func
+from sqlalchemy import select, delete, update, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
@@ -18,6 +18,8 @@ from app.models.registration import Registration
 from app.models.user import User
 from app.models.role import Role
 from app.models.event import Event, EventSchedule
+from app.models.notification import Notification
+from app.models.reminder import UserReminder
 from app.services.email_service import send_ticket_confirmation_email, generate_qr_base64
 
 router = APIRouter(prefix="/registrations", tags=["Registrations & Check-in"])
@@ -449,26 +451,9 @@ async def _process_event_registration(
     existing_reg = res_existing.scalar_one_or_none()
 
     if existing_reg:
-        qr_b64 = generate_qr_base64(existing_reg.qr_code_token)
-        return RegistrationResponse(
-            id=existing_reg.id,
-            event_id=existing_reg.event_id,
-            participant_id=existing_reg.participant_id,
-            participant_name=user.full_name,
-            participant_email=user.email,
-            qr_code_token=existing_reg.qr_code_token,
-            qr_code_image=qr_b64,
-            is_checked_in=existing_reg.is_checked_in,
-            checked_in_at=existing_reg.checked_in_at.strftime("%H:%M %d/%m/%Y") if existing_reg.checked_in_at else None,
-            ticket_type=existing_reg.ticket_type or payload.ticket_type or "Vé Tham Dự",
-            event_title=event.title,
-            schedule_id=existing_reg.schedule_id,
-            schedule_title=target_schedule.title if target_schedule else None,
-            phone_number=existing_reg.phone_number or user.phone_number,
-            organization=existing_reg.organization,
-            job_title=existing_reg.job_title,
-            notes=existing_reg.notes,
-            message="Bạn đã đăng ký tham dự phiên này rồi. Đây là mã vé QR chính thức của bạn!",
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Bạn đã đăng ký tham gia sự kiện này rồi! Vui lòng kiểm tra mã vé đã nhận hoặc xem mã QR."
         )
 
     # 5. Generate unique QR token & create new registration
@@ -538,7 +523,37 @@ async def _process_event_registration(
 
     qr_b64 = generate_qr_base64(qr_data)
 
-    # 6. Send Ticket Confirmation Email with QR Code
+    # 6. Create UserReminder & In-App Notification (3 timing milestones: Instant, 24h, 2h)
+    try:
+        reminder = UserReminder(
+            user_id=user.id,
+            event_id=event.id,
+            session_id=payload.schedule_id,
+            start_time=event.start_time,
+            notified_24h=False,
+            notified_1h=False,
+        )
+        db.add(reminder)
+    except Exception as e:
+        print(f"Failed to create UserReminder: {e}")
+
+    try:
+        notif = Notification(
+            user_id=user.id,
+            target_role="PARTICIPANT",
+            title="Xác nhận đăng ký vé thành công! 🎉",
+            message=f"Bạn đã đăng ký thành công sự kiện '{event.title}'. Hạng vé: {ticket_type}. Mã vé: {registration.qr_code_token}. Chuẩn bị mã QR khi đến sự kiện!",
+            type="TICKET_CONFIRMATION",
+            link="/events",
+            is_read=False,
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(notif)
+        await db.commit()
+    except Exception as e:
+        print(f"Failed to create in-app notification: {e}")
+
+    # 7. Send Ticket Confirmation Email with QR Code
     try:
         await send_ticket_confirmation_email(
             to_email=user.email,
@@ -686,14 +701,96 @@ async def cancel_registration(
         )
         await db.execute(upd_ev)
 
-    # 6. Commit transaction
+    # 6. Delete associated UserReminder
+    if participant_id and event_id:
+        try:
+            await db.execute(
+                delete(UserReminder).where(
+                    UserReminder.user_id == participant_id,
+                    UserReminder.event_id == event_id,
+                )
+            )
+        except Exception as e:
+            print(f"Failed to delete UserReminder: {e}")
+
+    # 7. Add in-app cancellation notification
+    if participant_id:
+        try:
+            cancel_notif = Notification(
+                user_id=participant_id,
+                target_role="PARTICIPANT",
+                title="Đã hủy đăng ký vé sự kiện",
+                message="Vé tham dự sự kiện của bạn đã được hủy thành công. Sức chứa của sự kiện đã được hoàn trả.",
+                type="INFO",
+                link="/events",
+                is_read=False,
+                created_at=datetime.now(timezone.utc),
+            )
+            db.add(cancel_notif)
+        except Exception as e:
+            print(f"Failed to create cancellation notification: {e}")
+
+    # 8. Commit transaction
     await db.commit()
 
-    # 7. Return simple JSON as instructed in Task 25 (DO NOT return ORM objects)
+    # 9. Return simple JSON as instructed in Task 25 (DO NOT return ORM objects)
     return {
         "success": True,
-        "message": "Hủy vé thành công",
+        "message": "Hủy vé thành công. Sức chứa của sự kiện đã được hoàn trả!",
     }
+
+
+@router.get("/my-registrations", response_model=List[RegistrationResponse])
+async def get_my_registrations(
+    email: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    """
+    [PUBLIC/PARTICIPANT] Fetch all registered tickets for the current user or guest email.
+    """
+    target_user_id = current_user.id if current_user else None
+    target_email = current_user.email if current_user else (email.strip().lower() if email else None)
+
+    if not target_user_id and not target_email:
+        return []
+
+    conditions = []
+    if target_user_id:
+        conditions.append(Registration.participant_id == target_user_id)
+    if target_email:
+        conditions.append(Registration.email == target_email)
+
+    stmt = select(Registration).where(or_(*conditions)).order_by(Registration.id.desc())
+    res = await db.execute(stmt)
+    regs = res.scalars().all()
+
+    results = []
+    for r in regs:
+        qr_b64 = generate_qr_base64(r.qr_code_token) if r.qr_code_token else None
+        ev = await db.get(Event, r.event_id)
+        results.append(
+            RegistrationResponse(
+                id=r.id,
+                event_id=r.event_id,
+                participant_id=r.participant_id,
+                participant_name=r.full_name or (current_user.full_name if current_user else None),
+                participant_email=r.email or (current_user.email if current_user else None),
+                qr_code_token=r.qr_code_token,
+                qr_code_image=qr_b64,
+                is_checked_in=r.is_checked_in,
+                checked_in_at=r.checked_in_at.strftime("%H:%M %d/%m/%Y") if r.checked_in_at else None,
+                ticket_type=r.ticket_type or "Vé Tham Dự",
+                event_title=ev.title if ev else "Sự kiện",
+                schedule_id=r.schedule_id,
+                phone_number=r.phone_number or r.phone,
+                organization=r.organization or r.company,
+                job_title=r.job_title,
+                notes=r.notes,
+                message="Vé hợp lệ",
+            )
+        )
+    return results
 
 
 @router.post("/{registration_id}/toggle-checkin")

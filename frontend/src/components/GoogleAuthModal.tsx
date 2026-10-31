@@ -44,8 +44,20 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [isPopupLoading, setIsPopupLoading] = useState(false);
 
+  const isGoogleOAuthClientConfigured = (): boolean => {
+    const id = import.meta.env.VITE_GOOGLE_CLIENT_ID || import.meta.env.GOOGLE_CLIENT_ID || '';
+    return (
+      Boolean(id) &&
+      !id.includes('YOUR_GOOGLE_CLIENT_ID') &&
+      !id.includes('demo-eventhub-ai') &&
+      !id.startsWith('000000') &&
+      id.endsWith('.apps.googleusercontent.com')
+    );
+  };
+
   // Official Google OAuth 2.0 Popup Handler via @react-oauth/google
   const triggerGooglePopup = useGoogleLogin({
+    prompt: 'select_account',
     onSuccess: async (tokenResponse) => {
       setIsPopupLoading(true);
       setErrorMsg('');
@@ -83,9 +95,18 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
     },
     onError: (errorResponse) => {
       console.warn('Google Popup closed or error:', errorResponse);
-      setErrorMsg('Cửa sổ Google Popup bị đóng hoặc chưa cấu hình Client ID hợp lệ.');
+      setErrorMsg('Cửa sổ Google Popup không thể kết nối hoặc Client ID chưa đăng ký domain localhost:3000 trên Google Cloud Console. Đã chuyển sang chế độ Safe Fallback.');
     },
   });
+
+  const handleOpenGooglePopup = () => {
+    if (!isGoogleOAuthClientConfigured()) {
+      console.warn('[Auth] Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET. Safe fallback mode enabled.');
+      setErrorMsg('Chế độ Safe Fallback: Google Client ID chưa cấu hình trên Google Cloud Console. Vui lòng chọn tài khoản gợi ý bên dưới hoặc nhập Gmail.');
+      return;
+    }
+    triggerGooglePopup();
+  };
 
   if (!isOpen) return null;
 
@@ -175,14 +196,12 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         <div>
           <button
             type="button"
-            disabled={isPopupLoading || isLoading}
-            onClick={() => triggerGooglePopup()}
+            disabled={isLoading}
+            onClick={handleOpenGooglePopup}
             className="w-full py-3 px-4 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-2xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50 group border border-slate-200"
           >
             <GoogleIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
-            <span>
-              {isPopupLoading ? 'Đang mở cửa sổ Google...' : 'Mở Cửa Sổ Google OAuth Popup'}
-            </span>
+            <span>Mở Cửa Sổ Google OAuth Popup</span>
             <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600" />
           </button>
         </div>

@@ -262,7 +262,17 @@
     "hashtags": "Hashtags",
     "smsNotification": "SMS / Push Notification",
     "preview": "Content preview",
-    "loadingSkeleton": "Drafting and optimizing multi-channel PR..."
+    "loadingSkeleton": "Drafting and optimizing multi-channel PR...",
+    "emailCampaign": "Email Campaign",
+    "facebookLinkedin": "Facebook & LinkedIn",
+    "zaloSms": "Zalo OA & SMS",
+    "pressRelease": "Press Release",
+    "aiScore": "AI Performance Score",
+    "abTesting": "Create 3 A/B Variants",
+    "dispatchPublish": "Approve AI & Dispatch",
+    "testSend": "Send Test Preview",
+    "marketingBanner": "Attached Marketing Banner",
+    "generateAIBanner": "Generate AI Banner"
   },
   "knowledge": {
     "title": "RAG Knowledge Base",

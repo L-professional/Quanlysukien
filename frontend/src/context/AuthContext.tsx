@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, UserRole } from '../types';
+export type { UserRole };
 import { apiService } from '../services/api';
 import { toast } from 'sonner';
+import { saveAccountToHistory } from '../utils/accountHistory';
 
 // Simple JWT payload decoder
 function decodeJWTPayload(token: string): Record<string, unknown> | null {
@@ -99,10 +101,20 @@ export const DEMO_PRESETS: Record<UserRole, User> = {
     role_name: 'ATTENDEE',
     is_active: true,
   },
+  SUPER_ADMIN: {
+    id: 99,
+    role_id: 99,
+    full_name: 'Nguyễn Văn Super Admin',
+    email: 'superadmin@eventhub.ai',
+    role_name: 'SUPER_ADMIN',
+    permissions: ['*'],
+    is_active: true,
+  },
   AUDITOR: {
-    id: 5,
-    role_id: 6,
-    full_name: 'Hoàng Minh Kiểm Toán',
+    id: 98,
+    role_id: 98,
+    full_name: 'Kiểm Toán Viên',
+
     email: 'auditor@eventhub.ai',
     role_name: 'AUDITOR',
     is_active: true,
@@ -125,7 +137,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   register: (email: string, password: string, fullName: string, phoneNumber?: string) => Promise<boolean>;
   googleLogin: (payload: { credential?: string; email?: string; full_name?: string; avatar_url?: string }) => Promise<boolean>;
-  logout: () => void;
+  microsoftLogin: (payload: { access_token?: string; credential?: string; email?: string; full_name?: string; avatar_url?: string }) => Promise<boolean>;
+  logout: (options?: { silent?: boolean; redirect?: boolean | string }) => void;
   switchDemoAccount: (role: UserRole) => void;
   updateUser: (updatedData: Partial<User>) => void;
 }
@@ -193,8 +206,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   /** Check if current user has one of the allowed roles */
   const hasRole = (roles: UserRole[]): boolean => {
-    const canonicalRoles = roles.map((r) => (r === 'PARTICIPANT' ? 'ATTENDEE' : r));
+    if (!roles || roles.length === 0) return true;
     const current = userRole === 'PARTICIPANT' ? 'ATTENDEE' : userRole;
+    if (current === 'SUPER_ADMIN') return true;
+    const canonicalRoles = roles.map((r) => (r === 'PARTICIPANT' ? 'ATTENDEE' : r));
+    if (current === 'ADMIN' && canonicalRoles.includes('ADMIN')) return true;
     return canonicalRoles.includes(current);
   };
 
@@ -240,6 +256,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(response.user);
       localStorage.setItem('eventhub_token', response.access_token);
       localStorage.setItem('eventhub_user', JSON.stringify(response.user));
+      document.cookie = `eventhub_token=${response.access_token}; path=/; max-age=86400; SameSite=Lax`;
       const role = normalizeRole(response.user.role_name);
       const roleDisplay =
         role === 'ADMIN'
@@ -249,6 +266,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           : role === 'STAFF'
           ? '🎫 Nhân Viên (Staff)'
           : '👤 Khách Tham Dự (Attendee)';
+      saveAccountToHistory({
+        email: response.user.email,
+        name: response.user.full_name,
+        avatar: response.user.avatar_url || undefined,
+        provider: (response.user.provider as any) || 'local',
+        lastUsed: Date.now(),
+      });
       toast.success(`Đăng nhập thành công! Chào ${roleDisplay}: ${response.user.full_name}`);
       return true;
     } catch (err: unknown) {
@@ -287,6 +311,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(response.user);
       localStorage.setItem('eventhub_token', response.access_token);
       localStorage.setItem('eventhub_user', JSON.stringify(response.user));
+      document.cookie = `eventhub_token=${response.access_token}; path=/; max-age=86400; SameSite=Lax`;
+      saveAccountToHistory({
+        email: response.user.email,
+        name: response.user.full_name,
+        avatar: response.user.avatar_url || undefined,
+        provider: 'local',
+        lastUsed: Date.now(),
+      });
       toast.success(`Đăng ký tài khoản thành công! Chào mừng ${response.user.full_name}`);
       return true;
     } catch (err: unknown) {
@@ -318,20 +350,59 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(response.user);
       localStorage.setItem('eventhub_token', response.access_token);
       localStorage.setItem('eventhub_user', JSON.stringify(response.user));
-      const role = normalizeRole(response.user.role_name);
-      const roleDisplay =
-        role === 'ADMIN'
-          ? '👑 Admin'
-          : role === 'EVENT_MANAGER'
-          ? '🎯 Quản Lý Sự Kiện'
-          : role === 'STAFF'
-          ? '🎫 Nhân Viên'
-          : '👤 Khách Tham Dự';
-      toast.success(`Đăng nhập Google thành công! (${roleDisplay}: ${response.user.full_name})`);
+      document.cookie = `eventhub_token=${response.access_token}; path=/; max-age=86400; SameSite=Lax`;
+      saveAccountToHistory({
+        email: response.user.email,
+        name: response.user.full_name,
+        avatar: response.user.avatar_url || undefined,
+        provider: 'google',
+        lastUsed: Date.now(),
+      });
+      toast.success(`Đăng nhập thành công! Chào mừng ${response.user.full_name}`);
       return true;
     } catch (err: unknown) {
       console.error('Google login failed:', err);
       let errorMsg = 'Đăng nhập Google không thành công!';
+      if (err && typeof err === 'object' && 'response' in err) {
+        const axErr = err as { response?: { data?: { detail?: string } } };
+        if (axErr.response?.data?.detail) {
+          errorMsg = axErr.response.data.detail;
+        }
+      }
+      toast.error(errorMsg);
+      throw new Error(errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const microsoftLogin = async (payload: {
+    access_token?: string;
+    credential?: string;
+    email?: string;
+    full_name?: string;
+    avatar_url?: string;
+  }): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const response = await apiService.microsoftAuth(payload);
+      setToken(response.access_token);
+      setUser(response.user);
+      localStorage.setItem('eventhub_token', response.access_token);
+      localStorage.setItem('eventhub_user', JSON.stringify(response.user));
+      document.cookie = `eventhub_token=${response.access_token}; path=/; max-age=86400; SameSite=Lax`;
+      saveAccountToHistory({
+        email: response.user.email,
+        name: response.user.full_name,
+        avatar: response.user.avatar_url || undefined,
+        provider: 'microsoft',
+        lastUsed: Date.now(),
+      });
+      toast.success(`Đăng nhập thành công! Chào mừng ${response.user.full_name}`);
+      return true;
+    } catch (err: unknown) {
+      console.error('Microsoft login failed:', err);
+      let errorMsg = 'Đăng nhập Microsoft không thành công!';
       if (err && typeof err === 'object' && 'response' in err) {
         const axErr = err as { response?: { data?: { detail?: string } } };
         if (axErr.response?.data?.detail) {
@@ -354,15 +425,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.setItem('eventhub_token', dummyToken);
     localStorage.setItem('eventhub_user', JSON.stringify(account));
     const roleTitles: Record<string, string> = {
-      ADMIN: '👑 Quản Trị Viên',
-      EVENT_MANAGER: '🎯 Quản Lý Sự Kiện',
-      STAFF: '🎫 Nhân Viên Soát Vé & Duyệt AI',
-      ATTENDEE: '👤 Khách Tham Dự',
+      ADMIN: '👑 Quản Trị Viên (Admin)',
+      SUPER_ADMIN: '👑 Quản Trị Viên Cấp Cao (Super Admin)',
+      EVENT_MANAGER: '🎯 Quản Lý Sự Kiện (Event Manager)',
+      SPEAKER: '🎤 Diễn Giả Hội Nghị (Speaker)',
+      STAFF: '🎫 Nhân Viên Soát Vé & Duyệt AI (Staff)',
+      ATTENDEE: '👤 Khách Tham Dự (Attendee)',
+
     };
     toast.success(`Đã chuyển vai trò sang: ${roleTitles[key]}!`);
   };
 
-  const logout = () => {
+  const logout = (options?: { silent?: boolean; redirect?: boolean | string }) => {
     setToken(null);
     setUser(null);
     localStorage.removeItem('eventhub_token');
@@ -371,9 +445,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem('eventhub_submitted_feedback_sessions');
     localStorage.removeItem('eventhub_my_agenda');
     document.cookie = 'eventhub_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-    toast.info('Đã đăng xuất khỏi hệ thống EventHub AI');
-    if (window.location.pathname !== '/') {
-      window.location.href = '/';
+    if (!options?.silent) {
+      toast.info('Đã đăng xuất khỏi hệ thống EventHub AI');
+    }
+    if (options?.redirect === false) {
+      return;
+    }
+    const target = typeof options?.redirect === 'string' ? options.redirect : '/';
+    if (window.location.pathname !== target) {
+      window.location.href = target;
     }
   };
 
@@ -402,6 +482,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         login,
         register,
         googleLogin,
+        microsoftLogin,
         logout,
         switchDemoAccount,
         updateUser,

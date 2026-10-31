@@ -5,6 +5,7 @@ Provides:
   - 768-dimension vector embeddings via text-embedding-004
 Includes graceful fallback when API key is absent or calls fail.
 """
+import os
 import asyncio
 import time
 import logging
@@ -38,17 +39,24 @@ class GeminiService:
     """
 
     def __init__(self):
-        self.api_key = settings.GEMINI_API_KEY
+        self.api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
         self.model_name = settings.GEMINI_MODEL
         self.embedding_model = settings.GEMINI_EMBEDDING_MODEL
         self._client: Optional[genai.Client] = None
+        self._ensure_client()
 
-        if self.api_key and self.api_key != "your_gemini_api_key_here":
+    def _ensure_client(self) -> Optional[genai.Client]:
+        if self._client is not None:
+            return self._client
+        key = self.api_key or settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
+        if key and key != "your_gemini_api_key_here":
             try:
-                self._client = genai.Client(api_key=self.api_key)
+                self.api_key = key
+                self._client = genai.Client(api_key=key)
                 logger.info("Gemini Client initialized successfully (google-genai SDK v2).")
             except Exception as e:
                 logger.error(f"Failed to initialize Gemini Client: {e}")
+        return self._client
 
     def _generate_mock_embedding(self, text: str) -> List[float]:
         """Generate a deterministic 768-dimensional fallback embedding vector."""
@@ -57,9 +65,10 @@ class GeminiService:
 
     async def generate_embedding(self, text: str, timeout_seconds: float = 8.0) -> List[float]:
         """
-        Generate 768-dimensional vector embedding for given text using text-embedding-004.
+        Generate 768-dimensional vector embedding for given text using Gemini Embeddings.
         Falls back to deterministic mock vector if API is unavailable.
         """
+        self._ensure_client()
         if self._client is None:
             logger.warning("Gemini Client not configured; using deterministic mock embedding.")
             return self._generate_mock_embedding(text)
@@ -67,15 +76,29 @@ class GeminiService:
         start_time = time.perf_counter()
         try:
             def _call_embed() -> List[float]:
-                response = self._client.models.embed_content(  # type: ignore[union-attr]
-                    model=f"models/{self.embedding_model}",
-                    contents=text,
-                    config=genai_types.EmbedContentConfig(task_type="RETRIEVAL_QUERY"),
-                )
-                # SDK v2: response.embeddings is a list of ContentEmbedding objects
-                if response.embeddings and len(response.embeddings) > 0:
-                    values = response.embeddings[0].values
-                    return list(values) if values else []
+                candidate_models = [
+                    "models/gemini-embedding-001",
+                    "gemini-embedding-001",
+                    f"models/{self.embedding_model}",
+                    self.embedding_model,
+                ]
+                for mod in candidate_models:
+                    try:
+                        cfg = genai_types.EmbedContentConfig(
+                            task_type="RETRIEVAL_QUERY",
+                            output_dimensionality=768
+                        )
+                        response = self._client.models.embed_content(
+                            model=mod,
+                            contents=text,
+                            config=cfg,
+                        )
+                        if response.embeddings and len(response.embeddings) > 0:
+                            values = response.embeddings[0].values
+                            if values and len(values) == 768:
+                                return list(values)
+                    except Exception:
+                        continue
                 return []
 
             embedding = await asyncio.wait_for(
@@ -103,6 +126,7 @@ class GeminiService:
         Generate a draft answer using gemini model with automatic fallback.
         """
         start_time = time.perf_counter()
+        self._ensure_client()
 
         if self._client is None:
             latency_ms = (time.perf_counter() - start_time) * 1000
@@ -127,8 +151,8 @@ class GeminiService:
                     config_kwargs["system_instruction"] = system_instruction
                 config = genai_types.GenerateContentConfig(**config_kwargs)
 
-                # Try preferred model first, then fallback models
-                candidate_models = [self.model_name, "gemini-2.5-flash", "gemini-flash-latest"]
+                # Try preferred model first, then standard fallback models
+                candidate_models = [self.model_name, "gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"]
                 # Deduplicate while preserving order
                 seen = set()
                 models_to_try = [m for m in candidate_models if not (m in seen or seen.add(m))]

@@ -45,6 +45,14 @@ class GoogleAuthRequest(BaseModel):
     avatar_url: Optional[str] = None
 
 
+class MicrosoftAuthRequest(BaseModel):
+    access_token: Optional[str] = None
+    credential: Optional[str] = None
+    email: Optional[EmailStr] = None
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
