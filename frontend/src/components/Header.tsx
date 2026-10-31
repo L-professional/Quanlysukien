@@ -26,18 +26,20 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenMobileDrawer,
   onOpenAuthModal,
 }) => {
-  const { user, isAuthenticated, userRole, logout } = useAuth();
+  const { user, isAuthenticated, userRole, logout, switchDemoAccount } = useAuth();
   const navigate = useNavigate();
   const { timeString, dateString } = useRealTimeClock();
 
   const currentRoleLabel =
     userRole === 'SUPER_ADMIN' || userRole === 'ADMIN'
-      ? 'Quản trị viên'
-      : userRole === 'EVENT_MANAGER'
-      ? 'Quản lý sự kiện'
+      ? 'Quản trị viên (Admin)'
+      : userRole === 'EVENT_MANAGER' || userRole === 'ORGANIZER'
+      ? 'Quản lý sự kiện (Manager)'
       : userRole === 'STAFF'
-      ? 'Nhân viên điều phối'
-      : 'Khách tham dự';
+      ? 'Nhân viên điều phối (Staff)'
+      : userRole === 'SPEAKER'
+      ? 'Diễn giả hội nghị (Speaker)'
+      : 'Khách tham dự (User)';
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -530,10 +532,9 @@ export const Header: React.FC<HeaderProps> = ({
                           key={r.role}
                           onClick={() => {
                             setShowDropdown(false);
-                            logout({ silent: true, redirect: false });
-                            navigate(`/login?email=${encodeURIComponent(r.email)}&role=${encodeURIComponent(r.label)}`);
+                            switchDemoAccount(r.role);
                           }}
-                          className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-[10px] font-bold transition-all ${
+                          className={`flex items-center gap-1.5 p-1.5 rounded-lg border text-[10px] font-bold transition-all cursor-pointer ${
                             isCurrent
                               ? 'border-[#DC2626] bg-red-50 text-[#DC2626]'
                               : 'border-slate-200 bg-slate-50 text-slate-600 hover:text-slate-900'

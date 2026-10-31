@@ -27,8 +27,9 @@ function decodeJWTPayload(token: string): Record<string, unknown> | null {
 export function normalizeRole(raw: string | undefined | null): UserRole {
   if (!raw) return 'ATTENDEE';
   const up = raw.toUpperCase();
+  if (up === 'SUPER_ADMIN') return 'SUPER_ADMIN';
   if (up === 'ADMIN') return 'ADMIN';
-  if (up === 'EVENT_MANAGER') return 'EVENT_MANAGER';
+  if (up === 'EVENT_MANAGER' || up === 'ORGANIZER') return 'EVENT_MANAGER';
   if (up === 'STAFF') return 'STAFF';
   if (up === 'SPEAKER') return 'SPEAKER';
   return 'ATTENDEE'; // PARTICIPANT, ATTENDEE, etc.
@@ -198,9 +199,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   /** Check if current user has one of the allowed roles */
   const hasRole = (roles: UserRole[]): boolean => {
     if (!roles || roles.length === 0) return true;
-    const current = userRole === 'PARTICIPANT' ? 'ATTENDEE' : userRole;
+    let current = userRole === 'PARTICIPANT' ? 'ATTENDEE' : userRole;
+    if (current === 'ORGANIZER') current = 'EVENT_MANAGER';
     if (current === 'SUPER_ADMIN') return true;
-    const canonicalRoles = roles.map((r) => (r === 'PARTICIPANT' ? 'ATTENDEE' : r));
+    const canonicalRoles = roles.map((r) => {
+      if (r === 'PARTICIPANT') return 'ATTENDEE';
+      if (r === 'ORGANIZER') return 'EVENT_MANAGER';
+      return r;
+    });
     if (current === 'ADMIN' && canonicalRoles.includes('ADMIN')) return true;
     return canonicalRoles.includes(current);
   };

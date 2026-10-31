@@ -65,8 +65,8 @@ export const Events: React.FC = () => {
   const { user, userRole } = useAuth();
   const navigate = useNavigate();
 
-  // Role-based permission: only ADMIN and EVENT_MANAGER can create/edit/delete events
-  const canManage = userRole === 'ADMIN' || userRole === 'EVENT_MANAGER';
+  // Role-based permission: only ADMIN, SUPER_ADMIN and EVENT_MANAGER can create/edit/delete events
+  const canManage = userRole === 'ADMIN' || userRole === 'EVENT_MANAGER' || userRole === 'SUPER_ADMIN' || userRole === 'ORGANIZER';
 
   // Primary State
   const [allEvents, setAllEvents] = useState<Event[]>([]);

@@ -150,17 +150,161 @@ export const Sidebar: React.FC<SidebarProps> = ({
     });
   }, [menuItems, currentRole]);
 
+  // Actor Workspace Metadata
+  const actorInfo = useMemo(() => {
+    switch (currentRole) {
+      case 'SUPER_ADMIN':
+      case 'ADMIN':
+        return {
+          title: 'Quản Trị Viên (Admin)',
+          subtitle: 'Giám sát toàn nền tảng',
+          badgeColor: 'bg-red-50 text-[#DC2626] border-red-200',
+          badgeText: 'Admin',
+        };
+      case 'EVENT_MANAGER':
+      case 'ORGANIZER':
+        return {
+          title: 'Quản Lý Sự Kiện (Manager)',
+          subtitle: 'Vận hành sự kiện & Tiếp thị',
+          badgeColor: 'bg-blue-50 text-blue-700 border-blue-200',
+          badgeText: 'Manager',
+        };
+      case 'STAFF':
+        return {
+          title: 'Nhân Viên Điều Phối (Staff)',
+          subtitle: 'Soát vé QR & Hỗ trợ khách',
+          badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+          badgeText: 'Staff',
+        };
+      case 'SPEAKER':
+        return {
+          title: 'Diễn Giả Hội Nghị (Speaker)',
+          subtitle: 'Thuyết trình & Điều khiển sân khấu',
+          badgeColor: 'bg-purple-50 text-purple-700 border-purple-200',
+          badgeText: 'Speaker',
+        };
+      default:
+        return {
+          title: 'Khách Tham Dự (User)',
+          subtitle: 'Khám phá sự kiện & Vé',
+          badgeColor: 'bg-amber-50 text-amber-700 border-amber-200',
+          badgeText: 'Attendee',
+        };
+    }
+  }, [currentRole]);
+
+  // Group visible menu items into logical actor sections
+  const menuSections = useMemo(() => {
+    const visibleMap = new Map(visibleMenuItems.map((item) => [item.id, item]));
+
+    if (currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN') {
+      return [
+        {
+          title: 'TỔNG QUAN',
+          items: ['dashboard'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+        {
+          title: 'QUẢN TRỊ NỀN TẢNG',
+          items: ['users', 'logs', 'reports', 'knowledge-base'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+        {
+          title: 'VẬN HÀNH & TIẾP THỊ',
+          items: ['events', 'campaigns', 'content-studio', 'inquiries'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+        {
+          title: 'ĐIỀU PHỐI & DIỄN GIẢ',
+          items: ['scanner', 'speaker', 'feedback'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+        {
+          title: 'HỆ THỐNG',
+          items: ['settings'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+      ];
+    }
+
+    if (currentRole === 'EVENT_MANAGER' || currentRole === 'ORGANIZER') {
+      return [
+        {
+          title: 'TỔNG QUAN',
+          items: ['dashboard'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+        {
+          title: 'VẬN HÀNH SỰ KIỆN',
+          items: ['events', 'campaigns', 'content-studio', 'knowledge-base', 'inquiries'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+        {
+          title: 'BÁO CÁO & PHẢN HỒI',
+          items: ['reports', 'feedback', 'speaker'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+        {
+          title: 'TÀI KHOẢN',
+          items: ['settings'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+      ];
+    }
+
+    if (currentRole === 'STAFF') {
+      return [
+        {
+          title: 'TỔNG QUAN',
+          items: ['dashboard'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+        {
+          title: 'ĐIỀU PHỐI HIỆN TRƯỜNG',
+          items: ['scanner', 'events', 'inquiries'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+        {
+          title: 'ĐÁNH GIÁ & CÀI ĐẶT',
+          items: ['feedback', 'settings'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+      ];
+    }
+
+    if (currentRole === 'SPEAKER') {
+      return [
+        {
+          title: 'CỔNG DIỄN GIẢ',
+          items: ['speaker', 'dashboard'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+        {
+          title: 'HOẠT ĐỘNG & TƯƠNG TÁC',
+          items: ['events', 'feedback'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+        {
+          title: 'HỒ SƠ CÁ NHÂN',
+          items: ['settings'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+      ];
+    }
+
+    // Default Attendee / User
+    return [
+      {
+        title: 'KHÁM PHÁ & THAM DỰ',
+        items: ['events', 'dashboard'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+      },
+      {
+        title: 'ĐÓNG GÓP Ý KIẾN',
+        items: ['feedback'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+      },
+      {
+        title: 'CÁ NHÂN',
+        items: ['settings'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+      },
+    ];
+  }, [visibleMenuItems, currentRole]);
+
   return (
     <aside
       className={`bg-white ${
         isMobileDrawer
           ? 'h-full w-full'
-          : `border-r border-[#E5EAF2] ${isCollapsed ? 'w-20' : 'w-[250px]'} h-screen sticky top-0 z-40`
+          : `border-r border-[#E5EAF2] ${isCollapsed ? 'w-20' : 'w-[260px]'} h-screen sticky top-0 z-40`
       } flex flex-col justify-between select-none transition-all duration-300 shrink-0 text-[#12213A] overflow-y-auto`}
     >
       <div className="flex flex-col h-full">
         {/* Top Header section inside Sidebar */}
-        <div className="px-6 py-6 pb-4">
+        <div className="px-5 py-5 pb-3">
           <div
             onClick={() => {
               setActiveTab('dashboard');
@@ -169,16 +313,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="flex items-center gap-3 cursor-pointer"
           >
             {/* EventAI Logo matching reference */}
-            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#DC2626] shrink-0">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[#DC2626] shrink-0 shadow-sm">
               <Zap className="w-4 h-4 text-white fill-white" />
             </div>
             {!isCollapsed && (
               <div className="min-w-0 flex-1">
-                <div className="font-bold text-xl text-[#12213A] tracking-tight truncate leading-tight">
-                  EventAI
+                <div className="font-bold text-lg text-[#12213A] tracking-tight truncate leading-tight">
+                  EventHub AI
                 </div>
-                <div className="text-[9px] font-semibold text-[#64748B] tracking-widest uppercase mt-0.5 truncate">
-                  KẾT NỐI · SÁNG TẠO · TRUYỀN CẢM HỨNG
+                <div className="text-[9px] font-semibold text-[#64748B] tracking-wider uppercase mt-0.5 truncate">
+                  NỀN TẢNG SỰ KIỆN THÔNG MINH
                 </div>
               </div>
             )}
@@ -187,73 +331,100 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {isMobileDrawer && onCloseMobileDrawer && (
             <button
               onClick={onCloseMobileDrawer}
-              className="absolute top-6 right-6 text-slate-400 hover:text-slate-900"
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-900"
             >
               <X className="w-5 h-5" />
             </button>
           )}
+
+          {/* Actor Identity Badge Card */}
+          {!isCollapsed && (
+            <div className="mt-4 p-2.5 rounded-xl border border-slate-200/80 bg-slate-50/80 flex items-center justify-between gap-2 shadow-xs">
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-bold text-[#12213A] truncate leading-tight">
+                  {actorInfo.title}
+                </div>
+                <div className="text-[9px] text-slate-500 truncate leading-snug mt-0.5">
+                  {actorInfo.subtitle}
+                </div>
+              </div>
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider shrink-0 ${actorInfo.badgeColor}`}>
+                {actorInfo.badgeText}
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Navigation items */}
-        <nav className="flex-1 px-4 space-y-1.5 mt-2 overflow-y-auto pb-4">
-          {(Array.isArray(visibleMenuItems) ? visibleMenuItems : []).map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
+        {/* Navigation items grouped by Actor Section */}
+        <nav className="flex-1 px-3 space-y-4 mt-1 overflow-y-auto pb-4">
+          {menuSections.map((section, sIdx) => {
+            if (!section.items || section.items.length === 0) return null;
             return (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveTab(item.id);
-                  if (onCloseMobileDrawer) onCloseMobileDrawer();
-                }}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-[14px] font-semibold transition-all duration-200 cursor-pointer ${
-                  isActive
-                    ? 'bg-[#DC2626] text-white shadow-[0_4px_12px_rgba(215,25,63,0.25)]'
-                    : 'text-[#64748B] hover:bg-[#F6F8FC] hover:text-[#12213A]'
-                } ${isCollapsed ? 'justify-center px-0' : ''}`}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Icon
-                    className={`w-[18px] h-[18px] shrink-0 ${
-                      isActive ? 'text-white' : 'text-[#64748B]'
-                    }`}
-                  />
-                  {!isCollapsed && <span className="truncate">{item.label}</span>}
-                </div>
-                
-                {!isCollapsed && item.badge && (
-                  <span
-                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
-                      item.badgeColor || 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {item.badge}
-                  </span>
+              <div key={sIdx} className="space-y-1">
+                {!isCollapsed && (
+                  <div className="px-3 pb-1 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                    {section.title}
+                  </div>
                 )}
-                
-                {/* Chevron for items with submenus (mocked for now) */}
-                {!isCollapsed && !item.badge && ['events', 'reports'].includes(item.id) && (
-                  <ChevronDown className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-white/70' : 'text-slate-400'}`} />
+                {isCollapsed && sIdx > 0 && (
+                  <div className="w-8 h-px bg-slate-200 mx-auto my-2" />
                 )}
-              </button>
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = activeTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        if (onCloseMobileDrawer) onCloseMobileDrawer();
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[13px] font-semibold transition-all duration-200 cursor-pointer ${
+                        isActive
+                          ? 'bg-[#DC2626] text-white shadow-[0_4px_12px_rgba(220,38,38,0.22)]'
+                          : 'text-[#64748B] hover:bg-[#F6F8FC] hover:text-[#12213A]'
+                      } ${isCollapsed ? 'justify-center px-0' : ''}`}
+                      title={isCollapsed ? item.label : undefined}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Icon
+                          className={`w-[17px] h-[17px] shrink-0 ${
+                            isActive ? 'text-white' : 'text-[#64748B]'
+                          }`}
+                        />
+                        {!isCollapsed && <span className="truncate">{item.label}</span>}
+                      </div>
+                      
+                      {!isCollapsed && item.badge && (
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
+                            item.badgeColor || 'bg-slate-100 text-slate-600'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </nav>
 
         {/* Footer Sidebar System Info Card */}
         {!isCollapsed && (
-          <div className="p-4 mt-auto">
-            <div className="p-3.5 rounded-xl bg-[#F6F8FC] border border-[#E5EAF2] flex gap-3 items-center">
-              <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center shrink-0 border border-slate-100">
-                <div className="w-3.5 h-3.5 bg-[#DC2626] rotate-45 rounded-sm" />
+          <div className="p-3.5 mt-auto border-t border-slate-100">
+            <div className="p-2.5 rounded-xl bg-[#F6F8FC] border border-[#E5EAF2] flex gap-2.5 items-center">
+              <div className="w-7 h-7 rounded-lg bg-white shadow-xs flex items-center justify-center shrink-0 border border-slate-100">
+                <div className="w-3 h-3 bg-[#DC2626] rotate-45 rounded-xs" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-bold text-[#12213A] truncate">EventAI</div>
-                <div className="text-[10px] text-[#64748B] font-medium leading-tight mt-0.5">Nền tảng sự kiện AI</div>
-                <div className="flex justify-between items-center mt-1.5 pt-1.5 border-t border-slate-200/50">
-                  <div className="text-[10px] font-medium text-slate-500">Phiên bản hệ thống</div>
-                  <div className="text-[10px] font-bold text-[#12213A]">v1.0.0</div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-bold text-[#12213A] truncate">EventHub AI</span>
+                  <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">Online</span>
                 </div>
+                <div className="text-[9px] text-[#64748B] truncate mt-0.5">5 Nhóm Tác Nhân Sẵn Sàng</div>
               </div>
             </div>
           </div>

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Calendar, Clock, CloudRain, Sun, CloudSun, Users, Mic, QrCode, ArrowUpRight, ArrowDownRight,
-  Plus, ScanLine, Sparkles, UserPlus, FileText, CheckCircle2, XCircle, AlertCircle
+  Plus, ScanLine, Sparkles, UserPlus, FileText, CheckCircle2, XCircle, AlertCircle,
+  Mail, ShieldCheck, Database, Star
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRealTimeClock } from '../hooks/useRealTimeClock';
@@ -86,11 +87,29 @@ export interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
+  const currentRole = (userRole === 'PARTICIPANT' ? 'ATTENDEE' : userRole) || 'ATTENDEE';
   const { dateFormatted, timeString12, weather } = useRealTimeClock();
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'quarter' | 'year'>('year');
   const [events, setEvents] = useState<Event[]>([]);
   const [, setLoadingEvents] = useState<boolean>(true);
+
+  const roleSubtitle = useMemo(() => {
+    switch (currentRole) {
+      case 'SUPER_ADMIN':
+      case 'ADMIN':
+        return 'Quản trị viên toàn hệ thống EventHub AI';
+      case 'EVENT_MANAGER':
+      case 'ORGANIZER':
+        return 'Quản lý điều hành sự kiện & chiến dịch tiếp thị';
+      case 'STAFF':
+        return 'Bàn làm việc điều phối điểm danh & soát vé QR';
+      case 'SPEAKER':
+        return 'Cổng thông tin diễn giả & điều khiển sân khấu';
+      default:
+        return 'Không gian sự kiện cá nhân & vé tham dự';
+    }
+  }, [currentRole]);
 
   const fetchDashboardEvents = useCallback(async () => {
     try {
@@ -209,6 +228,90 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
     });
   }, [events]);
 
+  const roleKPIs = useMemo(() => {
+    if (currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN') {
+      return [
+        { title: 'Tổng sự kiện hệ thống', value: totalEventsCount.toLocaleString('vi-VN'), growth: '+12%', isUp: true, icon: Calendar, color: 'text-[#DC2626]', bg: 'bg-red-50' },
+        { title: 'Tổng người tham dự sàn', value: totalAttendeesCount, growth: '+18%', isUp: true, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { title: 'Sự kiện sắp diễn ra', value: upcomingCount.toLocaleString('vi-VN'), growth: '+5%', isUp: true, icon: Mic, color: 'text-purple-600', bg: 'bg-purple-50' },
+        { title: 'Lượt cấp vé toàn sàn', value: totalAttendeesCount, growth: '+22%', isUp: true, icon: QrCode, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+      ];
+    }
+    if (currentRole === 'EVENT_MANAGER' || currentRole === 'ORGANIZER') {
+      return [
+        { title: 'Sự kiện phụ trách', value: totalEventsCount.toLocaleString('vi-VN'), growth: '+8%', isUp: true, icon: Calendar, color: 'text-[#DC2626]', bg: 'bg-red-50' },
+        { title: 'Lượt khách đăng ký', value: totalAttendeesCount, growth: '+24%', isUp: true, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { title: 'Sắp diễn ra tuần này', value: upcomingCount.toLocaleString('vi-VN'), growth: '+3%', isUp: true, icon: Clock, color: 'text-purple-600', bg: 'bg-purple-50' },
+        { title: 'Chiến dịch email Resend', value: '3 chiến dịch', growth: '+15%', isUp: true, icon: Mail, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+      ];
+    }
+    if (currentRole === 'STAFF') {
+      return [
+        { title: 'Lượt check-in hôm nay', value: totalAttendeesCount, growth: '+32%', isUp: true, icon: QrCode, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { title: 'Tỷ lệ quét vé thành công', value: '99.4%', growth: '+0.4%', isUp: true, icon: CheckCircle2, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { title: 'Sự kiện đang trực', value: ongoingCount > 0 ? String(ongoingCount) : '1', growth: 'Hiện trường', isUp: true, icon: Calendar, color: 'text-[#DC2626]', bg: 'bg-red-50' },
+        { title: 'Thắc mắc khách cần giải đáp', value: '2 câu hỏi', growth: '-50%', isUp: false, icon: Sparkles, color: 'text-amber-600', bg: 'bg-amber-50' },
+      ];
+    }
+    if (currentRole === 'SPEAKER') {
+      return [
+        { title: 'Phiên thuyết trình được gán', value: '2 phiên', growth: 'Đã xác nhận', isUp: true, icon: Mic, color: 'text-purple-600', bg: 'bg-purple-50' },
+        { title: 'Khán giả đăng ký', value: '680+', growth: '+15%', isUp: true, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { title: 'Câu hỏi Q&A trực tiếp', value: '5 câu', growth: 'Đang mở', isUp: true, icon: Sparkles, color: 'text-amber-600', bg: 'bg-amber-50' },
+        { title: 'Điểm đánh giá trung bình', value: '4.9 ★', growth: 'Xuất sắc', isUp: true, icon: Star, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+      ];
+    }
+    // Default Attendee / User
+    return [
+      { title: 'Vé sự kiện của tôi', value: '2 vé', growth: 'Hợp lệ', isUp: true, icon: QrCode, color: 'text-[#DC2626]', bg: 'bg-red-50' },
+      { title: 'Sự kiện sắp tham dự', value: upcomingCount > 0 ? `${upcomingCount} sự kiện` : '1 sự kiện', growth: 'Tuần này', isUp: true, icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50' },
+      { title: 'Điểm thưởng tích lũy', value: '150 điểm', growth: '+50', isUp: true, icon: Star, color: 'text-amber-600', bg: 'bg-amber-50' },
+      { title: 'Khảo sát chờ đánh giá', value: '1 khảo sát', growth: 'Mới', isUp: true, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    ];
+  }, [currentRole, totalEventsCount, totalAttendeesCount, upcomingCount, ongoingCount]);
+
+  const quickActions = useMemo(() => {
+    if (currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN') {
+      return [
+        { label: 'Quản lý người dùng', tab: 'users', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', hoverBorder: 'hover:border-blue-500 hover:bg-blue-50/50' },
+        { label: 'Nhật ký bảo mật', tab: 'logs', icon: ShieldCheck, color: 'text-purple-600', bg: 'bg-purple-50', hoverBorder: 'hover:border-purple-500 hover:bg-purple-50/50' },
+        { label: 'Kho tri thức RAG AI', tab: 'knowledge-base', icon: Database, color: 'text-emerald-600', bg: 'bg-emerald-50', hoverBorder: 'hover:border-emerald-500 hover:bg-emerald-50/50' },
+        { label: 'Báo cáo nền tảng', tab: 'reports', icon: Sparkles, color: 'text-white', bg: 'bg-[#12213A]', isDark: true },
+      ];
+    }
+    if (currentRole === 'EVENT_MANAGER' || currentRole === 'ORGANIZER') {
+      return [
+        { label: 'Tạo sự kiện mới', tab: 'events', icon: Plus, color: 'text-[#DC2626]', bg: 'bg-[#DC2626]/10', hoverBorder: 'hover:border-[#DC2626] hover:bg-red-50/50' },
+        { label: 'Chiến dịch Email Resend', tab: 'campaigns', icon: Mail, color: 'text-emerald-600', bg: 'bg-emerald-50', hoverBorder: 'hover:border-emerald-500 hover:bg-emerald-50/50' },
+        { label: 'AI PR Studio', tab: 'content-studio', icon: Sparkles, color: 'text-purple-600', bg: 'bg-purple-50', hoverBorder: 'hover:border-purple-500 hover:bg-purple-50/50' },
+        { label: 'Báo cáo & Phân tích', tab: 'reports', icon: Sparkles, color: 'text-white', bg: 'bg-[#12213A]', isDark: true },
+      ];
+    }
+    if (currentRole === 'STAFF') {
+      return [
+        { label: 'Quét vé QR Code camera', tab: 'scanner', icon: ScanLine, color: 'text-emerald-600', bg: 'bg-emerald-50', hoverBorder: 'hover:border-emerald-500 hover:bg-emerald-50/50' },
+        { label: 'Tra cứu danh sách sự kiện', tab: 'events', icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50', hoverBorder: 'hover:border-blue-500 hover:bg-blue-50/50' },
+        { label: 'Hỗ trợ khách (AI Concierge)', tab: 'inquiries', icon: Sparkles, color: 'text-purple-600', bg: 'bg-purple-50', hoverBorder: 'hover:border-purple-500 hover:bg-purple-50/50' },
+        { label: 'Khảo sát & Đánh giá', tab: 'feedback', icon: Star, color: 'text-white', bg: 'bg-[#12213A]', isDark: true },
+      ];
+    }
+    if (currentRole === 'SPEAKER') {
+      return [
+        { label: 'Cổng thông tin diễn giả', tab: 'speaker', icon: Mic, color: 'text-purple-600', bg: 'bg-purple-50', hoverBorder: 'hover:border-purple-500 hover:bg-purple-50/50' },
+        { label: 'Lịch trình sự kiện', tab: 'events', icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50', hoverBorder: 'hover:border-blue-500 hover:bg-blue-50/50' },
+        { label: 'Xem đánh giá phiên', tab: 'feedback', icon: Star, color: 'text-amber-600', bg: 'bg-amber-50', hoverBorder: 'hover:border-amber-500 hover:bg-amber-50/50' },
+        { label: 'Cài đặt hồ sơ diễn giả', tab: 'settings', icon: Users, color: 'text-white', bg: 'bg-[#12213A]', isDark: true },
+      ];
+    }
+    // Default Attendee / User
+    return [
+      { label: 'Khám phá sự kiện mới', tab: 'events', icon: Calendar, color: 'text-[#DC2626]', bg: 'bg-red-50', hoverBorder: 'hover:border-[#DC2626] hover:bg-red-50/50' },
+      { label: 'Đánh giá & Góp ý sự kiện', tab: 'feedback', icon: Star, color: 'text-amber-600', bg: 'bg-amber-50', hoverBorder: 'hover:border-amber-500 hover:bg-amber-50/50' },
+      { label: 'Cài đặt tài khoản & vé', tab: 'settings', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', hoverBorder: 'hover:border-blue-500 hover:bg-blue-50/50' },
+      { label: 'Hỏi đáp AI Concierge', tab: 'inquiries', icon: Sparkles, color: 'text-white', bg: 'bg-[#12213A]', isDark: true },
+    ];
+  }, [currentRole]);
+
   return (
     <div className="space-y-6">
       
@@ -218,7 +321,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
           <h1 className="text-2xl font-bold text-[#12213A]">
             Chào mừng trở lại, {user?.full_name || 'Quản trị viên'}!
           </h1>
-          <p className="text-[#64748B] mt-1 font-medium">Quản trị viên hệ thống</p>
+          <p className="text-[#64748B] mt-1 font-medium">{roleSubtitle}</p>
         </div>
         
         <div className="flex items-center gap-4 bg-white px-4 py-2.5 rounded-xl border border-[#E5EAF2] shadow-sm select-none">
@@ -247,12 +350,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
 
       {/* 2. KPI CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { title: 'Tổng sự kiện', value: totalEventsCount.toLocaleString('vi-VN'), growth: '+12%', isUp: true, icon: Calendar, color: 'text-[#DC2626]', bg: 'bg-red-50' },
-          { title: 'Tổng người tham dự', value: totalAttendeesCount, growth: '+18%', isUp: true, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { title: 'Sự kiện sắp diễn ra', value: upcomingCount.toLocaleString('vi-VN'), growth: '+5%', isUp: true, icon: Mic, color: 'text-purple-600', bg: 'bg-purple-50' },
-          { title: 'Lượt đăng ký vé', value: totalAttendeesCount, growth: '+22%', isUp: true, icon: QrCode, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        ].map((kpi, idx) => (
+        {roleKPIs.map((kpi, idx) => (
           <div key={idx} className="bg-white rounded-xl border border-[#E5EAF2] p-5 shadow-sm">
             <div className="flex justify-between items-start">
               <div>
@@ -376,53 +474,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
           <p className="text-[12px] text-[#64748B] mt-0.5 mb-5">Truy cập nhanh các chức năng chính</p>
           
           <div className="space-y-3">
-            <button 
-              onClick={() => onNavigateTab?.('events')}
-              className="w-full flex items-center justify-between p-3 rounded-xl border border-[#E5EAF2] hover:border-[#DC2626] hover:bg-red-50/50 transition-colors group text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#DC2626]/10 flex items-center justify-center shrink-0">
-                  <Plus className="w-4 h-4 text-[#DC2626]" />
-                </div>
-                <span className="text-[13px] font-bold text-[#12213A] group-hover:text-[#DC2626]">Tạo sự kiện mới</span>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => onNavigateTab?.('speakers')}
-              className="w-full flex items-center justify-between p-3 rounded-xl border border-[#E5EAF2] hover:border-blue-500 hover:bg-blue-50/50 transition-colors group text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                  <UserPlus className="w-4 h-4 text-blue-600" />
-                </div>
-                <span className="text-[13px] font-bold text-[#12213A] group-hover:text-blue-600">Thêm diễn giả</span>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => onNavigateTab?.('check-in')}
-              className="w-full flex items-center justify-between p-3 rounded-xl border border-[#E5EAF2] hover:border-emerald-500 hover:bg-emerald-50/50 transition-colors group text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                  <ScanLine className="w-4 h-4 text-emerald-600" />
-                </div>
-                <span className="text-[13px] font-bold text-[#12213A] group-hover:text-emerald-600">Quét vé QR Code</span>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => onNavigateTab?.('inquiries')}
-              className="w-full flex items-center justify-between p-3 rounded-xl bg-[#12213A] hover:bg-[#1a2d4f] transition-colors border border-transparent shadow-[0_4px_12px_rgba(18,33,58,0.2)] text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-                <span className="text-[13px] font-bold text-white">Phân tích bằng AI</span>
-              </div>
-            </button>
+            {quickActions.map((qa, idx) => {
+              const Icon = qa.icon;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => onNavigateTab?.(qa.tab)}
+                  className={`w-full flex items-center justify-between p-3 rounded-xl transition-all group text-left cursor-pointer ${
+                    qa.isDark
+                      ? 'bg-[#12213A] hover:bg-[#1a2d4f] text-white shadow-[0_4px_12px_rgba(18,33,58,0.2)]'
+                      : `border border-[#E5EAF2] ${qa.hoverBorder}`
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg ${qa.bg} flex items-center justify-center shrink-0`}>
+                      <Icon className={`w-4 h-4 ${qa.color}`} />
+                    </div>
+                    <span className={`text-[13px] font-bold ${qa.isDark ? 'text-white' : 'text-[#12213A]'}`}>
+                      {qa.label}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
