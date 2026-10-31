@@ -21,8 +21,8 @@ export interface User {
   };
   last_active_at?: string;
   created_at?: string;
-  permissions?: string[];
 }
+
 
 export interface ActiveSession {
   id: number;

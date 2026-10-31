@@ -34,8 +34,8 @@ const formatLocationCity = (loc?: string) => {
 
 const LandingPage: React.FC = () => {
 
-  const [_featuredEvents, setFeaturedEvents] = useState<any[]>([]);
-  const [_loadingEvents, setLoadingEvents] = useState(true);
+  const [featuredEvents, setFeaturedEvents] = useState<any[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
 
   const fetchHomepageEvents = useCallback(async () => {
     try {

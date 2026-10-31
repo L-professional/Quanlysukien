@@ -34,18 +34,9 @@ export function normalizeRole(raw: string | undefined | null): UserRole {
   return 'ATTENDEE'; // PARTICIPANT, ATTENDEE, etc.
 }
 
-export type { UserRole };
-
 export const DEMO_PRESETS: Record<UserRole, User> = {
-  SUPER_ADMIN: {
-    id: 1,
-    role_id: 1,
-    full_name: 'Nguyễn Văn Quản Trị Tối Cao',
-    email: 'superadmin@eventhub.ai',
-    role_name: 'SUPER_ADMIN',
-    is_active: true,
-  },
   ADMIN: {
+
     id: 1,
     role_id: 1,
     full_name: 'Nguyễn Văn Quản Trị',

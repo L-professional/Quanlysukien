@@ -1710,8 +1710,12 @@ ${generatedResults.press_release || ''}
                             </div>
                           </div>
                         </div>
+                      )}
+
+
                       {/* Direct Trigger to Resend Email Campaign */}
                       <div className="bg-gradient-to-r from-red-50/90 to-blue-50/90 border border-red-200/80 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-2">
                             <Mail className="w-4 h-4 text-red-600" />

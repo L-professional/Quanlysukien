@@ -3384,71 +3384,7 @@ export const apiService = {
     const response = await apiClient.post('/campaigns/unsubscribe', payload);
     return response.data;
   },
-
-  async getReportOverview(filters?: any): Promise<any> {
-    try {
-      const response = await apiClient.get('/reports/overview', { params: filters });
-      return response.data;
-    } catch {
-      return {
-        kpis: [
-          { label: 'Tổng số sự kiện', value: '24', change: '+12%', isPositive: true },
-          { label: 'Lượng người tham dự', value: '4,520', change: '+8.4%', isPositive: true },
-          { label: 'Tỷ lệ check-in thành công', value: '94.2%', change: '+3.1%', isPositive: true },
-          { label: 'Doanh thu vé ước tính', value: '185M VNĐ', change: '+15.6%', isPositive: true },
-        ],
-        lineChartData: [
-          { name: 'T1', value: 320 },
-          { name: 'T2', value: 450 },
-          { name: 'T3', value: 600 },
-          { name: 'T4', value: 580 },
-          { name: 'T5', value: 720 },
-          { name: 'T6', value: 890 },
-        ],
-        donutData: [
-          { name: 'Công nghệ & AI', value: 45 },
-          { name: 'Kinh doanh & Khởi nghiệp', value: 25 },
-          { name: 'Thiết kế & Nghệ thuật', value: 15 },
-          { name: 'Giáo dục & Đào tạo', value: 15 },
-        ],
-        barChartData: [
-          { name: 'Hội thảo', count: 12 },
-          { name: 'Networking', count: 8 },
-          { name: 'Workshop', count: 4 },
-        ]
-      };
-    }
-  },
-
-  async getReportsList(): Promise<any[]> {
-    try {
-      const response = await apiClient.get('/reports/list');
-      return response.data;
-    } catch {
-      return [
-        { id: 1, name: 'Báo cáo Tổng kết Tech Summit 2026', type: 'Hiệu quả sự kiện', period: '01/03/2026 - 16/03/2026', creator: 'Nguyễn Văn Admin', date: '16/03/2026', status: 'Hoàn thành' },
-        { id: 2, name: 'Báo cáo Tương tác Email Marketing AI', type: 'Marketing Campaign', period: '01/04/2026 - 20/04/2026', creator: 'Ban Truyền Thông', date: '21/04/2026', status: 'Hoàn thành' },
-      ];
-    }
-  },
-
-  async exportReport(payload: any): Promise<Blob> {
-    try {
-      const response = await apiClient.post('/reports/export', payload, { responseType: 'blob' });
-      return response.data;
-    } catch {
-      return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    }
-  },
-
-  async deleteReport(id: number): Promise<any> {
-    try {
-      const response = await apiClient.delete(`/reports/${id}`);
-      return response.data;
-    } catch {
-      return { success: true };
-    }
-  },
 };
+
 
 export type { NotificationItem };
