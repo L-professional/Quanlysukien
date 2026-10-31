@@ -29,6 +29,12 @@ import { ManagerAttendees } from './pages/ManagerAttendees';
 import { ManagerSpeakers } from './pages/ManagerSpeakers';
 import { ManagerStaff } from './pages/ManagerStaff';
 import { NotificationsPage } from './pages/NotificationsPage';
+import { StaffEvents } from './pages/StaffEvents';
+import { StaffAttendees } from './pages/StaffAttendees';
+import { StaffRegistrationSupport } from './pages/StaffRegistrationSupport';
+import { StaffSchedule } from './pages/StaffSchedule';
+import { StaffTasks } from './pages/StaffTasks';
+import { StaffReports } from './pages/StaffReports';
 
 const AppRoutes: React.FC = () => {
   const navigate = useNavigate();
@@ -293,6 +299,75 @@ const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
+
+        {/* Staff Dedicated Submodules */}
+        <Route
+          path="staff/events"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'STAFF']}
+              redirectTo="/dashboard"
+            >
+              <StaffEvents />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="staff/attendees"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'STAFF']}
+              redirectTo="/dashboard"
+            >
+              <StaffAttendees />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="staff/registration-support"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'STAFF']}
+              redirectTo="/dashboard"
+            >
+              <StaffRegistrationSupport />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="staff/schedule"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'STAFF']}
+              redirectTo="/dashboard"
+            >
+              <StaffSchedule />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="staff/tasks"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'STAFF']}
+              redirectTo="/dashboard"
+            >
+              <StaffTasks />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="staff/reports"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'STAFF']}
+              redirectTo="/dashboard"
+            >
+              <StaffReports />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="notifications"
           element={

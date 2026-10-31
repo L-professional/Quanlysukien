@@ -27,19 +27,31 @@ import {
 } from 'lucide-react';
 import jsQR from 'jsqr';
 import { apiService } from '../services/api';
-import { CheckInResult } from '../types';
+import { CheckInResult, StaffAssignedEvent } from '../types';
 import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useEvent } from '../context/EventContext';
 
 export const QRScanner: React.FC = () => {
   const { t } = useTranslation();
-  const { hasRole } = useAuth();
+  const { hasRole, userRole } = useAuth();
   const { events, activeEvent, setActiveEvent } = useEvent();
   const canIssueManual = hasRole(['ADMIN', 'STAFF', 'EVENT_MANAGER']);
 
   // Selected Event to check-in for (Task 59 Requirement 2)
   const [selectedEventId, setSelectedEventId] = useState<number>(activeEvent?.id || 1);
+  const [staffEvents, setStaffEvents] = useState<StaffAssignedEvent[]>([]);
+
+  useEffect(() => {
+    if (userRole === 'STAFF') {
+      apiService.getStaffAssignedEvents().then((data) => {
+        setStaffEvents(data);
+        if (data.length > 0 && !data.some((e) => e.id === selectedEventId)) {
+          setSelectedEventId(data[0].id);
+        }
+      }).catch(console.error);
+    }
+  }, [userRole]);
 
   useEffect(() => {
     if (activeEvent?.id) {
@@ -562,13 +574,13 @@ export const QRScanner: React.FC = () => {
             onChange={(e) => {
               const id = parseInt(e.target.value, 10);
               setSelectedEventId(id);
-              const ev = events.find((item) => item.id === id);
+              const ev = (userRole === 'STAFF' && staffEvents.length > 0 ? (staffEvents as any[]) : events).find((item) => item.id === id);
               if (ev) setActiveEvent(ev);
               toast.info(`Đã chuyển cổng soát vé sang: ${ev?.title || id}`);
             }}
             className="px-3.5 py-2 rounded-xl bg-red-800/80 border border-red-400/40 text-white text-xs font-bold focus:outline-hidden focus:ring-2 focus:ring-white cursor-pointer"
           >
-            {events.map((ev) => (
+            {(userRole === 'STAFF' && staffEvents.length > 0 ? staffEvents : events).map((ev) => (
               <option key={ev.id} value={ev.id}>
                 #{ev.id} - {ev.title}
               </option>

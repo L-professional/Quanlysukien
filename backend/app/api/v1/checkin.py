@@ -14,7 +14,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import require_roles
+from app.core.security import require_roles, get_current_user_optional
 from app.models.registration import Registration
 from app.models.user import User
 from app.models.event import EventSchedule, Event
@@ -49,13 +49,14 @@ class CheckInHistoryItem(BaseModel):
              dependencies=[Depends(require_roles(["ADMIN", "STAFF", "EVENT_MANAGER"]))])
 async def perform_checkin(
     payload: CheckInRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     [ADMIN/STAFF/EVENT_MANAGER] Perform QR code check-in.
     Alias for /api/v1/registrations/check-in.
     """
-    return await verify_check_in(payload=payload, db=db)
+    return await verify_check_in(payload=payload, db=db, current_user=current_user)
 
 
 @router.get("/history", response_model=List[CheckInHistoryItem],
@@ -144,13 +145,14 @@ async def get_checkin_history(
              dependencies=[Depends(require_roles(["ADMIN", "STAFF", "EVENT_MANAGER"]))])
 async def manual_checkin_ticket(
     payload: ManualCheckInRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     [ADMIN/STAFF/EVENT_MANAGER] Manual check-in by token or registration_id.
     """
     if payload.token:
-        return await verify_check_in(payload=CheckInRequest(token=payload.token), db=db)
+        return await verify_check_in(payload=CheckInRequest(token=payload.token), db=db, current_user=current_user)
     elif payload.registration_id:
         now_vn = datetime.now(timezone.utc) + timedelta(hours=7)
         stmt = select(Registration).where(Registration.id == payload.registration_id)
@@ -174,9 +176,26 @@ async def manual_checkin_ticket(
                 token=reg.qr_code_token,
             )
 
-        reg.is_checked_in = True
-        reg.checked_in_at = now_vn
-        db.add(reg)
+        # Atomic update
+        stmt_update = (
+            update(Registration)
+            .where(Registration.id == payload.registration_id, Registration.is_checked_in == False)
+            .values(
+                is_checked_in=True,
+                checked_in_at=now_vn,
+                checked_in_by=current_user.id if current_user else None
+            )
+        )
+        update_res = await db.execute(stmt_update)
+        if update_res.rowcount == 0:
+            return CheckInResponse(
+                status="ALREADY_USED",
+                message="Vé này đã được check-in trước đó tại một cổng khác!",
+                participantName=p_name,
+                ticketType=reg.ticket_type or "Vé Tham Dự",
+                token=reg.qr_code_token,
+            )
+
         await db.commit()
 
         c_time = now_vn.strftime("%H:%M:%S %d/%m/%Y")

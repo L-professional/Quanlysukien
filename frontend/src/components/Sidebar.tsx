@@ -3,7 +3,7 @@ import {
   LayoutDashboard, Calendar, Mic, QrCode, MessageSquare, 
   Sparkles, Database, Star, Users, ShieldCheck, 
   Settings as SettingsIcon, Zap, X, ChevronDown, PieChart, Mail,
-  Bell, Layers, Ticket, UserCheck
+  Bell, Layers, Ticket, UserCheck, CheckSquare, BarChart3, LifeBuoy
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
@@ -234,10 +234,77 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ], []);
 
+  // Dedicated 10-item navigation for Staff (Staff Master Prompt)
+  const staffMenuItems: MenuItem[] = useMemo(() => [
+    {
+      id: 'dashboard',
+      label: 'Tổng quan công việc',
+      icon: LayoutDashboard,
+      allowedRoles: ['STAFF'],
+    },
+    {
+      id: 'staff-events',
+      label: 'Sự kiện được phân công',
+      icon: Calendar,
+      allowedRoles: ['STAFF'],
+    },
+    {
+      id: 'scanner',
+      label: 'Quét mã và Check-in',
+      icon: QrCode,
+      allowedRoles: ['STAFF'],
+    },
+    {
+      id: 'staff-attendees',
+      label: 'Danh sách người tham dự',
+      icon: Users,
+      allowedRoles: ['STAFF'],
+    },
+    {
+      id: 'staff-support',
+      label: 'Hỗ trợ đăng ký',
+      icon: LifeBuoy,
+      allowedRoles: ['STAFF'],
+    },
+    {
+      id: 'staff-schedule',
+      label: 'Lịch trình sự kiện',
+      icon: Layers,
+      allowedRoles: ['STAFF'],
+    },
+    {
+      id: 'staff-tasks',
+      label: 'Nhiệm vụ được giao',
+      icon: CheckSquare,
+      allowedRoles: ['STAFF'],
+    },
+    {
+      id: 'staff-reports',
+      label: 'Báo cáo vận hành',
+      icon: BarChart3,
+      allowedRoles: ['STAFF'],
+    },
+    {
+      id: 'notifications',
+      label: 'Thông báo',
+      icon: Bell,
+      allowedRoles: ['STAFF'],
+    },
+    {
+      id: 'settings',
+      label: 'Hồ sơ cá nhân',
+      icon: SettingsIcon,
+      allowedRoles: ['STAFF'],
+    },
+  ], []);
+
   // Filter based on allowedRoles: items with insufficient permissions are completely removed
   const visibleMenuItems = useMemo(() => {
     if (currentRole === 'EVENT_MANAGER' || currentRole === 'ORGANIZER') {
       return managerMenuItems;
+    }
+    if (currentRole === 'STAFF') {
+      return staffMenuItems;
     }
     const list = Array.isArray(menuItems) ? menuItems : [];
     return list.filter((item) => {
@@ -252,7 +319,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         (currentRole === 'ATTENDEE' && allowed.includes('PARTICIPANT' as any))
       );
     });
-  }, [menuItems, managerMenuItems, currentRole]);
+  }, [menuItems, managerMenuItems, staffMenuItems, currentRole]);
 
   // Actor Workspace Metadata
   const actorInfo = useMemo(() => {
@@ -354,12 +421,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           items: ['dashboard'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
         },
         {
-          title: 'ĐIỀU PHỐI HIỆN TRƯỜNG',
-          items: ['scanner', 'events', 'inquiries'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+          title: 'VẬN HÀNH CỔNG & KHÁCH',
+          items: ['staff-events', 'scanner', 'staff-attendees', 'staff-support'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
         },
         {
-          title: 'ĐÁNH GIÁ & CÀI ĐẶT',
-          items: ['feedback', 'settings'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+          title: 'LỊCH TRÌNH & NHIỆM VỤ',
+          items: ['staff-schedule', 'staff-tasks', 'staff-reports'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
+        },
+        {
+          title: 'HỆ THỐNG & CÁ NHÂN',
+          items: ['notifications', 'settings'].map((id) => visibleMap.get(id)).filter(Boolean) as MenuItem[],
         },
       ];
     }

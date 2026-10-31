@@ -9,7 +9,7 @@ import { useRealTimeClock } from '../hooks/useRealTimeClock';
 import { apiService } from '../services/api';
 import { useEventSync } from '../services/eventSync';
 import { cleanEventTitle } from '../components/EventCard';
-import { Event, ManagerDashboardData } from '../types';
+import { Event, ManagerDashboardData, StaffDashboardData } from '../types';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -95,6 +95,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
   const [, setLoadingEvents] = useState<boolean>(true);
   const [managerData, setManagerData] = useState<ManagerDashboardData | null>(null);
   const [managerSelectedEventId, setManagerSelectedEventId] = useState<number | null>(null);
+  const [staffDashboardData, setStaffDashboardData] = useState<StaffDashboardData | null>(null);
 
   const roleSubtitle = useMemo(() => {
     switch (currentRole) {
@@ -146,6 +147,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
       loadManagerDashboard();
     }
   }, [currentRole, managerSelectedEventId, timeRange]);
+
+  // Load Staff Dashboard data when role is Staff
+  useEffect(() => {
+    if (currentRole === 'STAFF') {
+      const loadStaffDashboard = async () => {
+        try {
+          const sData = await apiService.getStaffDashboard();
+          setStaffDashboardData(sData);
+        } catch (e) {
+          console.warn('Lỗi tải dữ liệu staff dashboard:', e);
+        }
+      };
+      loadStaffDashboard();
+    }
+  }, [currentRole]);
 
   // Real-time synchronization whenever events are updated, created, or deleted across the system
   useEventSync(fetchDashboardEvents);
@@ -299,11 +315,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
       ];
     }
     if (currentRole === 'STAFF') {
+      const kpis = staffDashboardData?.kpis;
       return [
-        { title: 'Lượt check-in hôm nay', value: totalAttendeesCount, growth: '+32%', isUp: true, icon: QrCode, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { title: 'Tỷ lệ quét vé thành công', value: '99.4%', growth: '+0.4%', isUp: true, icon: CheckCircle2, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { title: 'Sự kiện đang trực', value: ongoingCount > 0 ? String(ongoingCount) : '1', growth: 'Hiện trường', isUp: true, icon: Calendar, color: 'text-[#DC2626]', bg: 'bg-red-50' },
-        { title: 'Thắc mắc khách cần giải đáp', value: '2 câu hỏi', growth: '-50%', isUp: false, icon: Sparkles, color: 'text-amber-600', bg: 'bg-amber-50' },
+        {
+          title: 'Sự kiện được phân công',
+          value: kpis ? `${kpis.assigned_events} sự kiện` : 'Đang tải...',
+          growth: `${kpis?.ongoing_events || 0} đang diễn ra`,
+          isUp: true,
+          icon: Calendar,
+          color: 'text-blue-600',
+          bg: 'bg-blue-50',
+        },
+        {
+          title: 'Tổng lượt đã check-in',
+          value: kpis ? `${kpis.total_checkins} lượt` : 'Đang tải...',
+          growth: `Hôm nay: +${kpis?.today_checkins || 0}`,
+          isUp: true,
+          icon: QrCode,
+          color: 'text-emerald-600',
+          bg: 'bg-emerald-50',
+        },
+        {
+          title: 'Khách còn lại cần đón',
+          value: kpis ? `${kpis.remaining_attendees} người` : 'Đang tải...',
+          growth: 'Chưa vào cổng',
+          isUp: false,
+          icon: Users,
+          color: 'text-amber-600',
+          bg: 'bg-amber-50',
+        },
+        {
+          title: 'Nhiệm vụ trong ca',
+          value: kpis ? `${kpis.completed_tasks}/${kpis.total_tasks}` : 'Đang tải...',
+          growth: kpis && kpis.blocked_tasks > 0 ? `⚠️ ${kpis.blocked_tasks} bị nghẽn` : 'Đúng tiến độ',
+          isUp: !(kpis && kpis.blocked_tasks > 0),
+          icon: CheckCircle2,
+          color: 'text-[#DC2626]',
+          bg: 'bg-red-50',
+        },
       ];
     }
     if (currentRole === 'SPEAKER') {
@@ -321,7 +370,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
       { title: 'Điểm thưởng tích lũy', value: '150 điểm', growth: '+50', isUp: true, icon: Star, color: 'text-amber-600', bg: 'bg-amber-50' },
       { title: 'Khảo sát chờ đánh giá', value: '1 khảo sát', growth: 'Mới', isUp: true, icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     ];
-  }, [currentRole, totalEventsCount, totalAttendeesCount, upcomingCount, ongoingCount]);
+  }, [currentRole, totalEventsCount, totalAttendeesCount, upcomingCount, ongoingCount, staffDashboardData]);
 
   const quickActions = useMemo(() => {
     if (currentRole === 'ADMIN' || currentRole === 'SUPER_ADMIN') {
@@ -343,9 +392,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
     if (currentRole === 'STAFF') {
       return [
         { label: 'Quét vé QR Code camera', tab: 'scanner', icon: ScanLine, color: 'text-emerald-600', bg: 'bg-emerald-50', hoverBorder: 'hover:border-emerald-500 hover:bg-emerald-50/50' },
-        { label: 'Tra cứu danh sách sự kiện', tab: 'events', icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50', hoverBorder: 'hover:border-blue-500 hover:bg-blue-50/50' },
-        { label: 'Hỗ trợ khách (AI Concierge)', tab: 'inquiries', icon: Sparkles, color: 'text-purple-600', bg: 'bg-purple-50', hoverBorder: 'hover:border-purple-500 hover:bg-purple-50/50' },
-        { label: 'Khảo sát & Đánh giá', tab: 'feedback', icon: Star, color: 'text-white', bg: 'bg-[#12213A]', isDark: true },
+        { label: 'Sự kiện được phân công', tab: 'staff-events', icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50', hoverBorder: 'hover:border-blue-500 hover:bg-blue-50/50' },
+        { label: 'Danh sách người tham dự', tab: 'staff-attendees', icon: Users, color: 'text-purple-600', bg: 'bg-purple-50', hoverBorder: 'hover:border-purple-500 hover:bg-purple-50/50' },
+        { label: 'Hỗ trợ đăng ký tại quầy', tab: 'staff-support', icon: Sparkles, color: 'text-white', bg: 'bg-[#12213A]', isDark: true },
       ];
     }
     if (currentRole === 'SPEAKER') {
@@ -444,6 +493,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
               className="px-3 py-1.5 text-xs font-semibold text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-lg transition shrink-0"
             >
               Kiểm tra ngay
+            </button>
+          </div>
+        )}
+
+      {/* Staff Operational Alerts Banner */}
+      {currentRole === 'STAFF' &&
+        staffDashboardData?.operational_alerts &&
+        staffDashboardData.operational_alerts.length > 0 && (
+          <div className="bg-cyan-50 border border-cyan-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-cyan-600 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-bold text-cyan-900">
+                  Thông báo điều phối ca trực ({staffDashboardData.operational_alerts.length})
+                </h4>
+                <div className="mt-1 space-y-1">
+                  {staffDashboardData.operational_alerts.map((al, idx) => (
+                    <p key={idx} className="text-xs text-cyan-800">
+                      • <span className="font-semibold">{al.title}</span>: {al.message}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => onNavigateTab?.('staff-tasks')}
+              className="px-3 py-1.5 text-xs font-semibold text-cyan-900 bg-cyan-100 hover:bg-cyan-200 rounded-lg transition shrink-0"
+            >
+              Xem nhiệm vụ ca
             </button>
           </div>
         )}

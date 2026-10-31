@@ -1,5 +1,14 @@
 import os
+import sys
 import time
+
+# Enforce UTF-8 stdout/stderr on Windows to prevent charmap UnicodeEncodeErrors
+if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 # Enforce Hanoi, Vietnam Timezone (UTC+7) across server processes and C-runtime
 os.environ["TZ"] = "Asia/Ho_Chi_Minh"
@@ -203,7 +212,81 @@ async def lifespan(app: FastAPI):
                     updated_at TIMESTAMPTZ DEFAULT NOW()
                 );
             """))
-        print("User, Registration, Event columns, Manager tables & event_knowledge_base view ensured.")
+
+            # Staff Module Safe Migrations (Task: Staff Operations Module)
+            await conn.execute(text(
+                "ALTER TABLE registrations ADD COLUMN IF NOT EXISTS checked_in_by INTEGER REFERENCES users(id) ON DELETE SET NULL;"
+            ))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS event_staff_tasks (
+                    id SERIAL PRIMARY KEY,
+                    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+                    staff_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT NULL,
+                    category VARCHAR(100) NOT NULL DEFAULT 'QR_CHECKIN',
+                    priority VARCHAR(50) NOT NULL DEFAULT 'MEDIUM',
+                    status VARCHAR(50) NOT NULL DEFAULT 'NOT_STARTED',
+                    start_time TIMESTAMPTZ NULL,
+                    deadline TIMESTAMPTZ NULL,
+                    completion_notes TEXT NULL,
+                    blocker_reason TEXT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                );
+            """))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS staff_operational_incidents (
+                    id SERIAL PRIMARY KEY,
+                    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+                    staff_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    incident_type VARCHAR(100) NOT NULL,
+                    severity VARCHAR(50) NOT NULL DEFAULT 'MEDIUM',
+                    title VARCHAR(255) NOT NULL,
+                    description TEXT NOT NULL,
+                    ticket_code VARCHAR(100) NULL,
+                    status VARCHAR(50) NOT NULL DEFAULT 'REPORTED',
+                    manager_response TEXT NULL,
+                    reported_at TIMESTAMPTZ DEFAULT NOW(),
+                    resolved_at TIMESTAMPTZ NULL
+                );
+            """))
+
+            # Seed demo assignments and tasks for Staff (User ID 4)
+            # 1. Assign staff ID 4 to available events
+            await conn.execute(text("""
+                INSERT INTO event_staff_assignments (event_id, staff_id, task_name, status, notes)
+                SELECT e.id, 4, 'Soát vé QR tại cổng chính A', 'ACTIVE', 'Phụ trách làn quét vé Standard & VIP'
+                FROM events e
+                LIMIT 5
+                ON CONFLICT (event_id, staff_id, task_name) DO NOTHING;
+            """))
+
+            # 2. Seed initial tasks for staff ID 4 if none exist
+            tasks_exist = (await conn.execute(text("SELECT COUNT(*) FROM event_staff_tasks WHERE staff_id = 4"))).scalar()
+            if not tasks_exist:
+                await conn.execute(text("""
+                    INSERT INTO event_staff_tasks (event_id, staff_id, title, description, category, priority, status, start_time, deadline)
+                    SELECT e.id, 4, 'Soát vé QR Code tại Cửa A - Sảnh chính', 'Quét mã QR và xác nhận thẻ đeo cho đại biểu tham dự phiên khai mạc.', 'QR_CHECKIN', 'HIGH', 'IN_PROGRESS', NOW(), NOW() + INTERVAL '4 hours'
+                    FROM events e LIMIT 1;
+                """))
+                await conn.execute(text("""
+                    INSERT INTO event_staff_tasks (event_id, staff_id, title, description, category, priority, status, start_time, deadline)
+                    SELECT e.id, 4, 'Bàn hướng dẫn & Cấp thẻ tại chỗ (Walk-in)', 'Hỗ trợ khách mời chưa nhận email hoặc quên mã QR đăng ký nhanh thẻ vé.', 'REGISTRATION_SUPPORT', 'MEDIUM', 'NOT_STARTED', NOW() + INTERVAL '1 hour', NOW() + INTERVAL '6 hours'
+                    FROM events e LIMIT 1;
+                """))
+                await conn.execute(text("""
+                    INSERT INTO event_staff_tasks (event_id, staff_id, title, description, category, priority, status, start_time, deadline)
+                    SELECT e.id, 4, 'Kiểm tra kỹ thuật micro & máy chiếu Hội trường B1', 'Phối hợp với kỹ thuật viên AV kiểm tra âm thanh trước phiên diễn thuyết.', 'VENUE_OPS', 'MEDIUM', 'COMPLETED', NOW() - INTERVAL '2 hours', NOW() - INTERVAL '30 minutes'
+                    FROM events e LIMIT 1;
+                """))
+                await conn.execute(text("""
+                    INSERT INTO event_staff_tasks (event_id, staff_id, title, description, category, priority, status, start_time, deadline)
+                    SELECT e.id, 4, 'Điều phối hàng đợi sảnh đón tiếp đại biểu VIP', 'Phân luồng khách VIP và giải tỏa dồn ứ cục bộ tại cửa soát vé.', 'ATTENDEE_ASSISTANCE', 'URGENT', 'NOT_STARTED', NOW(), NOW() + INTERVAL '2 hours'
+                    FROM events e LIMIT 1;
+                """))
+
+        print("User, Registration, Event columns, Staff & Manager tables ensured.")
 
     except Exception as e:
         print(f"Warning: Column migration skipped: {e}")

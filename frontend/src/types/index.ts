@@ -222,6 +222,7 @@ export interface CheckInResult {
   eventTitle?: string;
   checkInTime?: string;
   token?: string;
+  registration_id?: number;
 }
 
 export interface DashboardStats {
@@ -663,6 +664,138 @@ export interface ManagerSpeakerItem {
   status: 'INVITED' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CONFIRMED';
   avatar_url?: string;
 }
+
+// ── Staff Operations Module Types ───────────────────────────────────────────
+export interface StaffKPIs {
+  assigned_events: number;
+  ongoing_events: number;
+  upcoming_events: number;
+  completed_events: number;
+  total_tasks: number;
+  pending_tasks: number;
+  completed_tasks: number;
+  blocked_tasks: number;
+  total_checkins: number;
+  today_checkins: number;
+  remaining_attendees: number;
+}
+
+export interface StaffAssignedEvent {
+  id: number;
+  title: string;
+  description?: string;
+  location: string;
+  banner_url?: string;
+  start_time?: string;
+  end_time?: string;
+  status: string;
+  category?: string;
+  duty_role?: string;
+  duty_status?: string;
+  duty_notes?: string;
+  assigned_at?: string;
+  checkin_count: number;
+  total_attendees: number;
+  checkin_rate_percent: number;
+  progress_percent?: number;
+}
+
+export interface StaffTaskItem {
+  id: number;
+  event_id: number;
+  event_title: string;
+  staff_id: number;
+  title: string;
+  description?: string;
+  category: 'QR_CHECKIN' | 'REGISTRATION_SUPPORT' | 'VENUE_OPS' | 'ATTENDEE_ASSISTANCE' | 'TECHNICAL' | string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'URGENT' | string;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED';
+  start_time?: string;
+  deadline?: string;
+  completion_notes?: string;
+  blocker_reason?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StaffAttendeeItem {
+  id: number;
+  event_id: number;
+  event_title?: string;
+  full_name: string;
+  email: string;
+  phone_number?: string;
+  ticket_type: string;
+  is_checked_in: boolean;
+  checked_in_at?: string | null;
+  qr_code_token: string;
+  notes?: string;
+}
+
+export interface StaffIncidentItem {
+  id: number;
+  event_id: number;
+  event_title: string;
+  staff_id: number;
+  staff_name: string;
+  incident_type: string;
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  title: string;
+  description: string;
+  ticket_code?: string;
+  status: string;
+  manager_response?: string;
+  reported_at: string;
+  resolved_at?: string;
+}
+
+export interface StaffOperationalReport {
+  summary: {
+    total_attendees: number;
+    total_checked_in: number;
+    remaining: number;
+    checkin_rate_percent: number;
+    tasks_completion_percent: number;
+    total_incidents: number;
+    avg_scan_speed: string;
+  };
+  hourly_distribution: { hour: string; count: number }[];
+  ticket_breakdown: { ticket_type: string; total: number; checked_in: number; rate: number }[];
+  task_breakdown: { status: string; count: number; color: string }[];
+}
+
+export interface StaffScheduleSession {
+  id: number;
+  event_id: number;
+  event_title: string;
+  title: string;
+  description?: string;
+  start_time?: string;
+  end_time?: string;
+  speaker_name?: string;
+  status: 'UPCOMING' | 'ONGOING' | 'FINISHED';
+  room: string;
+}
+
+export interface StaffDashboardData {
+  kpis: StaffKPIs;
+  assigned_events: StaffAssignedEvent[];
+  today_tasks: StaffTaskItem[];
+  recent_checkins: {
+    id: number;
+    full_name: string;
+    ticket_type: string;
+    checked_in_at: string;
+    event_id: number;
+    qr_code_token: string;
+  }[];
+  operational_alerts: {
+    type: 'INFO' | 'WARNING' | 'SUCCESS';
+    title: string;
+    message: string;
+  }[];
+}
+
 
 
 

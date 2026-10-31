@@ -75,10 +75,16 @@ class Registration(Base, TimestampMixin):
     notes: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
     is_checked_in: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     checked_in_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    checked_in_by: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
 
     # Relationships
     event: Mapped["Event"] = relationship("Event", back_populates="registrations")
-    participant: Mapped["User"] = relationship("User", back_populates="registrations")
+    participant: Mapped["User"] = relationship("User", foreign_keys=[participant_id], back_populates="registrations")
     schedule = relationship("EventSchedule", back_populates="registrations")
 
     def __repr__(self) -> str:

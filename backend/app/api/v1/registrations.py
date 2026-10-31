@@ -101,7 +101,8 @@ class SelfRegisterRequest(BaseModel):
              dependencies=[Depends(require_roles(["ADMIN", "STAFF", "EVENT_MANAGER"]))])
 async def verify_check_in(
     payload: CheckInRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
 ):
     """
     [ADMIN/STAFF/EVENT_MANAGER] Verify a QR code token and perform check-in.
@@ -231,10 +232,27 @@ async def verify_check_in(
             token=token,
         )
 
-    # 5. Mark as checked-in with UTC+7 timestamp & log to AILog
-    registration.is_checked_in = True
-    registration.checked_in_at = now_vn
-    db.add(registration)
+    # 5. Mark as checked-in with UTC+7 timestamp & record checked_in_by
+    # ATOMIC UPDATE to avoid race condition across multiple gates
+    stmt = (
+        update(Registration)
+        .where(Registration.id == registration.id, Registration.is_checked_in == False)
+        .values(
+            is_checked_in=True,
+            checked_in_at=now_vn,
+            checked_in_by=current_user.id if current_user else None
+        )
+    )
+    update_res = await db.execute(stmt)
+    if update_res.rowcount == 0:
+        return CheckInResponse(
+            status="ALREADY_USED",
+            message="Vé đã được quét thành công bởi một cổng check-in khác!",
+            participantName=p_name,
+            ticketType=registration.ticket_type or "Vé Tham Dự",
+            eventTitle=title,
+            token=token,
+        )
 
     # Record check-in audit log
     try:
@@ -244,7 +262,7 @@ async def verify_check_in(
             prompt_tokens=0,
             completion_tokens=0,
             latency_ms=10.5,
-            staff_action=f"CHECKIN_SUCCESS_REG_{registration.id}"
+            staff_action=f"CHECKIN_SUCCESS_REG_{registration.id}_BY_{current_user.id if current_user else 'ANON'}"
         )
         db.add(ai_log)
     except Exception as e:

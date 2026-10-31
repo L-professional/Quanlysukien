@@ -57,3 +57,5 @@ export function formatVietnameseTime(dateInput?: string | number | Date | null):
   if (isNaN(d.getTime())) return String(dateInput);
   return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' });
 }
+
+export const formatVietnamDateTime = formatVietnameseDateTime;

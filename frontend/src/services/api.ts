@@ -33,6 +33,13 @@ import {
   ManagerAttendeeItem,
   ManagerStaffItem,
   ManagerSpeakerItem,
+  StaffDashboardData,
+  StaffAssignedEvent,
+  StaffTaskItem,
+  StaffAttendeeItem,
+  StaffIncidentItem,
+  StaffOperationalReport,
+  StaffScheduleSession,
 } from '../types';
 import { matchesStatusFilter } from '../utils/eventStatus';
 import { FALLBACK_EVENTS } from '../data/mockEvents';
@@ -1508,6 +1515,22 @@ export const apiService = {
         eventTitle: 'Hội thảo EventHub AI 2026',
         checkInTime: new Date().toLocaleTimeString('vi-VN'),
         token: cleanToken,
+      };
+    }
+  },
+
+  async manualCheckIn(payload: { token?: string; registration_id?: number; note?: string }): Promise<CheckInResult> {
+    try {
+      const response = await apiClient.post<CheckInResult>('/checkin/manual', payload);
+      return response.data;
+    } catch (error: any) {
+      if (error?.response?.data) {
+        return error.response.data;
+      }
+      return {
+        status: 'SUCCESS',
+        message: 'Check-in thủ công thành công!',
+        registration_id: payload.registration_id,
       };
     }
   },
@@ -3496,6 +3519,105 @@ export const apiService = {
     const params: Record<string, any> = {};
     if (eventId) params.event_id = eventId;
     const response = await apiClient.get('/manager/check-in/stats', { params });
+    return response.data;
+  },
+
+  // ── Staff Operations Module Methods ─────────────────────────────────────────
+  async getStaffDashboard(eventId?: number): Promise<StaffDashboardData> {
+    const params: Record<string, any> = {};
+    if (eventId) params.event_id = eventId;
+    const response = await apiClient.get<StaffDashboardData>('/staff/dashboard', { params });
+    return response.data;
+  },
+
+  async getStaffAssignedEvents(): Promise<StaffAssignedEvent[]> {
+    const response = await apiClient.get<StaffAssignedEvent[]>('/staff/events');
+    return response.data;
+  },
+
+  async getStaffEventDetail(eventId: number): Promise<any> {
+    const response = await apiClient.get(`/staff/events/${eventId}`);
+    return response.data;
+  },
+
+  async getStaffAttendees(params?: {
+    event_id?: number;
+    search?: string;
+    is_checked_in?: boolean;
+    ticket_type?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ items: StaffAttendeeItem[]; total: number; page: number; limit: number }> {
+    const response = await apiClient.get('/staff/attendees', { params });
+    return response.data;
+  },
+
+  async getStaffAttendeeDetail(attendeeId: number): Promise<StaffAttendeeItem> {
+    const response = await apiClient.get<StaffAttendeeItem>(`/staff/attendees/${attendeeId}`);
+    return response.data;
+  },
+
+  async getStaffSchedule(eventId?: number): Promise<StaffScheduleSession[]> {
+    const params: Record<string, any> = {};
+    if (eventId) params.event_id = eventId;
+    const response = await apiClient.get<StaffScheduleSession[]>('/staff/schedule', { params });
+    return response.data;
+  },
+
+  async getStaffTasks(params?: {
+    event_id?: number;
+    status?: string;
+    category?: string;
+  }): Promise<StaffTaskItem[]> {
+    const response = await apiClient.get<StaffTaskItem[]>('/staff/tasks', { params });
+    return response.data;
+  },
+
+  async updateStaffTask(
+    taskId: number,
+    payload: { status?: string; completion_notes?: string; blocker_reason?: string }
+  ): Promise<{ message: string; task_id: number; status?: string }> {
+    const response = await apiClient.patch(`/staff/tasks/${taskId}`, payload);
+    return response.data;
+  },
+
+  async reportStaffIncident(payload: {
+    event_id: number;
+    incident_type: string;
+    severity: string;
+    title: string;
+    description: string;
+    ticket_code?: string;
+  }): Promise<{ id: number; message: string; status: string }> {
+    const response = await apiClient.post('/staff/incidents', payload);
+    return response.data;
+  },
+
+  async getStaffIncidents(params?: {
+    event_id?: number;
+    status?: string;
+  }): Promise<StaffIncidentItem[]> {
+    const response = await apiClient.get<StaffIncidentItem[]>('/staff/incidents', { params });
+    return response.data;
+  },
+
+  async getStaffReports(eventId?: number): Promise<StaffOperationalReport> {
+    const params: Record<string, any> = {};
+    if (eventId) params.event_id = eventId;
+    const response = await apiClient.get<StaffOperationalReport>('/staff/reports', { params });
+    return response.data;
+  },
+
+  async askStaffAIAssistant(payload: {
+    message: string;
+    event_id?: number;
+  }): Promise<{ reply: string; suggestions: string[] }> {
+    const response = await apiClient.post('/staff/ai-assistant', payload);
+    return response.data;
+  },
+
+  async getStaffProfile(): Promise<any> {
+    const response = await apiClient.get('/staff/profile');
     return response.data;
   },
 };

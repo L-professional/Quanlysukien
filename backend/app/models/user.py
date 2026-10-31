@@ -51,6 +51,7 @@ class User(Base, TimestampMixin):
     role: Mapped["Role"] = relationship("Role", back_populates="users")
     registrations: Mapped[List["Registration"]] = relationship(
         "Registration",
+        foreign_keys="Registration.participant_id",
         back_populates="participant",
         cascade="all, delete-orphan"
     )
