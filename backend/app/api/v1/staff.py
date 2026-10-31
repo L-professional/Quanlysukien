@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import select, update, func, text, desc, and_, or_
+from sqlalchemy import select, update, func, text, desc, and_, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -225,7 +225,7 @@ async def get_staff_dashboard(
             "id": ev.id,
             "title": ev.title,
             "location": ev.location or "Hội trường chính",
-            "banner_url": ev.banner_url,
+            "banner_url": getattr(ev, "cover_image", None),
             "start_time": ev.start_time.isoformat() if ev.start_time else None,
             "end_time": ev.end_time.isoformat() if ev.end_time else None,
             "status": ev.status or "PUBLISHED",
@@ -364,11 +364,11 @@ async def get_staff_assigned_events(
             "title": ev.title,
             "description": ev.description,
             "location": ev.location or "Hội trường trung tâm",
-            "banner_url": ev.banner_url,
+            "banner_url": getattr(ev, "cover_image", None),
             "start_time": ev.start_time.isoformat() if ev.start_time else None,
             "end_time": ev.end_time.isoformat() if ev.end_time else None,
             "status": ev.status or "PUBLISHED",
-            "category": ev.category or "Hội thảo",
+            "category": getattr(ev, "event_type", "Hội thảo"),
             "duty_role": duty_role,
             "duty_status": duty_status,
             "duty_notes": duty_notes,
@@ -412,7 +412,7 @@ async def get_staff_event_detail(
         "title": event.title,
         "description": event.description,
         "location": event.location,
-        "banner_url": event.banner_url,
+        "banner_url": getattr(event, "cover_image", None),
         "start_time": event.start_time.isoformat() if event.start_time else None,
         "end_time": event.end_time.isoformat() if event.end_time else None,
         "status": event.status,
@@ -892,7 +892,7 @@ async def get_staff_operational_reports(
         select(
             Registration.ticket_type,
             func.count(Registration.id).label("total"),
-            func.sum(func.cast(Registration.is_checked_in, func.int4)).label("checked_in")
+            func.sum(case((Registration.is_checked_in == True, 1), else_=0)).label("checked_in")
         )
         .where(Registration.event_id.in_(target_ids))
         .group_by(Registration.ticket_type)
