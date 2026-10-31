@@ -27,6 +27,12 @@ const pathToTab: Record<string, string> = {
   '/users': 'users',
   '/logs': 'logs',
   '/speaker/dashboard': 'speaker',
+  '/manager/sessions': 'manager-sessions',
+  '/manager/tickets': 'manager-tickets',
+  '/manager/attendees': 'manager-attendees',
+  '/manager/speakers': 'manager-speakers',
+  '/manager/staff': 'manager-staff',
+  '/notifications': 'notifications',
   '/settings': 'settings',
 };
 
@@ -44,6 +50,12 @@ const tabToPath: Record<string, string> = {
   users: '/users',
   logs: '/logs',
   speaker: '/speaker/dashboard',
+  'manager-sessions': '/manager/sessions',
+  'manager-tickets': '/manager/tickets',
+  'manager-attendees': '/manager/attendees',
+  'manager-speakers': '/manager/speakers',
+  'manager-staff': '/manager/staff',
+  notifications: '/notifications',
   settings: '/settings',
 };
 

@@ -535,6 +535,135 @@ export interface CampaignAnalyticsOverview {
   click_rate_pct: number;
 }
 
+export interface ManagerKPIs {
+  total_managed_events: number;
+  draft_events: number;
+  upcoming_events: number;
+  ongoing_events: number;
+  completed_events: number;
+  cancelled_events: number;
+  total_tickets_sold: number;
+  total_registrations: number;
+  total_checked_in: number;
+  checkin_completion_rate: number;
+  total_event_revenue: number;
+  pending_payments: number;
+  assigned_speakers: number;
+  assigned_staff: number;
+}
+
+export interface ManagerAttentionEvent {
+  id: number;
+  title: string;
+  type: string;
+  message: string;
+  severity: 'warning' | 'info' | 'error';
+}
+
+export interface ManagerRecentRegistration {
+  id: number;
+  full_name: string;
+  email: string;
+  event_title: string;
+  ticket_type: string;
+  price: number;
+  is_checked_in: boolean;
+  created_at: string;
+}
+
+export interface ManagerUpcomingSession {
+  id: number;
+  event_id: number;
+  event_title: string;
+  title: string;
+  speaker_name: string;
+  room_location: string;
+  start_time: string;
+  end_time: string;
+  capacity: number;
+  registered_count: number;
+}
+
+export interface ManagerDashboardData {
+  kpis: ManagerKPIs;
+  events_requiring_attention: ManagerAttentionEvent[];
+  recent_registrations: ManagerRecentRegistration[];
+  upcoming_sessions: ManagerUpcomingSession[];
+  ticket_type_distribution: { name: string; value: number }[];
+  registration_trends: { date: string; count: number }[];
+}
+
+export interface ManagerSessionItem {
+  id: number;
+  event_id: number;
+  title: string;
+  description?: string;
+  speaker_name: string;
+  speaker_role?: string;
+  start_time: string;
+  end_time: string;
+  room_location: string;
+  day_number: number;
+  date_label: string;
+  track: string;
+  capacity: number;
+  registered_count: number;
+  has_conflict?: boolean;
+  conflict_reason?: string | null;
+}
+
+export interface ManagerTicketItem {
+  id: number;
+  event_id: number;
+  event_title: string;
+  ticket_type: string;
+  buyer_name: string;
+  buyer_email: string;
+  price: number;
+  qr_code_token: string;
+  is_checked_in: boolean;
+  payment_status: string;
+  created_at: string;
+}
+
+export interface ManagerAttendeeItem {
+  id: number;
+  event_id: number;
+  event_title: string;
+  full_name: string;
+  email: string;
+  phone?: string;
+  company?: string;
+  job_title?: string;
+  ticket_type: string;
+  price: number;
+  qr_code_token: string;
+  is_checked_in: boolean;
+  checked_in_at?: string | null;
+  created_at?: string | null;
+}
+
+export interface ManagerStaffItem {
+  id: number;
+  full_name: string;
+  email: string;
+  phone_number?: string;
+  is_active: boolean;
+  assigned_task: string;
+  status: string;
+  scanned_count: number;
+}
+
+export interface ManagerSpeakerItem {
+  id: number;
+  name: string;
+  role: string;
+  sessions_count: number;
+  sessions: { id: number; title: string; room_location: string; start_time: string }[];
+  status: 'INVITED' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CONFIRMED';
+  avatar_url?: string;
+}
+
 
 
 

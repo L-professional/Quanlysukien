@@ -55,6 +55,12 @@ class Event(Base, TimestampMixin):
     homepage_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
     cancelled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    organizer_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
     
     status: Mapped[str] = mapped_column(
         String(50),

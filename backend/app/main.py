@@ -156,7 +156,54 @@ async def lifespan(app: FastAPI):
                 ))
             # Ensure event_knowledge_base view for 100% backward compatibility (Task 101)
             await conn.execute(text("CREATE OR REPLACE VIEW event_knowledge_base AS SELECT * FROM knowledge_base;"))
-        print("User, Registration, Event columns & event_knowledge_base view ensured.")
+
+            # Manager Module Safe Migrations (Task: Manager Module)
+            await conn.execute(text(
+                "ALTER TABLE events ADD COLUMN IF NOT EXISTS organizer_id INTEGER REFERENCES users(id) ON DELETE SET NULL;"
+            ))
+            await conn.execute(text(
+                "UPDATE events SET organizer_id = 2 WHERE organizer_id IS NULL;"
+            ))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS event_staff_assignments (
+                    id SERIAL PRIMARY KEY,
+                    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+                    staff_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    task_name VARCHAR(100) NOT NULL DEFAULT 'Soát vé QR',
+                    status VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+                    assigned_at TIMESTAMPTZ DEFAULT NOW(),
+                    notes TEXT NULL,
+                    UNIQUE(event_id, staff_id, task_name)
+                );
+            """))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS event_speaker_invitations (
+                    id SERIAL PRIMARY KEY,
+                    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+                    speaker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    session_id INTEGER NULL REFERENCES event_schedules(id) ON DELETE SET NULL,
+                    status VARCHAR(50) NOT NULL DEFAULT 'CONFIRMED',
+                    invited_at TIMESTAMPTZ DEFAULT NOW(),
+                    responded_at TIMESTAMPTZ NULL,
+                    notes TEXT NULL,
+                    UNIQUE(event_id, speaker_id, session_id)
+                );
+            """))
+            await conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS event_ticket_tiers (
+                    id SERIAL PRIMARY KEY,
+                    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+                    name VARCHAR(100) NOT NULL,
+                    price INTEGER NOT NULL DEFAULT 500000,
+                    quantity INTEGER NOT NULL DEFAULT 100,
+                    sold_count INTEGER NOT NULL DEFAULT 0,
+                    description TEXT NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                );
+            """))
+        print("User, Registration, Event columns, Manager tables & event_knowledge_base view ensured.")
 
     except Exception as e:
         print(f"Warning: Column migration skipped: {e}")

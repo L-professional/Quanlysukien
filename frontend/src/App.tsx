@@ -23,6 +23,12 @@ import { SpeakerDashboard } from './pages/SpeakerDashboard';
 import { SpeakerControlCenter } from './pages/SpeakerControlCenter';
 import { LandingPage } from './pages/LandingPage';
 import { Settings } from './pages/Settings';
+import { ManagerSessions } from './pages/ManagerSessions';
+import { ManagerTickets } from './pages/ManagerTickets';
+import { ManagerAttendees } from './pages/ManagerAttendees';
+import { ManagerSpeakers } from './pages/ManagerSpeakers';
+import { ManagerStaff } from './pages/ManagerStaff';
+import { NotificationsPage } from './pages/NotificationsPage';
 
 const AppRoutes: React.FC = () => {
   const navigate = useNavigate();
@@ -231,12 +237,80 @@ const AppRoutes: React.FC = () => {
           }
         />
 
+        {/* Manager Dedicated Submodules */}
+        <Route
+          path="manager/sessions"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'ORGANIZER']}
+              redirectTo="/dashboard"
+            >
+              <ManagerSessions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="manager/tickets"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'ORGANIZER']}
+              redirectTo="/dashboard"
+            >
+              <ManagerTickets />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="manager/attendees"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'ORGANIZER']}
+              redirectTo="/dashboard"
+            >
+              <ManagerAttendees />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="manager/speakers"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'ORGANIZER']}
+              redirectTo="/dashboard"
+            >
+              <ManagerSpeakers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="manager/staff"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'ORGANIZER']}
+              redirectTo="/dashboard"
+            >
+              <ManagerStaff />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="notifications"
+          element={
+            <ProtectedRoute
+              allowedRoles={['SUPER_ADMIN', 'ADMIN', 'EVENT_MANAGER', 'ORGANIZER', 'STAFF', 'SPEAKER', 'ATTENDEE']}
+              redirectTo="/dashboard"
+            >
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Settings — All authenticated roles (Task 65) */}
         <Route
           path="settings"
           element={
             <ProtectedRoute
-              allowedRoles={['ADMIN', 'SUPER_ADMIN', 'EVENT_MANAGER', 'SPEAKER', 'ATTENDEE', 'STAFF']}
+              allowedRoles={['ADMIN', 'SUPER_ADMIN', 'EVENT_MANAGER', 'ORGANIZER', 'SPEAKER', 'ATTENDEE', 'STAFF']}
               redirectTo="/login"
             >
               <Settings />

@@ -2,14 +2,14 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Calendar, Clock, CloudRain, Sun, CloudSun, Users, Mic, QrCode, ArrowUpRight, ArrowDownRight,
   Plus, ScanLine, Sparkles, UserPlus, FileText, CheckCircle2, XCircle, AlertCircle,
-  Mail, ShieldCheck, Database, Star
+  Mail, ShieldCheck, Database, Star, DollarSign, Layers, Ticket
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useRealTimeClock } from '../hooks/useRealTimeClock';
 import { apiService } from '../services/api';
 import { useEventSync } from '../services/eventSync';
 import { cleanEventTitle } from '../components/EventCard';
-import { Event } from '../types';
+import { Event, ManagerDashboardData } from '../types';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -93,6 +93,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | 'quarter' | 'year'>('year');
   const [events, setEvents] = useState<Event[]>([]);
   const [, setLoadingEvents] = useState<boolean>(true);
+  const [managerData, setManagerData] = useState<ManagerDashboardData | null>(null);
+  const [managerSelectedEventId, setManagerSelectedEventId] = useState<number | null>(null);
 
   const roleSubtitle = useMemo(() => {
     switch (currentRole) {
@@ -126,6 +128,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
   useEffect(() => {
     fetchDashboardEvents();
   }, [fetchDashboardEvents]);
+
+  // Load Manager Dashboard data when role is Manager/Organizer
+  useEffect(() => {
+    if (currentRole === 'EVENT_MANAGER' || currentRole === 'ORGANIZER') {
+      const loadManagerDashboard = async () => {
+        try {
+          const mData = await apiService.getManagerDashboard(
+            managerSelectedEventId || undefined,
+            timeRange === 'quarter' ? '90d' : timeRange
+          );
+          setManagerData(mData);
+        } catch (e) {
+          console.warn('Lỗi tải dữ liệu manager dashboard:', e);
+        }
+      };
+      loadManagerDashboard();
+    }
+  }, [currentRole, managerSelectedEventId, timeRange]);
 
   // Real-time synchronization whenever events are updated, created, or deleted across the system
   useEventSync(fetchDashboardEvents);
@@ -238,11 +258,44 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
       ];
     }
     if (currentRole === 'EVENT_MANAGER' || currentRole === 'ORGANIZER') {
+      const kpis = managerData?.kpis;
       return [
-        { title: 'Sự kiện phụ trách', value: totalEventsCount.toLocaleString('vi-VN'), growth: '+8%', isUp: true, icon: Calendar, color: 'text-[#DC2626]', bg: 'bg-red-50' },
-        { title: 'Lượt khách đăng ký', value: totalAttendeesCount, growth: '+24%', isUp: true, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { title: 'Sắp diễn ra tuần này', value: upcomingCount.toLocaleString('vi-VN'), growth: '+3%', isUp: true, icon: Clock, color: 'text-purple-600', bg: 'bg-purple-50' },
-        { title: 'Chiến dịch email Resend', value: '3 chiến dịch', growth: '+15%', isUp: true, icon: Mail, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        {
+          title: 'Sự kiện phụ trách',
+          value: kpis ? String(kpis.total_managed_events) : totalEventsCount.toLocaleString('vi-VN'),
+          growth: kpis ? `${kpis.upcoming_events} sắp tới` : '+8%',
+          isUp: true,
+          icon: Calendar,
+          color: 'text-[#DC2626]',
+          bg: 'bg-red-50'
+        },
+        {
+          title: 'Lượt khách đăng ký / Vé bán',
+          value: kpis ? kpis.total_registrations.toLocaleString('vi-VN') : totalAttendeesCount,
+          growth: kpis ? `${kpis.total_tickets_sold} vé` : '+24%',
+          isUp: true,
+          icon: Users,
+          color: 'text-blue-600',
+          bg: 'bg-blue-50'
+        },
+        {
+          title: 'Doanh thu sự kiện',
+          value: kpis ? `${kpis.total_event_revenue.toLocaleString('vi-VN')} đ` : '0 đ',
+          growth: kpis?.pending_payments ? `${kpis.pending_payments} chờ thu` : 'Đã thanh toán',
+          isUp: true,
+          icon: DollarSign,
+          color: 'text-emerald-600',
+          bg: 'bg-emerald-50'
+        },
+        {
+          title: 'Tiến độ check-in vào cổng',
+          value: kpis ? `${kpis.checkin_completion_rate}%` : '96.4%',
+          growth: kpis ? `${kpis.total_checked_in} đã vào` : '+15%',
+          isUp: true,
+          icon: QrCode,
+          color: 'text-purple-600',
+          bg: 'bg-purple-50'
+        },
       ];
     }
     if (currentRole === 'STAFF') {
@@ -282,9 +335,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
     if (currentRole === 'EVENT_MANAGER' || currentRole === 'ORGANIZER') {
       return [
         { label: 'Tạo sự kiện mới', tab: 'events', icon: Plus, color: 'text-[#DC2626]', bg: 'bg-[#DC2626]/10', hoverBorder: 'hover:border-[#DC2626] hover:bg-red-50/50' },
-        { label: 'Chiến dịch Email Resend', tab: 'campaigns', icon: Mail, color: 'text-emerald-600', bg: 'bg-emerald-50', hoverBorder: 'hover:border-emerald-500 hover:bg-emerald-50/50' },
-        { label: 'AI PR Studio', tab: 'content-studio', icon: Sparkles, color: 'text-purple-600', bg: 'bg-purple-50', hoverBorder: 'hover:border-purple-500 hover:bg-purple-50/50' },
-        { label: 'Báo cáo & Phân tích', tab: 'reports', icon: Sparkles, color: 'text-white', bg: 'bg-[#12213A]', isDark: true },
+        { label: 'Lịch trình & Phiên', tab: 'manager-sessions', icon: Layers, color: 'text-indigo-600', bg: 'bg-indigo-50', hoverBorder: 'hover:border-indigo-500 hover:bg-indigo-50/50' },
+        { label: 'Quản lý vé & Doanh thu', tab: 'manager-tickets', icon: Ticket, color: 'text-emerald-600', bg: 'bg-emerald-50', hoverBorder: 'hover:border-emerald-500 hover:bg-emerald-50/50' },
+        { label: 'Người tham dự & Check-in', tab: 'manager-attendees', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', hoverBorder: 'hover:border-blue-500 hover:bg-blue-50/50' },
       ];
     }
     if (currentRole === 'STAFF') {
@@ -324,29 +377,76 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigateTab }) => {
           <p className="text-[#64748B] mt-1 font-medium">{roleSubtitle}</p>
         </div>
         
-        <div className="flex items-center gap-4 bg-white px-4 py-2.5 rounded-xl border border-[#E5EAF2] shadow-sm select-none">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-[#DC2626]" />
-            <span className="text-[13px] font-bold text-[#12213A]">{dateFormatted}</span>
-          </div>
-          <div className="w-px h-4 bg-[#E5EAF2]"></div>
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-slate-400" />
-            <span className="text-[13px] font-bold text-[#12213A] font-mono">{timeString12}</span>
-          </div>
-          <div className="w-px h-4 bg-[#E5EAF2]"></div>
-          <div className="flex items-center gap-2">
-            {weather.condition === 'sunny' ? (
-              <Sun className="w-4 h-4 text-amber-500 animate-spin-slow" />
-            ) : weather.condition === 'rain' ? (
-              <CloudRain className="w-4 h-4 text-blue-500" />
-            ) : (
-              <CloudSun className="w-4 h-4 text-sky-500" />
-            )}
-            <span className="text-[13px] font-bold text-[#12213A]">{weather.tempText}</span>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Manager Event Filter */}
+          {(currentRole === 'EVENT_MANAGER' || currentRole === 'ORGANIZER') && (
+            <select
+              value={managerSelectedEventId || ''}
+              onChange={(e) => setManagerSelectedEventId(e.target.value ? Number(e.target.value) : null)}
+              className="px-3 py-2 bg-white border border-[#E5EAF2] rounded-xl text-xs font-semibold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+            >
+              <option value="">Tất cả sự kiện quản lý ({safeEvents.length})</option>
+              {safeEvents.map((ev) => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.title}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <div className="flex items-center gap-4 bg-white px-4 py-2.5 rounded-xl border border-[#E5EAF2] shadow-sm select-none">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-[#DC2626]" />
+              <span className="text-[13px] font-bold text-[#12213A]">{dateFormatted}</span>
+            </div>
+            <div className="w-px h-4 bg-[#E5EAF2]"></div>
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-slate-400" />
+              <span className="text-[13px] font-bold text-[#12213A] font-mono">{timeString12}</span>
+            </div>
+            <div className="w-px h-4 bg-[#E5EAF2]"></div>
+            <div className="flex items-center gap-2">
+              {weather.condition === 'sunny' ? (
+                <Sun className="w-4 h-4 text-amber-500 animate-spin-slow" />
+              ) : weather.condition === 'rain' ? (
+                <CloudRain className="w-4 h-4 text-blue-500" />
+              ) : (
+                <CloudSun className="w-4 h-4 text-sky-500" />
+              )}
+              <span className="text-[13px] font-bold text-[#12213A]">{weather.tempText}</span>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Manager Attention Banner */}
+      {(currentRole === 'EVENT_MANAGER' || currentRole === 'ORGANIZER') &&
+        managerData?.events_requiring_attention &&
+        managerData.events_requiring_attention.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-sm font-bold text-amber-900">
+                  Sự kiện cần bạn lưu ý ({managerData.events_requiring_attention.length})
+                </h4>
+                <div className="mt-1 space-y-1">
+                  {managerData.events_requiring_attention.map((att, idx) => (
+                    <p key={idx} className="text-xs text-amber-800">
+                      • <span className="font-semibold">{att.title}</span>: {att.message}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => onNavigateTab?.('manager-tickets')}
+              className="px-3 py-1.5 text-xs font-semibold text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-lg transition shrink-0"
+            >
+              Kiểm tra ngay
+            </button>
+          </div>
+        )}
 
       {/* 2. KPI CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

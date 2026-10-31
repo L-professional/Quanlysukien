@@ -27,7 +27,12 @@ import {
   CampaignAnalyticsOverview,
   Speaker,
   TicketTier,
-
+  ManagerDashboardData,
+  ManagerSessionItem,
+  ManagerTicketItem,
+  ManagerAttendeeItem,
+  ManagerStaffItem,
+  ManagerSpeakerItem,
 } from '../types';
 import { matchesStatusFilter } from '../utils/eventStatus';
 import { FALLBACK_EVENTS } from '../data/mockEvents';
@@ -3382,6 +3387,115 @@ export const apiService = {
 
   async unsubscribeRecipient(payload: { token: string; reason?: string }): Promise<{ status: string; message: string; unsubscribed_at?: string }> {
     const response = await apiClient.post('/campaigns/unsubscribe', payload);
+    return response.data;
+  },
+
+  // =========================================================================
+  // Manager – Event Operations APIs
+  // =========================================================================
+  async getManagerDashboard(eventId?: number, timeRange: string = '30d'): Promise<ManagerDashboardData> {
+    const params: Record<string, any> = { range: timeRange };
+    if (eventId) params.event_id = eventId;
+    const response = await apiClient.get<ManagerDashboardData>('/manager/dashboard', { params });
+    return response.data;
+  },
+
+  async getManagerEvents(): Promise<Event[]> {
+    const response = await apiClient.get<Event[]>('/manager/events');
+    return response.data;
+  },
+
+  async getManagerSessions(eventId?: number): Promise<ManagerSessionItem[]> {
+    const params: Record<string, any> = {};
+    if (eventId) params.event_id = eventId;
+    const response = await apiClient.get<ManagerSessionItem[]>('/manager/sessions', { params });
+    return response.data;
+  },
+
+  async validateSessionConflict(payload: {
+    event_id: number;
+    speaker_name: string;
+    room_location: string;
+    start_time: string;
+    end_time: string;
+    day_number?: number;
+    session_id?: number;
+  }): Promise<{ has_conflict: boolean; conflict_reason?: string; message: string }> {
+    const response = await apiClient.post('/manager/sessions/validate-conflict', payload);
+    return response.data;
+  },
+
+  async getManagerTickets(eventId?: number, status?: string): Promise<ManagerTicketItem[]> {
+    const params: Record<string, any> = {};
+    if (eventId) params.event_id = eventId;
+    if (status) params.status = status;
+    const response = await apiClient.get<ManagerTicketItem[]>('/manager/tickets', { params });
+    return response.data;
+  },
+
+  async getManagerAttendees(params?: {
+    event_id?: number;
+    search?: string;
+    ticket_type?: string;
+    is_checked_in?: boolean;
+    page?: number;
+    limit?: number;
+  }): Promise<ManagerAttendeeItem[]> {
+    const response = await apiClient.get<ManagerAttendeeItem[]>('/manager/attendees', { params });
+    return response.data;
+  },
+
+  async toggleAttendeeCheckIn(attendeeId: number): Promise<{ success: boolean; is_checked_in: boolean; checked_in_at?: string; message: string }> {
+    const response = await apiClient.post(`/manager/attendees/${attendeeId}/toggle-checkin`);
+    return response.data;
+  },
+
+  async getManagerSpeakers(eventId?: number): Promise<ManagerSpeakerItem[]> {
+    const params: Record<string, any> = {};
+    if (eventId) params.event_id = eventId;
+    const response = await apiClient.get<ManagerSpeakerItem[]>('/manager/speakers', { params });
+    return response.data;
+  },
+
+  async inviteManagerSpeaker(payload: {
+    event_id: number;
+    name: string;
+    email: string;
+    role?: string;
+    topic?: string;
+    session_title?: string;
+  }): Promise<{ success: boolean; message: string; speaker: any }> {
+    const response = await apiClient.post('/manager/speakers/invite', payload);
+    return response.data;
+  },
+
+  async getManagerStaff(eventId?: number): Promise<ManagerStaffItem[]> {
+    const params: Record<string, any> = {};
+    if (eventId) params.event_id = eventId;
+    const response = await apiClient.get<ManagerStaffItem[]>('/manager/staff', { params });
+    return response.data;
+  },
+
+  async assignManagerStaff(payload: {
+    event_id: number;
+    user_id: number;
+    assigned_role?: string;
+    assigned_task?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post('/manager/staff/assign', payload);
+    return response.data;
+  },
+
+  async getManagerCheckInStats(eventId?: number): Promise<{
+    total_attendees: number;
+    checked_in_count: number;
+    pending_count: number;
+    completion_rate: number;
+    hourly_distribution: Array<{ hour: string; count: number }>;
+  }> {
+    const params: Record<string, any> = {};
+    if (eventId) params.event_id = eventId;
+    const response = await apiClient.get('/manager/check-in/stats', { params });
     return response.data;
   },
 };

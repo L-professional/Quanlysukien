@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 import { 
   LayoutDashboard, Calendar, Mic, QrCode, MessageSquare, 
   Sparkles, Database, Star, Users, ShieldCheck, 
-  Settings as SettingsIcon, Zap, X, ChevronDown, PieChart, Mail
+  Settings as SettingsIcon, Zap, X, ChevronDown, PieChart, Mail,
+  Bell, Layers, Ticket, UserCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
@@ -133,8 +134,111 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ], []);
 
+  // Dedicated 15-item navigation for Manager (Task Master Prompt)
+  const managerMenuItems: MenuItem[] = useMemo(() => [
+    {
+      id: 'dashboard',
+      label: 'Tổng quan',
+      icon: LayoutDashboard,
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'events',
+      label: 'Quản lý sự kiện',
+      icon: Calendar,
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'manager-sessions',
+      label: 'Lịch trình và phiên',
+      icon: Layers,
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'manager-tickets',
+      label: 'Quản lý vé',
+      icon: Ticket,
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'manager-attendees',
+      label: 'Người tham dự',
+      icon: UserCheck,
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'manager-speakers',
+      label: 'Quản lý diễn giả',
+      icon: Mic,
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'manager-staff',
+      label: 'Quản lý nhân viên',
+      icon: Users,
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'scanner',
+      label: 'Giám sát Check-in',
+      icon: QrCode,
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'content-studio',
+      label: 'AI PR Studio',
+      icon: Sparkles,
+      badge: 'AI',
+      badgeColor: 'bg-[#DC2626] text-white',
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'campaigns',
+      label: 'Chiến dịch Email',
+      icon: Mail,
+      badge: 'Mới',
+      badgeColor: 'bg-emerald-600 text-white',
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'inquiries',
+      label: 'Trợ lý sự kiện AI',
+      icon: MessageSquare,
+      badge: 'AI',
+      badgeColor: 'bg-[#DC2626] text-white',
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'feedback',
+      label: 'Đánh giá và phản hồi',
+      icon: Star,
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'reports',
+      label: 'Phân tích và báo cáo',
+      icon: PieChart,
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'notifications',
+      label: 'Thông báo',
+      icon: Bell,
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+    {
+      id: 'settings',
+      label: 'Hồ sơ cá nhân',
+      icon: SettingsIcon,
+      allowedRoles: ['EVENT_MANAGER', 'ORGANIZER'],
+    },
+  ], []);
+
   // Filter based on allowedRoles: items with insufficient permissions are completely removed
   const visibleMenuItems = useMemo(() => {
+    if (currentRole === 'EVENT_MANAGER' || currentRole === 'ORGANIZER') {
+      return managerMenuItems;
+    }
     const list = Array.isArray(menuItems) ? menuItems : [];
     return list.filter((item) => {
       const allowed = item.allowedRoles || (item.requiresRole as UserRole[]);
@@ -148,7 +252,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         (currentRole === 'ATTENDEE' && allowed.includes('PARTICIPANT' as any))
       );
     });
-  }, [menuItems, currentRole]);
+  }, [menuItems, managerMenuItems, currentRole]);
 
   // Actor Workspace Metadata
   const actorInfo = useMemo(() => {

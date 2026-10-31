@@ -20,9 +20,11 @@ from app.api.v1.campaigns import router as campaigns_router
 from app.api.v1.webhooks import router as webhooks_router
 from app.api.v1.invitations import router as invitations_router
 from app.api.v1.system_time import router as system_time_router
+from app.api.v1.manager import router as manager_router
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(system_time_router)
+api_v1_router.include_router(manager_router)
 api_v1_router.include_router(auth_router)
 api_v1_router.include_router(users_router)
 api_v1_router.include_router(reports_router, prefix="/reports")
