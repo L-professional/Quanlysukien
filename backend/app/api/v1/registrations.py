@@ -257,12 +257,13 @@ async def verify_check_in(
     # Record check-in audit log
     try:
         from app.models.ai_log import AILog
+        staff_user_id = current_user.id if hasattr(current_user, "id") and isinstance(current_user.id, int) else "ANON"
         ai_log = AILog(
             task_type="QR_CHECK_IN",
             prompt_tokens=0,
             completion_tokens=0,
             latency_ms=10.5,
-            staff_action=f"CHECKIN_SUCCESS_REG_{registration.id}_BY_{current_user.id if current_user else 'ANON'}"
+            staff_action=f"CHECKIN_SUCCESS_REG_{registration.id}_BY_{staff_user_id}"
         )
         db.add(ai_log)
     except Exception as e:

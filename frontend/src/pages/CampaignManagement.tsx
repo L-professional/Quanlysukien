@@ -584,11 +584,16 @@ export const CampaignManagement: React.FC = () => {
       if (res.is_simulated) {
         toast.info(`[Chế độ xem trước] Đã tạo email thử nghiệm đến ${testEmailAddress} (ID: ${res.provider_message_id})`);
       } else {
-        toast.success(`Đã gửi email thử nghiệm đến ${testEmailAddress} qua Resend thành công!`);
+        toast.success(`Đã gửi email thử nghiệm kèm vé QR đến ${testEmailAddress} thành công!`);
       }
       setIsTestEmailModalOpen(false);
     } catch (err: any) {
-      toast.error(err.response?.data?.detail || 'Gửi email thử nghiệm thất bại.');
+      const errMsg =
+        err.response?.data?.detail ||
+        (err.code === 'ECONNABORTED'
+          ? 'Thời gian chờ gửi thư quá lâu (Timeout). Vui lòng thử lại.'
+          : err.message || 'Gửi email thử nghiệm thất bại.');
+      toast.error(errMsg);
     } finally {
       setIsSendingTest(false);
     }
@@ -1564,20 +1569,20 @@ export const CampaignManagement: React.FC = () => {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:bg-white focus:border-indigo-500 focus:outline-none"
               />
 
-              {/* Sandbox notice & quick-fill button */}
-              <div className="mt-2.5 p-3 bg-amber-50 rounded-xl border border-amber-200/80 text-[11px] text-amber-900 space-y-1.5">
-                <div className="flex items-center gap-1.5 font-bold text-amber-800">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span>Quy định gửi thử nghiệm Resend (Tài khoản thử nghiệm):</span>
+              {/* SMTP active notice */}
+              <div className="mt-2.5 p-3 bg-emerald-50 rounded-xl border border-emerald-200/80 text-[11px] text-emerald-900 space-y-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-emerald-800">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Đã kết nối Gmail SMTP &amp; Cấp vé QR tự động:</span>
                 </div>
-                <p className="leading-relaxed text-amber-700">
-                  Do cổng Resend chưa hoàn tất xác thực tên miền riêng, hệ thống đang chạy chế độ thử nghiệm an toàn và <strong>chỉ cho phép gửi đến địa chỉ email đăng ký tài khoản Resend</strong> (<code>giachien616@gmail.com</code>).
+                <p className="leading-relaxed text-emerald-700">
+                  Hệ thống hỗ trợ gửi thử nghiệm đến <strong>bất kỳ địa chỉ email nào</strong> (Gmail, Outlook, Edu...). Mỗi email gửi đi đều được tự động tạo vé QR hợp lệ quét được tại cổng soát vé.
                 </p>
                 <div className="pt-1 flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => setTestEmailAddress('giachien616@gmail.com')}
-                    className="px-2.5 py-1 bg-amber-200 hover:bg-amber-300 rounded-lg text-amber-900 font-bold text-[10px] transition-colors cursor-pointer"
+                    className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 rounded-lg text-emerald-900 font-bold text-[10px] transition-colors cursor-pointer"
                   >
                     👉 Bấm để điền nhanh: giachien616@gmail.com
                   </button>

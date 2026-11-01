@@ -2693,7 +2693,7 @@ export const apiService = {
     event_name?: string;
   }): Promise<{ success: boolean; channel: string; recipient: string; sent_at: string; message: string; previewUrl?: string | null }> {
     try {
-      const res = await apiClient.post<any>('/ai/dispatch-test', payload);
+      const res = await apiClient.post<any>('/ai/dispatch-test', payload, { timeout: 45000 });
       return res.data;
     } catch (err: any) {
       if (!err.response && payload.channel === 'email') {
@@ -2703,7 +2703,7 @@ export const apiService = {
             subject: payload.subject,
             custom_message: payload.content,
             event_title: payload.event_name,
-          });
+          }, { timeout: 45000 });
           return fallbackRes.data;
         } catch (fbErr: any) {
           throw fbErr?.response ? fbErr : err;
@@ -2720,7 +2720,7 @@ export const apiService = {
     event_title?: string;
     recipient_name?: string;
   }): Promise<{ success: boolean; message: string; previewUrl?: string | null }> {
-    const res = await apiClient.post<any>('/email/send-test', payload);
+    const res = await apiClient.post<any>('/email/send-test', payload, { timeout: 45000 });
     return res.data;
   },
 
@@ -3432,7 +3432,7 @@ export const apiService = {
     subject?: string;
     html_content?: string;
   }): Promise<{ message: string; provider_message_id?: string; is_simulated?: boolean }> {
-    const response = await apiClient.post(`/campaigns/${id}/test-send`, payload);
+    const response = await apiClient.post(`/campaigns/${id}/test-send`, payload, { timeout: 45000 });
     return response.data;
   },
 

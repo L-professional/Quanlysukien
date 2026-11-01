@@ -438,7 +438,9 @@ class ResendEmailService:
             headers["X-Idempotency-Key"] = idempotency_key
 
         effective_key = (self.api_key or "").strip()
-        smtp_res = _send_via_smtp(to_email, subject, html_content, plain_text, from_address)
+        smtp_res = await asyncio.to_thread(
+            _send_via_smtp, to_email, subject, html_content, plain_text, from_address
+        )
         if smtp_res and smtp_res.get("success"):
             return smtp_res
 
