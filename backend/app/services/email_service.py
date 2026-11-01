@@ -495,15 +495,19 @@ async def send_invitation_email(
             msg["To"] = to_email
             msg.attach(MIMEText(html_content, "html", "utf-8"))
 
+            import email.utils
+            envelope_from = email.utils.parseaddr(cfg["from"])[1] or cfg["user"]
+            envelope_to = email.utils.parseaddr(to_email)[1] or to_email.strip()
+
             if cfg["secure"] or cfg["port"] == 465:
                 with smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=15) as server:
                     server.login(cfg["user"], cfg["password"])
-                    server.sendmail(cfg["from"], [to_email], msg.as_string())
+                    server.sendmail(envelope_from, [envelope_to], msg.as_string())
             else:
                 with smtplib.SMTP(cfg["host"], cfg["port"], timeout=15) as server:
                     server.starttls()
                     server.login(cfg["user"], cfg["password"])
-                    server.sendmail(cfg["from"], [to_email], msg.as_string())
+                    server.sendmail(envelope_from, [envelope_to], msg.as_string())
 
             logger.info(f"Successfully sent invitation email via SMTP to {to_email}")
             return {

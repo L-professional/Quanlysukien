@@ -322,18 +322,20 @@ def _send_via_smtp(
 
         if plain_text:
             msg.attach(MIMEText(plain_text, "plain", "utf-8"))
-        msg.attach(MIMEText(html_content, "html", "utf-8"))
+        import email.utils
+        envelope_from = email.utils.parseaddr(sender)[1] or cfg.get("user")
+        envelope_to = email.utils.parseaddr(to_email)[1] or to_email.strip()
 
         port = cfg.get("port", 587)
         if cfg.get("secure") or port == 465:
             with smtplib.SMTP_SSL(cfg["host"], port, timeout=15) as server:
                 server.login(cfg["user"], cfg["password"])
-                server.sendmail(sender, [to_email], msg.as_string())
+                server.sendmail(envelope_from, [envelope_to], msg.as_string())
         else:
             with smtplib.SMTP(cfg["host"], port, timeout=15) as server:
                 server.starttls()
                 server.login(cfg["user"], cfg["password"])
-                server.sendmail(sender, [to_email], msg.as_string())
+                server.sendmail(envelope_from, [envelope_to], msg.as_string())
 
         mock_id = f"smtp_{uuid.uuid4().hex[:16]}"
         logger.info(f"Successfully delivered email to {to_email} via SMTP ({cfg['host']})")
